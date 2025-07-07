@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration dest="err" status="info" name="XMLConfig" monitorInterval="30">
+    <Properties>
+        <!--       / 是从盘开始   -->
+    </Properties>
+
+    <Appenders>
+
+        <Console name="Console1" target="SYSTEM_OUT">
+            <PatternLayout disableAnsi="false" pattern="%style{%d{yyyy-MM-dd HH:mm:ss:SSS} [%pid]}{black} %highlight{%-6p%r %sn %c{-8}} - %m%n" />
+        </Console>
+
+        <RollingFile name="RollingFile1" fileName="logs/study.log"
+                     filePattern="logs/$${date:yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <Pattern>%d{ISO8601} [%t] %p %c{3} - %m%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="10MB"/> <!-- 默认就是10MB -->
+            </Policies>
+        </RollingFile>
+
+        <Routing name="Routing">
+            <Routes pattern="$${sys:env}">
+                <Route key="pro" ref="RollingFile1" />
+                <!-- env为null, 即defaultRoute -->
+                <Route ref="Console1" />
+            </Routes>
+        </Routing>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Routing" />
+        </Root>
+    </Loggers>
+
+</Configuration>
