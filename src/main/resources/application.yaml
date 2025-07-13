@@ -2,14 +2,33 @@ logging:
   config: "classpath:config/log4j2.xml"
 
 spring:
+  application:
+    name: study
+  datasource:
+    username: root
+    password: root
+    url: jdbc:mysql://192.168.56.10:3306/study?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     date-format: "yyyy-MM-dd HH:mm:ss"
     time-zone: GMT+8
+    deserialization:
+      fail-on-unknown-properties: false
+  redis:
+    host: 192.168.56.10
+    port: 6379
 
+mybatis:
+  mapper-locations: "classpath:mybatis/mapper/*.xml"
+  type-aliases-package: "com.kwang.study.pojo"
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl  # console 输出，部署时要改为log4j2
+    log-prefix: study.mybatis.
 
-
-
-
+kwang:
+  filestorage:
+    file-path: filedata
 
 
 
