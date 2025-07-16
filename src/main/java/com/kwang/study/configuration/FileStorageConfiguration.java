@@ -15,8 +15,13 @@ public class FileStorageConfiguration {
     @Autowired
     private AppConfig appConfig;
 
-    @Bean
+    @Bean("fileStorage")
     public FileStorage fileStorage() throws URISyntaxException, IOException {
         return new LocalFileStorage(appConfig.getFileStorage().getFilePath());
+    }
+
+    @Bean("chunkStorage")
+    public FileStorage chunkStorage() throws URISyntaxException, IOException {
+        return new LocalFileStorage(appConfig.getFileStorage().getChunkPath());
     }
 }

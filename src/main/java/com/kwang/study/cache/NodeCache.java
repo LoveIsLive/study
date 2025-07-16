@@ -1,12 +1,16 @@
 package com.kwang.study.cache;
 
+import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.pojo.Node;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Component
 public class NodeCache {
@@ -61,6 +65,12 @@ public class NodeCache {
 
     public List<Node> getRootChildren() {
         return (List<Node>) redisTemplate.opsForValue().get(ROOT_KEY);
+    }
+
+    public void batchDeleteNodeCache(List<Node> nodes) {
+        List<String> collect = nodes.stream().map(node -> (Objects.equals(node.getType(), NodeTypeEnum.DIR.getCode()) ?
+                NODE_KEY_PREFIX : CHILDREN_KEY_PREFIX) + node.getId()).collect(Collectors.toList());
+        redisTemplate.delete(collect);
     }
 
 }

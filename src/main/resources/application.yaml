@@ -29,6 +29,7 @@ mybatis:
 kwang:
   filestorage:
     file-path: filedata
+    chunk-path: filedata/chunk
 
 
 

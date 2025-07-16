@@ -2,6 +2,7 @@ package com.kwang.study.filesystem;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -50,5 +51,17 @@ public class LocalFileStorage implements FileStorage {
     public boolean contains(String key) {
         Path path = dir.resolve(key);
         return Files.exists(path);
+    }
+
+    @Override
+    public void createFile(String key) throws IOException {
+        Path path = dir.resolve(key);
+        Files.createFile(path);
+    }
+
+    @Override
+    public OutputStream openFile(String key) throws IOException {
+        Path path = dir.resolve(key);
+        return Files.newOutputStream(path);
     }
 }

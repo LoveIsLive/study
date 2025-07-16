@@ -18,6 +18,7 @@ public class FileTest {
 //        stream.close();
 //        System.out.println(path.toAbsolutePath().toUri());
 
-        System.out.println(Paths.get("./filedata").toAbsolutePath());
+//        System.out.println(Paths.get("./filedata").toAbsolutePath());
+        System.out.println(String.valueOf(Long.MAX_VALUE).length());
     }
 }

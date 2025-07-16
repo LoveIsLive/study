@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.mapper.FileChunkMapper">
+
+    <insert id="insertChunk">
+        INSERT INTO file_chunk (
+            file_id, chunk_index, key, status, size
+        ) VALUES (
+                     #{fileId}, #{chunkIndex}, #{key}, #{status}, #{size}
+                 )
+    </insert>
+
+    <select id="selectAllByFileIdOrderByChunkIndex" resultType="com.kwang.study.pojo.FileChunk">
+        SELECT * FROM file_chunk
+        WHERE file_id = #{fileId}
+        ORDER BY chunk_index ASC
+    </select>
+
+    <update id="updateAllStatusByFileId">
+        UPDATE file_chunk
+        SET status = #{status}
+        WHERE file_id = #{fileId}
+    </update>
+
+    <delete id="deleteByFileId">
+        DELETE FROM file_chunk WHERE file_id = #{fileId}
+    </delete>
+
+</mapper>

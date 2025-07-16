@@ -2,6 +2,7 @@ package com.kwang.study.filesystem;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 public interface FileStorage {
 
@@ -24,4 +25,12 @@ public interface FileStorage {
     返回存储中是否包含这个key
      */
     boolean contains(String key);
+
+    /*
+    新建一个文件
+     */
+    void createFile(String key) throws IOException;
+
+
+    OutputStream openFile(String key) throws IOException;
 }

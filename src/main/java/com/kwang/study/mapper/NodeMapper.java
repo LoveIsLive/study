@@ -13,15 +13,16 @@ public interface NodeMapper {
 
     Node selectNodeById(Long id);
 
-    List<Node> selectChildrenByParentId(Long parentId);
+    List<Node> selectChildrenByParentId(@Param("parentId") Long parentId,
+                                        @Param("types") List<Integer> types);
 
-    List<Node> selectRootChildren();
+    List<Node> selectRootChildren(List<Integer> types);
 
     Node selectNodeByParentIdAndName(@Param("parentId") Long parentId, @Param("name") String name);
 
     int deleteNodeById(Long id);
 
-    int deleteNodeByIds(@Param("ids") List<Long> ids);
+    int batchDeleteNodeByIds(@Param("ids") List<Long> ids);
 
     int updateNodeForFile(@Param("id") Long id,
                           @Param("refPath") String refPath,

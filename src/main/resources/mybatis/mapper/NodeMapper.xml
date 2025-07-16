@@ -14,11 +14,17 @@
     </select>
 
     <select id="selectChildrenByParentId" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node WHERE parent_id = #{parentId}
+        SELECT * FROM node WHERE parent_id = #{parentId} AND type IN
+                <foreach item="type" collection="types" open="(" separator="," close=")">
+                    #{type}
+                </foreach>
     </select>
 
     <select id="selectRootChildren" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node WHERE parent_id IS NULL
+        SELECT * FROM node WHERE parent_id IS NULL AND type IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
     </select>
 
     <select id="selectNodeByParentIdAndName" resultType="com.kwang.study.pojo.Node">
@@ -30,7 +36,7 @@
         DELETE FROM node WHERE id = #{id}
     </delete>
 
-    <delete id="deleteNodeByIds">
+    <delete id="batchDeleteNodeByIds">
         DELETE FROM node
         WHERE id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">

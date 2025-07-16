@@ -15,5 +15,6 @@ public class AppConfig {
     @Data
     public static class FileStorageConfig {
         private String filePath;
+        private String chunkPath;
     }
 }
