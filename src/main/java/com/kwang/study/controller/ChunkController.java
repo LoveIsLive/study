@@ -42,7 +42,7 @@ public class ChunkController {
             @RequestParam("totalChunks") Integer totalChunks,
             @RequestParam("chunk") MultipartFile chunk) throws Exception {
         chunkService.uploadChunk(fileId, chunkIndex, chunk.getInputStream());
-        if (Objects.equals(chunkIndex, totalChunks)) {
+        if (Objects.equals(chunkService.countUploadChunk(fileId), totalChunks)) {
             chunkService.mergeChunks(fileId);
             return ResponseEntity.ok("Upload complete");
         }

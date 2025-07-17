@@ -1,6 +1,7 @@
 package com.kwang.study.service;
 
 import com.kwang.study.cache.NodeCache;
+import com.kwang.study.enums.FileChunkStatus;
 import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.enums.PermissionsEnum;
 import com.kwang.study.filesystem.FileStorage;
@@ -51,7 +52,6 @@ public class ChunkService {
     // 初始化大文件节点
     public Node initBigFileNode(String name, Long parentId, String permissions) throws IOException {
         nodeService.validateParent(parentId);
-        nodeService.checkNameUnique(parentId, name);
 
         String key = UUID.randomUUID().toString();
         Node node = new Node();
@@ -67,6 +67,10 @@ public class ChunkService {
         return node;
     }
 
+    public int countUploadChunk(Long fileId) {
+        return fileChunkMapper.countStatusChunks(fileId, FileChunkStatus.INIT.getCode());
+    }
+
     public void uploadChunk(Long fileId, Integer chunkIndex, InputStream chunkStream) throws IOException {
         String chunkKey = fileId + "/" + chunkIndex;
         chunkStorage.putFile(chunkKey, chunkStream);
@@ -78,11 +82,13 @@ public class ChunkService {
     }
 
     public void mergeChunks(Long fileId) throws IOException {
+        fileChunkMapper.updateAllStatusByFileId(fileId, FileChunkStatus.MERGING.getCode());
         List<FileChunk> chunks = fileChunkMapper.selectAllByFileIdOrderByChunkIndex(fileId);
         Node node = nodeMapper.selectNodeById(fileId);
         MessageDigest digest = HashUtil.sha256();
         OutputStream outputStream = fileStorage.openFile(node.getRefPath());
 
+        // TODO: 应该是异步计算
         // 合并分片并计算哈希
         int size = 0;
         for (FileChunk chunk : chunks) {

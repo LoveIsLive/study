@@ -6,14 +6,17 @@ import com.kwang.study.enums.PermissionsEnum;
 import com.kwang.study.exception.NodeNotFoundException;
 import com.kwang.study.filesystem.FileStorage;
 import com.kwang.study.mapper.FileChunkMapper;
+import com.kwang.study.mapper.HashRefNumMapper;
 import com.kwang.study.mapper.NodeMapper;
 import com.kwang.study.pojo.FileChunk;
+import com.kwang.study.pojo.HashRefNum;
 import com.kwang.study.pojo.Node;
 import com.kwang.study.utils.HashUtil;
 import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +50,9 @@ public class NodeService {
     @Autowired
     private NodeCache nodeCache;
 
+    @Autowired
+    private HashRefNumMapper hashRefNumMapper;
+
     public InputStream getFileById(Long id) throws IOException {
         Node node = this.getNodeById(id);
         if (node == null || !Objects.equals(node.getType(), NodeTypeEnum.FILE.getCode())) {
@@ -68,7 +74,6 @@ public class NodeService {
     // 创建目录
     public Node createDirectory(String name, Long parentId, String permissions) {
         validateParent(parentId);
-        checkNameUnique(parentId, name);
 
         Node node = new Node();
         node.setParentId(parentId);
@@ -89,40 +94,35 @@ public class NodeService {
     }
 
     // 创建文件
+    @Transactional
     public Node createFile(String name, Long parentId, InputStream file, String permissions)
             throws Exception {
         validateParent(parentId);
-        checkNameUnique(parentId, name);
 
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        byte[] buffer = new byte[8192];
-        int bytesRead;
-        while ((bytesRead = file.read(buffer)) != -1) {
-            outputStream.write(buffer, 0, bytesRead);
-        }
-        byte[] contentBytes = outputStream.toByteArray();
-
-        String hash = HashUtil.sha256Hash(contentBytes);
         String key = UUID.randomUUID().toString();
+        byte[] content = file.readAllBytes();
+        String hash = HashUtil.sha256Hash(content);
+        HashRefNum hashRefNum = hashRefNumMapper.selectHashForUpdate(hash);
+        boolean existed = hashRefNum != null;
 
-        fileStorage.putFile(key, new ByteArrayInputStream(contentBytes));
+        if (existed) {
+            hashRefNumMapper.addNum(hash);
+            key = hashRefNum.getRefPath();
+        } else {
+            fileStorage.putFile(key, file);
+            hashRefNumMapper.insertHash(new HashRefNum(hash, key, 1));
+        }
 
         Node node = new Node();
         node.setParentId(parentId);
         node.setName(name);
         node.setType(NodeTypeEnum.FILE.getCode());
         node.setPermissions(permissions != null ? permissions : PermissionsEnum.ALL.getCode());
-        node.setSize(contentBytes.length);
+        node.setSize(content.length);
         node.setRefPath(key);
         node.setHash(hash);
 
-        try {
-            nodeMapper.insertNode(node);
-        } catch (Exception e) {
-            // 插入失败时清理存储文件
-            fileStorage.deleteFile(key);
-            throw e;
-        }
+        nodeMapper.insertNode(node);
         if (node.getParentId() == null) {
             nodeCache.deleteRootChildren();
         } else {
@@ -132,11 +132,17 @@ public class NodeService {
     }
 
 
+    @Transactional
     public void deleteFileNode(Long id) throws IOException {
         Node node = this.getNodeById(id);
         if (node == null) return;
         fileStorage.deleteFile(node.getRefPath());
         nodeMapper.deleteNodeById(id);
+        String hash = node.getHash();
+        int row = hashRefNumMapper.decNum(hash);
+        if (row <= 0) {
+            hashRefNumMapper.deleteHash(hash);
+        }
         nodeCache.deleteNodeCache(id);
         if (node.getParentId() != null) {
             nodeCache.deleteChildrenCache(node.getParentId());
@@ -213,12 +219,6 @@ public class NodeService {
             if (parent != null && !Objects.equals(parent.getType(), NodeTypeEnum.DIR.getCode())) {
                 throw new IllegalArgumentException("Parent must be a valid directory");
             }
-        }
-    }
-
-    public void checkNameUnique(Long parentId, String name) {
-        if (nodeMapper.selectNodeByParentIdAndName(parentId, name) != null) {
-            throw new IllegalArgumentException("Name must be unique in the directory");
         }
     }
 }

@@ -18,8 +18,6 @@ public interface NodeMapper {
 
     List<Node> selectRootChildren(List<Integer> types);
 
-    Node selectNodeByParentIdAndName(@Param("parentId") Long parentId, @Param("name") String name);
-
     int deleteNodeById(Long id);
 
     int batchDeleteNodeByIds(@Param("ids") List<Long> ids);

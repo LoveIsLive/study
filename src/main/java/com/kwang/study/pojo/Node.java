@@ -16,4 +16,5 @@ public class Node {
     private LocalDateTime modifyTime;
     private String refPath;
     private String hash;
+    private Integer refNum;
 }

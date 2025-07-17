@@ -27,11 +27,6 @@
             </foreach>
     </select>
 
-    <select id="selectNodeByParentIdAndName" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node
-        WHERE parent_id = #{parentId} AND name = #{name}
-    </select>
-
     <delete id="deleteNodeById">
         DELETE FROM node WHERE id = #{id}
     </delete>

@@ -32,5 +32,8 @@ public interface FileStorage {
     void createFile(String key) throws IOException;
 
 
+    /*
+    打开一个文件
+     */
     OutputStream openFile(String key) throws IOException;
 }

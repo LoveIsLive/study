@@ -12,4 +12,5 @@ public interface FileChunkMapper {
     List<FileChunk> selectAllByFileIdOrderByChunkIndex(Long fileId);
     int updateAllStatusByFileId(@Param("fileId") Long fileId, @Param("status") Integer status);
     int deleteByFileId(Long fileId);
+    int countStatusChunks(@Param("fileId") Long fileId, @Param("status") Integer status);
 }

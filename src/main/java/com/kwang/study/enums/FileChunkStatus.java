@@ -4,8 +4,10 @@ import lombok.Getter;
 
 @Getter
 public enum FileChunkStatus {
-    UPLOADED(0, "在上传"),
-    MERGED(1, "已合并"),
+    INIT(0, "初态-分片刚上传"),
+    MERGING(1, "合并中"),
+    MERGE_SUCCESS(2, "合并成功"),
+    MERGE_FAIL(3, "合并失败")
     ;
 
     private final Integer code;

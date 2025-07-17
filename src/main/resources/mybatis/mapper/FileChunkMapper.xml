@@ -26,4 +26,9 @@
         DELETE FROM file_chunk WHERE file_id = #{fileId}
     </delete>
 
+    <select id="countStatusChunks" resultType="int">
+        SELECT COUNT(*) FROM file_chunk
+        WHERE file_id = #{fileId} AND status = #{status}
+    </select>
+
 </mapper>
