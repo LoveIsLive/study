@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.mapper.MimeTypeMapper">
+
+    <select id="selectById" resultType="com.kwang.study.pojo.MimeType">
+        SELECT id, `name` FROM mime_types WHERE id = #{id}
+    </select>
+
+    <insert id="insertMimeType" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mime_types (`name`) VALUES (#{name})
+            ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id);
+    </insert>
+
+    <select id="selectByName" resultType="com.kwang.study.pojo.MimeType">
+        SELECT id, `name` FROM mime_types WHERE `name` = #{name}
+    </select>
+
+</mapper>

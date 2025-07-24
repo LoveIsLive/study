@@ -4,28 +4,55 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kwang.study.mapper.NodeMapper">
 
+    <resultMap id="BaseResultMap" type="com.kwang.study.pojo.Node">
+        <id property="id" column="id" />
+        <result property="parentId" column="parent_id" />
+        <result property="name" column="name" />
+        <result property="type" column="type" />
+        <result property="permissions" column="permissions" />
+        <result property="size" column="size" />
+        <result property="createTime" column="create_time" />
+        <result property="modifyTime" column="modify_time" />
+        <result property="hashId" column="hash_id" />
+        <result property="mimeTypeId" column="mime_type_id" />
+    </resultMap>
+
+    <!-- 用于JOIN查询的 DTO ResultMap -->
+    <resultMap id="NodeDetailResultMap" type="com.kwang.study.dto.NodeDetailDTO" extends="BaseResultMap">
+        <result property="mimeTypeName" column="mime_type_name"/>
+    </resultMap>
+
+
+    <sql id="Base_Column_List">
+        id, parent_id, `name`, `type`, permissions, `size`, create_time, modify_time, hash_id, mime_type_id
+    </sql>
+
     <insert id="insertNode" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO node (parent_id, name, type, permissions, size, ref_path, hash)
-        VALUES (#{parentId}, #{name}, #{type}, #{permissions}, #{size}, #{refPath}, #{hash})
+        INSERT INTO node (parent_id, `name`, `type`, permissions, `size`, hash_id, mime_type_id)
+        VALUES (#{parentId}, #{name}, #{type}, #{permissions}, #{size}, #{hashId}, #{mimeTypeId})
     </insert>
 
-    <select id="selectNodeById" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node WHERE id = #{id}
-    </select>
-
-    <select id="selectChildrenByParentId" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node WHERE parent_id = #{parentId} AND type IN
-                <foreach item="type" collection="types" open="(" separator="," close=")">
-                    #{type}
-                </foreach>
-    </select>
-
-    <select id="selectRootChildren" resultType="com.kwang.study.pojo.Node">
-        SELECT * FROM node WHERE parent_id IS NULL AND type IN
-            <foreach item="type" collection="types" open="(" separator="," close=")">
-                #{type}
-            </foreach>
-    </select>
+    <update id="updateNode">
+        UPDATE node
+        <set>
+            <if test="name != null and name != ''">
+                `name` = #{name},
+            </if>
+            <if test="permissions != null and permissions != ''">
+                permissions = #{permissions},
+            </if>
+            <if test="size != null">
+                `size` = #{size},
+            </if>
+            <if test="hashId != null">
+                hash_id = #{hashId},
+            </if>
+            <if test="mimeTypeId != null">
+                mime_type_id = #{mimeTypeId},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
 
     <delete id="deleteNodeById">
         DELETE FROM node WHERE id = #{id}
@@ -39,13 +66,150 @@
         </foreach>
     </delete>
 
-    <update id="updateNodeForFile">
+    <select id="selectNodeById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectNodesByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectNodeByParentIdAndName" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE parent_id = #{parentId} AND `name` = #{name}
+    </select>
+
+    <select id="selectChildrenByParentId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE parent_id = #{parentId}
+        <if test="types != null and !types.isEmpty()">
+            AND `type` IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectRootChildren" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE parent_id IS NULL
+        <if test="types != null and !types.isEmpty()">
+            AND `type` IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectAllDescendantIds" resultType="long">
+        WITH RECURSIVE descendants AS (
+            SELECT id FROM node WHERE id = #{id}
+            UNION ALL
+            SELECT n.id FROM node n JOIN descendants d ON n.parent_id = d.id
+        )
+        SELECT id FROM descendants WHERE id != #{id};
+    </select>
+
+    <select id="selectNodeDetailById" resultMap="NodeDetailResultMap">
+        SELECT
+        <include refid="Base_Column_List" />,
+        mt.name AS mime_type_name
+        FROM
+        node n
+        LEFT JOIN
+        mime_types mt ON n.mime_type_id = mt.id
+        WHERE
+        n.id = #{id}
+    </select>
+
+    <select id="selectChildrenDetailByParentId" resultMap="NodeDetailResultMap">
+        SELECT
+        <include refid="Base_Column_List" />,
+        mt.name AS mime_type_name
+        FROM
+        node n
+        LEFT JOIN
+        mime_types mt ON n.mime_type_id = mt.id
+        WHERE
+        n.parent_id = #{parentId}
+        <if test="types != null and !types.isEmpty()">
+            AND n.`type` IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectRootChildrenDetail" resultMap="NodeDetailResultMap">
+        SELECT
+        <include refid="Base_Column_List" />,
+        mt.name AS mime_type_name
+        FROM
+        node n
+        LEFT JOIN
+        mime_types mt ON n.mime_type_id = mt.id
+        WHERE
+        n.parent_id IS NULL
+        <if test="types != null and !types.isEmpty()">
+            AND n.`type` IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+    </select>
+
+    <update id="updateNodeParentAndName">
         UPDATE node
-        SET ref_path = #{refPath},
-            hash = #{hash},
-            size = #{size},
+        <set>
+            <if test="newParentId != null">
+                parent_id = #{newParentId},
+            </if>
+            <if test="newName != null and newName != ''">
+                `name` = #{newName},
+            </if>
             modify_time = CURRENT_TIMESTAMP
+        </set>
         WHERE id = #{id}
     </update>
+
+    <select id="selectFullPathById" resultType="string">
+        WITH RECURSIVE path_cte (id, name, parent_id) AS (
+            SELECT id, name, parent_id
+            FROM node
+            WHERE id = #{id}
+            UNION ALL
+            SELECT n.id, n.name, n.parent_id
+            FROM node n
+                     JOIN path_cte p ON n.id = p.parent_id
+        )
+        SELECT GROUP_CONCAT(name ORDER BY id SEPARATOR '/')
+        FROM (
+                 SELECT id, name FROM path_cte WHERE parent_id IS NOT NULL
+                 UNION
+                 SELECT 0 as id, '' as name -- Add a root '/' placeholder
+             ) as final_path;
+    </select>
+
+    <select id="searchNodesByName" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM node
+        WHERE `name` LIKE #{namePattern}
+        <if test="types != null and !types.isEmpty()">
+            AND `type` IN
+            <foreach item="type" collection="types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+    </select>
 
 </mapper>

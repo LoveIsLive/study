@@ -1,76 +1,139 @@
 package com.kwang.study.cache;
 
-import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.pojo.Node;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+/**
+ * 文件系统节点和目录结构的Redis缓存
+ * 缓存策略:
+ * - 单个节点信息 (Node): 使用 "filesystem:node:{id}" 作为键。
+ * - 目录内容 (List<Node>): 使用 "filesystem:children:{parentId}" 作为键。
+ * - 根目录内容 (List<Node>): 使用 "filesystem:ROOT" 作为键。
+ */
 @Component
 public class NodeCache {
+
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
-    
+
     public static final String NODE_KEY_PREFIX = "filesystem:node:";
     public static final String CHILDREN_KEY_PREFIX = "filesystem:children:";
-
     public static final String ROOT_KEY = "filesystem:ROOT";
-    
-    public static final int timeout = 10 * 60; // 以秒为单位
 
+    // 缓存过期时间（10分钟）
+    public static final long TIMEOUT_SECONDS = 10 * 60;
+
+    /**
+     * 缓存单个节点信息
+     *
+     * @param id   节点ID
+     * @param node 节点对象
+     */
     public void setNodeCache(Long id, Node node) {
+        if (id == null || node == null) return;
         String key = NODE_KEY_PREFIX + id;
-        redisTemplate.opsForValue().set(key, node, timeout, TimeUnit.SECONDS);
+        redisTemplate.opsForValue().set(key, node, TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
+    /**
+     * 获取单个节点缓存
+     *
+     * @param id 节点ID
+     * @return 节点对象或null
+     */
     public Node getNodeCache(Long id) {
+        if (id == null) return null;
         String key = NODE_KEY_PREFIX + id;
         return (Node) redisTemplate.opsForValue().get(key);
     }
 
+    /**
+     * 缓存目录的子节点列表
+     *
+     * @param parentId 父节点ID
+     * @param children 子节点列表
+     */
     public void setChildrenCache(Long parentId, List<Node> children) {
+        if (parentId == null || children == null) return;
         String key = CHILDREN_KEY_PREFIX + parentId;
-        redisTemplate.opsForValue().set(key, children, timeout, TimeUnit.SECONDS);
+        redisTemplate.opsForValue().set(key, children, TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
+    /**
+     * 获取目录的子节点缓存
+     *
+     * @param parentId 父节点ID
+     * @return 子节点列表或null
+     */
+    @SuppressWarnings("unchecked")
     public List<Node> getChildrenCache(Long parentId) {
+        if (parentId == null) return null;
         String key = CHILDREN_KEY_PREFIX + parentId;
         return (List<Node>) redisTemplate.opsForValue().get(key);
     }
 
+    /**
+     * 删除单个节点缓存
+     *
+     * @param id 节点ID
+     */
     public void deleteNodeCache(Long id) {
+        if (id == null) return;
         String key = NODE_KEY_PREFIX + id;
         redisTemplate.delete(key);
     }
 
+    /**
+     * 删除目录的子节点缓存
+     *
+     * @param parentId 父节点ID
+     */
     public void deleteChildrenCache(Long parentId) {
+        if (parentId == null) return;
         String key = CHILDREN_KEY_PREFIX + parentId;
         redisTemplate.delete(key);
     }
 
+    /**
+     * 删除根目录缓存
+     */
     public void deleteRootChildren() {
         redisTemplate.delete(ROOT_KEY);
     }
 
-    // 设置根目录内容永不超时
+    /**
+     * 缓存根目录的子节点列表 (永不过期)
+     *
+     * @param children 根目录子节点列表
+     */
     public void setRootChildren(List<Node> children) {
+        if (children == null) return;
         redisTemplate.opsForValue().set(ROOT_KEY, children);
     }
 
+    /**
+     * 获取根目录的子节点缓存
+     *
+     * @return 根目录子节点列表或null
+     */
+    @SuppressWarnings("unchecked")
     public List<Node> getRootChildren() {
         return (List<Node>) redisTemplate.opsForValue().get(ROOT_KEY);
     }
 
-    public void batchDeleteNodeCache(List<Node> nodes) {
-        List<String> collect = nodes.stream().map(node -> (Objects.equals(node.getType(), NodeTypeEnum.DIR.getCode()) ?
-                NODE_KEY_PREFIX : CHILDREN_KEY_PREFIX) + node.getId()).collect(Collectors.toList());
-        redisTemplate.delete(collect);
+    /**
+     * 批量删除缓存
+     *
+     * @param keys 要删除的缓存键列表
+     */
+    public void batchDeleteCache(List<String> keys) {
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
-
 }

@@ -7,11 +7,11 @@ import javax.validation.constraints.Pattern;
 
 @Data
 public class CreateDirectoryDTO {
-    @NotBlank(message = "Name is required")
+    @NotBlank(message = "目录名称不能为空")
+    @Pattern(regexp = "^[^/\\\\:*?\"<>|]+$", message = "目录名称不能包含非法字符")
     private String name;
 
     private Long parentId;
 
-    @Pattern(regexp = "[r-][w-][x-][r-][w-][x-][r-][w-][x-]", message = "Permissions must be in rwxrwxrwx format")
     private String permissions = "rwxrwxrwx";
 }
