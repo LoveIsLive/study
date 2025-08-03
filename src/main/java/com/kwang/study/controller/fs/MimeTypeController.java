@@ -1,7 +1,7 @@
 package com.kwang.study.controller.fs;
 
 import com.kwang.study.common.R;
-import com.kwang.study.service.MimeTypeService;
+import com.kwang.study.service.fs.MimeTypeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

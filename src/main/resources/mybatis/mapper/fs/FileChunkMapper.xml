@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.kwang.study.mapper.FileChunkMapper">
+<mapper namespace="com.kwang.study.mapper.fs.FileChunkMapper">
 
-    <resultMap id="BaseResultMap" type="com.kwang.study.pojo.FileChunk">
+    <resultMap id="BaseResultMap" type="com.kwang.study.pojo.fs.FileChunk">
         <id property="fileId" column="file_id"/>
         <id property="chunkIndex" column="chunk_index"/>
         <result property="key" column="key"/>

@@ -1,18 +1,18 @@
-package com.kwang.study.service;
+package com.kwang.study.service.fs;
 
 import com.kwang.study.cache.NodeCache;
 import com.kwang.study.constant.FileStorageConstant;
 import com.kwang.study.configuration.AppConfig;
-import com.kwang.study.dto.NodeDetailDTO;
-import com.kwang.study.dto.result.CDDirResult;
+import com.kwang.study.dto.fs.result.NodeDetailDTO;
+import com.kwang.study.dto.fs.result.CDDirResult;
 import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.enums.PermissionsEnum;
 import com.kwang.study.exception.NodeNotFoundException;
 import com.kwang.study.filesystem.FileStorage;
-import com.kwang.study.mapper.HashRefNumMapper;
-import com.kwang.study.mapper.NodeMapper;
-import com.kwang.study.pojo.HashRefNum;
-import com.kwang.study.pojo.Node;
+import com.kwang.study.mapper.fs.HashRefNumMapper;
+import com.kwang.study.mapper.fs.NodeMapper;
+import com.kwang.study.pojo.fs.HashRefNum;
+import com.kwang.study.pojo.fs.Node;
 import com.kwang.study.utils.ChunkUtil;
 import com.kwang.study.utils.HashUtil;
 import com.kwang.study.utils.TextMimeUtil;
@@ -34,7 +34,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -134,9 +133,6 @@ public class NodeService {
     @Transactional
     public Node createFile(String name, Long parentId, InputStream fileStream, String permissions, String mimeTypeName) throws IOException {
         validateParent(parentId);
-        if (!StringUtils.hasText(mimeTypeName)) {
-            throw new IllegalArgumentException("mimeTypeName cannot is null");
-        }
 
         int chunkSize = appConfig.getFileStorage().getChunkSize();
         byte[] content = new byte[chunkSize];
@@ -164,7 +160,10 @@ public class NodeService {
             hashRefNumMapper.insertHash(hashRefNum);
         }
 
-        Integer mimeTypeId = mimeTypeService.getOrCreateMimeTypeId(mimeTypeName);
+        Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
+        if (mimeTypeId == null) {
+            throw new IllegalArgumentException("文件类型名称未知");
+        }
 
         Node node = new Node();
         node.setParentId(parentId);

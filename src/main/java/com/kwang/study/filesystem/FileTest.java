@@ -1,18 +1,13 @@
 package com.kwang.study.filesystem;
 
-import com.kwang.study.enums.FileChunkStatus;
-import com.kwang.study.pojo.FileChunk;
+import com.kwang.study.pojo.fs.FileChunk;
 import com.kwang.study.utils.HashUtil;
-import org.apache.catalina.core.StandardContext;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;

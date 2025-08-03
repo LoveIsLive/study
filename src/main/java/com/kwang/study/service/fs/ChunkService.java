@@ -1,20 +1,18 @@
-package com.kwang.study.service;
+package com.kwang.study.service.fs;
 
 import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.collection.ListUtil;
 import com.kwang.study.cache.NodeCache;
 import com.kwang.study.configuration.AppConfig;
-import com.kwang.study.dto.NodeDetailDTO;
 import com.kwang.study.enums.FileChunkStatus;
 import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.enums.PermissionsEnum;
 import com.kwang.study.filesystem.FileStorage;
-import com.kwang.study.mapper.FileChunkMapper;
-import com.kwang.study.mapper.HashRefNumMapper;
-import com.kwang.study.mapper.NodeMapper;
-import com.kwang.study.pojo.FileChunk;
-import com.kwang.study.pojo.HashRefNum;
-import com.kwang.study.pojo.Node;
+import com.kwang.study.mapper.fs.FileChunkMapper;
+import com.kwang.study.mapper.fs.HashRefNumMapper;
+import com.kwang.study.mapper.fs.NodeMapper;
+import com.kwang.study.pojo.fs.FileChunk;
+import com.kwang.study.pojo.fs.HashRefNum;
+import com.kwang.study.pojo.fs.Node;
 import com.kwang.study.service.async.AsyncCleanupChunkService;
 import com.kwang.study.utils.ChunkUtil;
 import com.kwang.study.utils.HashUtil;
@@ -27,21 +25,14 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.util.unit.DataSize;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_PARTIAL_CONTENT;
 
 
 @Service
@@ -94,7 +85,10 @@ public class ChunkService {
             throw new IllegalArgumentException("mimeTypeName cannot is null");
         }
 
-        Integer mimeTypeId = mimeTypeService.getOrCreateMimeTypeId(mimeTypeName);
+        Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
+        if (mimeTypeId == null) {
+            throw new IllegalArgumentException("文件类型名称未知");
+        }
         Node node = new Node();
         node.setParentId(parentId);
         node.setName(name);

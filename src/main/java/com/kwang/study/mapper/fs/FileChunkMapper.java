@@ -1,6 +1,6 @@
-package com.kwang.study.mapper;
+package com.kwang.study.mapper.fs;
 
-import com.kwang.study.pojo.FileChunk;
+import com.kwang.study.pojo.fs.FileChunk;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;

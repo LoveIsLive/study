@@ -1,10 +1,9 @@
-package com.kwang.study.service;
+package com.kwang.study.service.fs;
 
-import com.kwang.study.mapper.MimeTypeMapper;
-import com.kwang.study.pojo.MimeType;
+import com.kwang.study.mapper.fs.MimeTypeMapper;
+import com.kwang.study.pojo.fs.MimeType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -24,13 +23,11 @@ public class MimeTypeService {
     private final ConcurrentMap<Integer, String> idToNameCache = new ConcurrentHashMap<>();
 
     /**
-     * 根据MIME类型名称获取其ID。如果不存在，则创建新的记录。
-     * 该方法是线程安全的，并能在事务环境中正确运行。
+     * 根据MIME类型名称获取其ID。不存在返回null
      * @param name MIME类型名称, e.g., "application/json"
      * @return MIME类型的ID
      */
-    @Transactional
-    public Integer getOrCreateMimeTypeId(String name) {
+    public Integer getMimeTypeId(String name) {
         if (!StringUtils.hasText(name)) {
             return null;
         }
@@ -49,19 +46,8 @@ public class MimeTypeService {
             nameToIdCache.put(name, mimeType.getId());
             idToNameCache.put(mimeType.getId(), name);
             return mimeType.getId();
-        } else {
-            // 如果不存在，则插入新记录
-            MimeType newMimeType = new MimeType();
-            newMimeType.setName(name);
-            mimeTypeMapper.insertMimeType(newMimeType);
-            // 插入后，MyBatis会回填ID
-            Integer newId = newMimeType.getId();
-
-            // 存入缓存并返回
-            nameToIdCache.put(name, newId);
-            idToNameCache.put(newId, name);
-            return newId;
         }
+        return null;
     }
 
     /**

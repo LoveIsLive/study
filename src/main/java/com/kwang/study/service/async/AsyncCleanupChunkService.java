@@ -1,8 +1,8 @@
 package com.kwang.study.service.async;
 
 import com.kwang.study.filesystem.FileStorage;
-import com.kwang.study.mapper.FileChunkMapper;
-import com.kwang.study.pojo.FileChunk;
+import com.kwang.study.mapper.fs.FileChunkMapper;
+import com.kwang.study.pojo.fs.FileChunk;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;

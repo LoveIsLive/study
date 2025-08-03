@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.kwang.study.mapper.HashRefNumMapper">
+<mapper namespace="com.kwang.study.mapper.fs.HashRefNumMapper">
 
-    <resultMap id="BaseResultMap" type="com.kwang.study.pojo.HashRefNum">
+    <resultMap id="BaseResultMap" type="com.kwang.study.pojo.fs.HashRefNum">
         <id property="id" column="id"/>
         <result property="hash" column="hash"/>
         <result property="refPath" column="ref_path"/>

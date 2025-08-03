@@ -1,12 +1,13 @@
 package com.kwang.study.controller.fs;
 
 import com.kwang.study.common.R;
-import com.kwang.study.dto.CreateDirectoryDTO;
-import com.kwang.study.dto.NodeDetailDTO;
-import com.kwang.study.dto.result.CDDirResult;
+import com.kwang.study.dto.fs.request.CreateDirectoryDTO;
+import com.kwang.study.dto.fs.request.UploadFileRequestDTO;
+import com.kwang.study.dto.fs.result.NodeDetailDTO;
+import com.kwang.study.dto.fs.result.CDDirResult;
 import com.kwang.study.enums.NodeTypeEnum;
-import com.kwang.study.pojo.Node;
-import com.kwang.study.service.NodeService;
+import com.kwang.study.pojo.fs.Node;
+import com.kwang.study.service.fs.NodeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,8 @@ public class NodeController {
      */
     @PostMapping("/directories")
     public ResponseEntity<R<Node>> createDirectory(@Valid @RequestBody CreateDirectoryDTO request) {
+        request.check();
+
         Node node = nodeService.createDirectory(request.getName(), request.getParentId(), request.getPermissions());
         return ResponseEntity.status(201).body(R.success(node, "目录创建成功"));
     }
@@ -65,28 +68,17 @@ public class NodeController {
 
     /**
      * 上传小文件
-     * @param name 文件名
-     * @param parentId 父目录ID
-     * @param file 上传的文件
-     * @param permissions 权限字符串 (可选)
-     * @param mimeTypeName 文件MIME类型
+     * @param requestDTO 请求参数
      * @return 包含新创建的文件节点的响应
      * @throws IOException IO异常
      */
     @PostMapping("/files")
-    public ResponseEntity<R<Node>> uploadFile(
-            // TODO: 待DTO进行校验
-            @RequestParam("name") @NotBlank(message = "文件名不能为空")
-            @Pattern(regexp = "^[^/\\\\:*?\"<>|]+$", message = "文件名不能包含非法字符") String name,
-            @RequestParam("parentId") Long parentId,
-            @RequestParam("file") @NotNull(message = "文件不能为空") MultipartFile file,
-            @RequestParam(value = "permissions", required = false)
-            @Pattern(regexp = "^([r-][w-][x-]){3}$",
-                    message = "文件权限格式不正确，应为rwxrwxrwx形式") String permissions,
-            @RequestParam(value = "mimeTypeName") @NotBlank(message = "MIME类型不能为空") String mimeTypeName) throws IOException {
+    public ResponseEntity<R<Node>> uploadFile(@Valid @RequestBody UploadFileRequestDTO requestDTO) throws IOException {
+        requestDTO.check();
 
-        try (InputStream inputStream = file.getInputStream()) {
-            Node node = nodeService.createFile(name, parentId, inputStream, permissions, mimeTypeName);
+        try (InputStream inputStream = requestDTO.getFile().getInputStream()) {
+            Node node = nodeService.createFile(requestDTO.getName(), requestDTO.getParentId(),
+                    inputStream, requestDTO.getPermissions(), requestDTO.getMimeTypeName());
             return ResponseEntity.status(201).body(R.success(node, "文件上传成功"));
         }
     }
@@ -150,7 +142,6 @@ public class NodeController {
      */
     @GetMapping("/list-by-path")
     public ResponseEntity<R<CDDirResult>> listDirectoryByPath(
-            // TODO: 待DTO进行校验
             @RequestParam("path") String path,
             @RequestParam(required = false) Long currentDirectoryId) {
 

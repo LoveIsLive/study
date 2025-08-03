@@ -1,4 +1,4 @@
-package com.kwang.study.pojo;
+package com.kwang.study.pojo.fs;
 
 import lombok.Data;
 

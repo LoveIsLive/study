@@ -1,6 +1,6 @@
-package com.kwang.study.mapper;
+package com.kwang.study.mapper.fs;
 
-import com.kwang.study.pojo.MimeType;
+import com.kwang.study.pojo.fs.MimeType;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

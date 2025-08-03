@@ -1,6 +1,6 @@
-package com.kwang.study.dto;
+package com.kwang.study.dto.fs.result;
 
-import com.kwang.study.pojo.Node;
+import com.kwang.study.pojo.fs.Node;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 

@@ -1,7 +1,7 @@
-package com.kwang.study.mapper;
+package com.kwang.study.mapper.fs;
 
-import com.kwang.study.dto.NodeDetailDTO;
-import com.kwang.study.pojo.Node;
+import com.kwang.study.dto.fs.result.NodeDetailDTO;
+import com.kwang.study.pojo.fs.Node;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;

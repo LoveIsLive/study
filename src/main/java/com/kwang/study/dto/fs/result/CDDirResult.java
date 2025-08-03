@@ -1,6 +1,5 @@
-package com.kwang.study.dto.result;
+package com.kwang.study.dto.fs.result;
 
-import com.kwang.study.dto.NodeDetailDTO;
 import lombok.Data;
 
 import java.io.Serializable;

@@ -1,7 +1,7 @@
 package com.kwang.study.cache;
 
-import com.kwang.study.dto.NodeDetailDTO;
-import com.kwang.study.pojo.Node;
+import com.kwang.study.dto.fs.result.NodeDetailDTO;
+import com.kwang.study.pojo.fs.Node;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;

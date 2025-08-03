@@ -1,7 +1,7 @@
 package com.kwang.study.service.async;
 
-import com.kwang.study.dto.NodeDetailDTO;
-import com.kwang.study.service.NodeService;
+import com.kwang.study.dto.fs.result.NodeDetailDTO;
+import com.kwang.study.service.fs.NodeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -18,25 +18,25 @@ public class AsyncSearchService {
     private SimpMessagingTemplate messagingTemplate;
 
     @Async
-    public void searchAndSendResults(Long startNodeId, String namePattern, String sessionId) {
+    public void searchAndSendResults(Long startNodeId, String namePattern, String user) {
         String destination = "/queue/search-results";
-        log.info("Async search started for user: {}, destination: {}", sessionId, destination);
+        log.info("Async search started for user: {}, destination: {}", user, destination);
 
         try {
             nodeService.searchNodesBFS(
                     startNodeId,
                     namePattern,
                     (NodeDetailDTO foundNode) -> {
-                        log.info("Found node for user {}, sending: {}", sessionId, foundNode.getName());
-                        messagingTemplate.convertAndSendToUser(sessionId, destination, foundNode);
+                        log.info("Found node for user {}, sending: {}", user, foundNode.getName());
+                        messagingTemplate.convertAndSendToUser(user, destination, foundNode);
                     }
             );
             // 搜索完成后可以发送一个结束信号
-            messagingTemplate.convertAndSendToUser(sessionId, destination, "SEARCH_COMPLETE");
-            log.info("Async search completed for user: {}", sessionId);
+            messagingTemplate.convertAndSendToUser(user, destination, "SEARCH_COMPLETE");
+            log.info("Async search completed for user: {}", user);
         } catch (Exception e) {
-            log.error("Error during async search for user: " + sessionId, e);
-            messagingTemplate.convertAndSendToUser(sessionId, destination, "SEARCH_ERROR: " + e.getMessage());
+            log.error("Error during async search for user: " + user, e);
+            messagingTemplate.convertAndSendToUser(user, destination, "SEARCH_ERROR: " + e.getMessage());
         }
     }
 }

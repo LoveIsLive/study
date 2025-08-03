@@ -1,8 +1,10 @@
 package com.kwang.study.controller.fs;
 
 import com.kwang.study.common.R;
-import com.kwang.study.pojo.Node;
-import com.kwang.study.service.ChunkService;
+import com.kwang.study.dto.fs.request.InitUploadBigFileRequestDTO;
+import com.kwang.study.dto.fs.request.UploadChunkRequestDTO;
+import com.kwang.study.pojo.fs.Node;
+import com.kwang.study.service.fs.ChunkService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -11,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
@@ -28,33 +31,30 @@ public class ChunkController {
     @Autowired
     private ChunkService chunkService;
 
-    // 使用简单的本地锁来防止并发合并问题，生产环境建议使用分布式锁（如Redis）
+    // 使用简单的本地锁来防止并发合并问题
     private final ConcurrentHashMap<Long, Object> mapLock = new ConcurrentHashMap<>();
 
     @PostMapping("/init")
-    public ResponseEntity<R<Node>> initUploadBigFile(
-            @RequestParam("name") @NotBlank(message = "文件名不能为空") @Pattern(regexp = "^[^/\\\\:*?\"<>|]+$", message = "文件名不能包含非法字符") String name,
-            @RequestParam("parentId") Long parentId,
-            @RequestParam(value = "permissions", required = false)
-            @Pattern(regexp = "^([r-][w-][x-]){3}$",
-                    message = "文件权限格式不正确，应为rwxrwxrwx形式") String permissions,
-            @RequestParam(value = "mimeTypeName") @NotBlank(message = "MIME类型不能为空") String mimeTypeName) {
+    public ResponseEntity<R<Node>> initUploadBigFile(@Valid @RequestBody InitUploadBigFileRequestDTO requestDTO) {
+        requestDTO.check();
 
-        Node node = chunkService.initBigFileNode(name, parentId, permissions, mimeTypeName);
+        Node node = chunkService.initBigFileNode(requestDTO.getName(), requestDTO.getParentId(),
+                requestDTO.getPermissions(), requestDTO.getMimeTypeName());
         return ResponseEntity.ok(R.success(node, "大文件初始化成功"));
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadChunk(
-            @RequestParam("fileId") @NotNull Long fileId,
-            @RequestParam("chunkIndex") @Min(0) Integer chunkIndex,
-            @RequestParam("totalChunks") @Min(1) Integer totalChunks,
-            @RequestParam("chunk") @NotNull MultipartFile chunk) throws Exception {
+    public ResponseEntity<?> uploadChunk(@Valid @RequestBody UploadChunkRequestDTO requestDTO) throws Exception {
+        requestDTO.check();
 
-        try (InputStream chunkInputStream = chunk.getInputStream()) {
-            chunkService.uploadChunk(fileId, chunkIndex, chunkInputStream);
+        long fileId = requestDTO.getFileId();
+        int totalChunks = requestDTO.getTotalChunks();
+
+        try (InputStream chunkInputStream = requestDTO.getChunk().getInputStream()) {
+            chunkService.uploadChunk(fileId, requestDTO.getChunkIndex(), chunkInputStream);
         }
         int uploadedCount = chunkService.countUploadedChunks(fileId);
+
 
         // 双重检查锁定，防止高并发下重复调用mergeChunks
         if (uploadedCount == totalChunks) {
