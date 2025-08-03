@@ -1,6 +1,8 @@
 package com.kwang.study.pojo;
 
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -35,4 +37,9 @@ public class FileChunk implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 分片大小
+     */
+    private Integer size;
 }

@@ -50,4 +50,13 @@ public interface FileChunkMapper {
      * @return 对应状态的分片数量
      */
     int countChunksByStatus(@Param("fileId") Long fileId, @Param("status") Integer status);
+
+    /**
+     * 根据文件ID和状态计算所有分片大小的总和
+     *
+     * @param fileId 文件ID
+     * @param status 状态值 (0:初态, 1:合并中, 2:合并成功, 3:合并失败)
+     * @return 分片大小总和，如果无记录则返回0
+     */
+    long selectSizeSumByFileIdAndStatus(@Param("fileId") Long fileId, @Param("status") Integer status);
 }

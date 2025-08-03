@@ -40,18 +40,11 @@ public interface NodeMapper {
 
     /**
      * 查询指定目录下的子节点
-     * @param parentId 父节点ID
+     * @param parentId 父节点ID, 根目录为null
      * @param types 节点类型列表 (0: 目录, 1: 文件)，如果为null则查询所有类型
      * @return 子节点列表
      */
     List<Node> selectChildrenByParentId(@Param("parentId") Long parentId, @Param("types") List<Integer> types);
-
-    /**
-     * 查询根目录下的子节点
-     * @param types 节点类型列表 (0: 目录, 1: 文件)，如果为null则查询所有类型
-     * @return 根目录子节点列表
-     */
-    List<Node> selectRootChildren(@Param("types") List<Integer> types);
 
     /**
      * 更新节点信息（例如：重命名）
@@ -90,18 +83,11 @@ public interface NodeMapper {
 
     /**
      * 查询指定目录下的子节点详细信息（包含MIME类型名称）
-     * @param parentId 父节点ID
+     * @param parentId 父节点ID, 根目录为null
      * @param types 节点类型列表 (0: 目录, 1: 文件)，如果为null则查询所有类型
      * @return 子节点详细信息DTO列表
      */
     List<NodeDetailDTO> selectChildrenDetailByParentId(@Param("parentId") Long parentId, @Param("types") List<Integer> types);
-
-    /**
-     * 查询根目录下的子节点详细信息（包含MIME类型名称）
-     * @param types 节点类型列表 (0: 目录, 1: 文件)，如果为null则查询所有类型
-     * @return 根目录子节点详细信息DTO列表
-     */
-    List<NodeDetailDTO> selectRootChildrenDetail(@Param("types") List<Integer> types);
 
     /**
      * 更新节点的父ID或名称（用于移动和重命名）
@@ -117,7 +103,7 @@ public interface NodeMapper {
 
     /**
      * 根据节点ID，反向递归查询其完整路径
-     * @param id 节点ID
+     * @param id 节点ID, id为null时，返回"/"
      * @return 节点的完整路径字符串, e.g., "/home/user/file.txt"
      */
     String selectFullPathById(Long id);

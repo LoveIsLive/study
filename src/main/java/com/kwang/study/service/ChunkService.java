@@ -3,6 +3,7 @@ package com.kwang.study.service;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.collection.ListUtil;
 import com.kwang.study.cache.NodeCache;
+import com.kwang.study.configuration.AppConfig;
 import com.kwang.study.dto.NodeDetailDTO;
 import com.kwang.study.enums.FileChunkStatus;
 import com.kwang.study.enums.NodeTypeEnum;
@@ -14,6 +15,8 @@ import com.kwang.study.mapper.NodeMapper;
 import com.kwang.study.pojo.FileChunk;
 import com.kwang.study.pojo.HashRefNum;
 import com.kwang.study.pojo.Node;
+import com.kwang.study.service.async.AsyncCleanupChunkService;
+import com.kwang.study.utils.ChunkUtil;
 import com.kwang.study.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -67,6 +72,12 @@ public class ChunkService {
 
     @Autowired
     private NodeCache nodeCache;
+
+    @Autowired
+    private AppConfig appConfig;
+
+    @Autowired
+    private AsyncCleanupChunkService cleanupChunkService;
 
     /**
      * 初始化一个大文件上传节点，该节点是中间状态。
@@ -112,19 +123,28 @@ public class ChunkService {
      * @param chunkStream 分片内容的输入流
      * @throws IOException IO异常
      */
+    @Transactional
     public void uploadChunk(Long fileId, Integer chunkIndex, InputStream chunkStream) throws IOException {
         Node node = nodeMapper.selectNodeById(fileId);
         if (node == null || !Objects.equals(NodeTypeEnum.CHUNK_INTERM.getCode(), node.getType())) {
             throw new IllegalArgumentException("Invalid fileId or the file is not in chunk uploading state.");
         }
-        String chunkKey = fileId + "/" + chunkIndex;
-        chunkStorage.putFile(chunkKey, chunkStream);
+        int chunkSize = appConfig.getFileStorage().getChunkSize();
+        byte[] content = new byte[chunkSize];
+        int readSize = ChunkUtil.readChunk(chunkStream, content);
+        if (readSize == -1) {
+            throw new IllegalArgumentException("上传文件大小超过：" + DataSize.ofBytes(content.length).toMegabytes());
+        }
+
+        String chunkKey = fileId + "-" + chunkIndex;
+        chunkStorage.putFile(chunkKey, new ByteArrayInputStream(content, 0, readSize));
 
         FileChunk chunk = new FileChunk();
         chunk.setFileId(fileId);
         chunk.setChunkIndex(chunkIndex);
         chunk.setKey(chunkKey);
         chunk.setStatus(FileChunkStatus.INIT.getCode());
+        chunk.setSize(readSize);
 
         fileChunkMapper.insertChunk(chunk);
     }
@@ -167,6 +187,7 @@ public class ChunkService {
         String tempFileKey = UUID.randomUUID().toString(); // 创建一个临时的key用于合并
 
         // 2. 合并分片到临时文件并计算哈希和大小
+        long startTime = System.currentTimeMillis();
         try (OutputStream os = fileStorage.openFile(tempFileKey)) {
             for (FileChunk chunk : chunks) {
                 try (InputStream is = chunkStorage.getFile(chunk.getKey())) {
@@ -184,6 +205,11 @@ public class ChunkService {
             fileStorage.deleteFile(tempFileKey); // 合并失败，删除临时文件
             throw new IOException("Failed to merge chunks for fileId: " + fileId, e);
         }
+
+        long endTime = System.currentTimeMillis();
+        double executionTimeSeconds = (endTime - startTime) / 1000.0;
+        // TODO: 6GB文件需要4分钟，需要改进。
+        System.out.println("执行耗时: " + executionTimeSeconds + " 秒");
 
         String hash = HashUtil.bytesToHex(sha256.digest());
 
@@ -217,152 +243,18 @@ public class ChunkService {
         fileChunkMapper.updateAllStatusByFileId(fileId, FileChunkStatus.MERGE_SUCCESS.getCode());
 
         // 6. 异步清理分片记录和物理文件
-        cleanupChunksAsync(chunks);
+        if (!CollectionUtils.isEmpty(chunks)) {
+            cleanupChunkService.cleanup(chunks);
+        }
 
         // 7. 更新缓存
         invalidateParentCache(node.getParentId());
     }
 
     /**
-     * 异步清理分片数据
-     */
-    private void cleanupChunksAsync(List<FileChunk> chunks) {
-        if (CollectionUtils.isEmpty(chunks)) return;
-        Long fileId = chunks.get(0).getFileId();
-        CompletableFuture.runAsync(() -> {
-            try {
-                // 删除物理分片文件
-                for (FileChunk chunk : chunks) {
-                    try {
-                        chunkStorage.deleteFile(chunk.getKey());
-                    } catch (IOException e) {
-                        log.error("Failed to delete chunk file: {}", chunk.getKey(), e);
-                    }
-                }
-                // 删除数据库分片记录
-                fileChunkMapper.deleteByFileId(fileId);
-                log.info("Successfully cleaned up chunks for fileId: {}", fileId);
-            } catch (Exception e) {
-                log.error("Error during async chunk cleanup for fileId: {}", fileId, e);
-            }
-        });
-    }
-
-    /**
-     * 下载文件（支持断点续传）
-     *
-     * @param fileId   文件ID
-     * @param request  HTTP请求
-     * @param response HTTP响应
-     * @throws IOException IO异常
-     */
-    public void downloadFile(Long fileId, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        NodeDetailDTO node = nodeMapper.selectNodeDetailById(fileId);
-        if (node == null || Objects.equals(NodeTypeEnum.DIR.getCode(), node.getType())) {
-            response.sendError(SC_NOT_FOUND, "File not found");
-            return;
-        }
-
-        HashRefNum hashRefNum = node.getHashId() != null ? hashRefNumMapper.selectById(node.getHashId()) : null;
-        if (hashRefNum == null) {
-            response.sendError(SC_NOT_FOUND, "File data not found");
-            return;
-        }
-
-        String fileKey = hashRefNum.getRefPath();
-
-        try (InputStream is = fileStorage.getFile(fileKey)) {
-            if (is == null) {
-                response.sendError(SC_NOT_FOUND, "File data not found");
-                return;
-            }
-
-            long fileSize = node.getSize();
-            // 处理Range请求
-            long[] range = parseRangeHeader(request, fileSize);
-            long start = range[0];
-            long end = range[1];
-            long length = end - start + 1;
-
-            response.setContentType(node.getMimeTypeName() != null ? node.getMimeTypeName() : "application/octet-stream");
-            response.setHeader("Content-Disposition", "attachment; filename=\"" + node.getName() + "\"");
-            response.setHeader("Accept-Ranges", "bytes");
-
-            // 根据是否是范围请求设置不同的响应头
-            if (request.getHeader("Range") != null) {
-                response.setStatus(SC_PARTIAL_CONTENT);
-                response.setHeader("Content-Range", "bytes " + start + "-" + end + "/" + fileSize);
-                response.setContentLengthLong(length);
-            } else {
-                response.setStatus(HttpServletResponse.SC_OK);
-                response.setContentLengthLong(fileSize);
-            }
-
-            // 跳过起始字节
-            if (start > 0) {
-                long bytesToSkip = start;
-                while (bytesToSkip > 0) {
-                    long skipped = is.skip(bytesToSkip);
-                    if (skipped <= 0) {
-                        // 如果无法再跳过任何字节，但还没到目标位置，说明流出了问题
-                        throw new IOException("Unable to skip to the specified start position.");
-                    }
-                    bytesToSkip -= skipped;
-                }
-            }
-
-            // 流式传输
-            try (OutputStream os = response.getOutputStream()) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                long bytesToWrite = length;
-                while (bytesToWrite > 0 && (bytesRead = is.read(buffer, 0, (int) Math.min(buffer.length, bytesToWrite))) != -1) {
-                    os.write(buffer, 0, bytesRead);
-                    bytesToWrite -= bytesRead;
-                }
-                os.flush();
-            }
-        }
-    }
-
-    /**
-     * 解析Range头，返回[start, end]
-     */
-    private long[] parseRangeHeader(HttpServletRequest request, long fileSize) {
-        String rangeHeader = request.getHeader("Range");
-        if (rangeHeader == null || !rangeHeader.startsWith("bytes=")) {
-            return new long[]{0, fileSize - 1};
-        }
-        // "bytes=0-499" or "bytes=500-" or "bytes=-500"
-        String rangeValue = rangeHeader.substring(6);
-        long start = 0, end = fileSize - 1;
-
-        if (rangeValue.startsWith("-")) { // e.g., "-500" (last 500 bytes)
-            long lastBytes = Long.parseLong(rangeValue.substring(1));
-            start = Math.max(0, fileSize - lastBytes);
-        } else {
-            String[] parts = rangeValue.split("-");
-            start = Long.parseLong(parts[0]);
-            if (parts.length > 1 && !parts[1].isEmpty()) {
-                end = Long.parseLong(parts[1]);
-            }
-        }
-
-        // 保证范围有效
-        if (start < 0 || start >= fileSize || start > end) {
-            return new long[]{0, fileSize - 1};
-        }
-        return new long[]{start, Math.min(end, fileSize - 1)};
-    }
-
-    /**
      * 使父目录的缓存失效
      */
     private void invalidateParentCache(Long parentId) {
-        if (parentId == null) {
-            nodeCache.deleteRootChildren();
-        } else {
-            nodeCache.deleteChildrenCache(parentId);
-        }
+        nodeCache.deleteChildrenCache(parentId);
     }
 }

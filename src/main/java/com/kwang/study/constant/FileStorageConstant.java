@@ -1,4 +1,4 @@
-package com.kwang.study.common;
+package com.kwang.study.constant;
 
 import com.kwang.study.enums.NodeTypeEnum;
 

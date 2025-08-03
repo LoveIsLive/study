@@ -14,7 +14,8 @@ public class AppConfig {
 
     @Data
     public static class FileStorageConfig {
-        private String filePath;
-        private String chunkPath;
+        private String filePath = "/filedata";
+        private String chunkPath = "/filedata/chunk";
+        private Integer chunkSize = 10 * 1024 * 1024;
     }
 }

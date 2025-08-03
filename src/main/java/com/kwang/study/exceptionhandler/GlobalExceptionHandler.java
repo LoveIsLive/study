@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartException;
 import java.io.IOException;
 import java.util.stream.Collectors;
 
-@RestControllerAdvice
+//@RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

@@ -1,5 +1,6 @@
 package com.kwang.study.utils;
 
+import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -15,9 +16,9 @@ public class HashUtil {
         }
     }
 
-    public static String sha256Hash(byte[] input) {
-        byte[] hashBytes = md.digest(input);
-        return bytesToHex(hashBytes);
+    public static String sha256Hash(byte[] input, int offset, int len) {
+        md.update(input, offset, len);
+        return bytesToHex(md.digest());
     }
 
     public static MessageDigest sha256() {

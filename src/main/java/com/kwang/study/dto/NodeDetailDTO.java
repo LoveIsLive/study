@@ -16,4 +16,7 @@ public class NodeDetailDTO extends Node {
      * 文件的MIME类型名称 (e.g., "application/json")
      */
     private String mimeTypeName;
+
+    // 完整路径
+    private String fullPath;
 }

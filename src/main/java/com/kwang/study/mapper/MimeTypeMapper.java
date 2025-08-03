@@ -3,6 +3,8 @@ package com.kwang.study.mapper;
 import com.kwang.study.pojo.MimeType;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 @Mapper
 public interface MimeTypeMapper {
 
@@ -26,4 +28,6 @@ public interface MimeTypeMapper {
      * @return 影响的行数 (会设置对象的id)
      */
     int insertMimeType(MimeType mimeType);
+
+    List<MimeType> selectAll();
 }

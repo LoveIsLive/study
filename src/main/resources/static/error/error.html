@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>糟糕！出错了</title>
+
+    <link rel="stylesheet" href="/static/lib/css/font-awesome-all.min.css">
+    <link rel="stylesheet" href="/static/error/error.css">
+</head>
+<body>
+
+<div class="error-container">
+    <!-- 插画容器 -->
+    <div class="illustration-container">
+        <!-- 404 插画 (默认隐藏) -->
+        <div id="illustration-404" class="illustration" style="display: none;">
+            <!-- SVG 代码直接嵌入 -->
+            <svg viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg"><path d="M544 0h-448c-52.8 0-96 43.2-96 96v288c0 52.8 43.2 96 96 96h448c52.8 0 96-43.2 96-96v-288c0-52.8-43.2-96-96-96z" fill="#f2f2f2"/><path d="M544 32h-448c-35.2 0-64 28.8-64 64v288c0 35.2 28.8 64 64 64h448c35.2 0 64-28.8 64-64v-288c0-35.2-28.8-64-64-64z" fill="#4d4d4d"/><path d="M128 352h384v-224c0-17.6-14.4-32-32-32h-320c-17.6 0-32 14.4-32 32v224z" fill="#f2f2f2"/><path d="M480 96h-320c-17.6 0-32 14.4-32 32v32h384v-32c0-17.6-14.4-32-32-32z" fill="#b3b3b3"/><g fill="#4d4d4d"><path d="M160 112h32v32h-32zM208 112h32v32h-32zM256 112h32v32h-32z"/><path d="M464 112h-16v32h16c8.8 0 16-7.2 16-16s-7.2-16-16-16z"/></g><path d="M128 352h384v-192h-384v192z" fill="#fff"/><g fill="#808080"><path d="M192 224h-32v32h32v-32zM256 224h-32v32h32v-32zM224 256h-32v32h32v-32zM192 288h-32v32h32v-32zM320 224h-32v32h32v-32zM384 224h-32v32h32v-32zM448 224h-32v32h32v-32zM352 256h-32v32h32v-32zM416 256h-32v32h32v-32zM288 288h-32v32h32v-32zM352 288h-32v32h32v-32zM256 288h-32v32h32v-32zM416 320h-160c-8.8 0-16 7.2-16 16s7.2 16 16 16h160c8.8 0 16-7.2 16-16s-7.2-16-16-16z"/></g><path d="M224 240c0-4.4-3.6-8-8-8s-8 3.6-8 8v8c0 4.4 3.6 8 8 8s8-3.6 8-8v-8z" fill="#ff4d4d" transform="rotate(-45 216 248)"/><path d="M208 248h16v16h-16z" fill="#ff4d4d" transform="rotate(-45 216 248)"/><path d="M216 224c-13.2 0-24 10.8-24 24s10.8 24 24 24 24-10.8 24-24-10.8-24-24-24zm0 40c-8.8 0-16-7.2-16-16s7.2-16 16-16 16 7.2 16 16-7.2 16-16 16z" fill="#ff4d4d"/></svg>
+        </div>
+        <!-- 500 插画 (默认隐藏) -->
+        <div id="illustration-500" class="illustration" style="display: none;">
+            <!-- SVG 代码直接嵌入 -->
+            <svg viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg"><path d="M544 0h-448c-52.8 0-96 43.2-96 96v288c0 52.8 43.2 96 96 96h448c52.8 0 96-43.2 96-96v-288c0-52.8-43.2-96-96-96z" fill="#f2f2f2"/><path d="M544 32h-448c-35.2 0-64 28.8-64 64v288c0 35.2 28.8 64 64 64h448c35.2 0 64-28.8 64-64v-288c0-35.2-28.8-64-64-64z" fill="#4d4d4d"/><path d="M384 64h-128v64h128v-64z" fill="#b3b3b3"/><path d="M368 64h-96v16h96v-16zM368 112h-96v16h96v-16z" fill="#808080"/><g fill="#f2f2f2"><path d="M160 384h-64v-256h64v256zM544 384h-64v-256h64v256zM160 128h320v256h-320v-256z"/></g><path d="M480 160h-320v192h320v-192z" fill="#fff"/><g><path d="M224 208c-17.6 0-32 14.4-32 32s14.4 32 32 32 32-14.4 32-32-14.4-32-32-32z" fill="#ffc107"/><path d="M224 224c-8.8 0-16 7.2-16 16s7.2 16 16 16 16-7.2 16-16-7.2-16-16-16z" fill="#ff9800"/></g><path d="M416 208h-128c-8.8 0-16 7.2-16 16s7.2 16 16 16h128c8.8 0 16-7.2 16-16s-7.2-16-16-16z" fill="#ccc"/><path d="M416 256h-128c-8.8 0-16 7.2-16 16s7.2 16 16 16h128c8.8 0 16-7.2 16-16s-7.2-16-16-16z" fill="#ccc"/><path d="M245.6 285.6l-48-48c-6.4-6.4-16.8-6.4-23.2 0s-6.4 16.8 0 23.2l48 48c6.4 6.4 16.8 6.4 23.2 0s6.4-16.8 0-23.2z" fill="#ff4d4d"/><path d="M197.6 285.6l48-48c6.4-6.4 6.4-16.8 0-23.2s-16.8-6.4-23.2 0l-48 48c-6.4 6.4-6.4 16.8 0 23.2s16.8 6.4 23.2 0z" fill="#ff4d4d"/></svg>
+        </div>
+    </div>
+
+    <h1 id="error-title"></h1>
+    <p id="error-description"></p>
+
+    <div class="error-actions">
+        <a href="javascript:history.back()" class="action-btn">
+            <i class="fas fa-arrow-left"></i> 返回
+        </a>
+        <a href="/" class="action-btn primary">
+            <i class="fas fa-home"></i> 回到主页
+        </a>
+    </div>
+</div>
+
+<script src="/static/error/error.js"></script>
+
+</body>
+</html>

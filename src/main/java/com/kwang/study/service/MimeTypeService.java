@@ -8,8 +8,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 @Service
 public class MimeTypeService {
@@ -60,5 +62,15 @@ public class MimeTypeService {
             idToNameCache.put(newId, name);
             return newId;
         }
+    }
+
+    /**
+     * 获取所有MIME类型的名称列表
+     * @return MIME类型名称列表
+     */
+    public List<String> getAllMimeTypeNames() {
+        return mimeTypeMapper.selectAll().stream()
+                .map(MimeType::getName)
+                .collect(Collectors.toList());
     }
 }

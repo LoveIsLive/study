@@ -8,18 +8,19 @@
         <result property="key" column="key"/>
         <result property="status" column="status"/>
         <result property="createTime" column="create_time"/>
+        <result property="size" column="size"/>
     </resultMap>
 
     <insert id="insertChunk">
-        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`)
-        VALUES (#{fileId}, #{chunkIndex}, #{key}, #{status})
+        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`, `size`)
+        VALUES (#{fileId}, #{chunkIndex}, #{key}, #{status}, #{size})
     </insert>
 
     <insert id="batchInsertChunks">
-        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`)
+        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`, `szie`)
         VALUES
         <foreach collection="chunks" item="chunk" separator=",">
-            (#{chunk.fileId}, #{chunk.chunkIndex}, #{chunk.key}, #{chunk.status})
+            (#{chunk.fileId}, #{chunk.chunkIndex}, #{chunk.key}, #{chunk.status}, #{size})
         </foreach>
     </insert>
 
@@ -42,6 +43,13 @@
     <select id="countChunksByStatus" resultType="int">
         SELECT COUNT(*) FROM file_chunk
         WHERE file_id = #{fileId} AND `status` = #{status}
+    </select>
+
+    <select id="selectSizeSumByFileIdAndStatus" resultType="long">
+        SELECT COALESCE(SUM(size), 0)
+        FROM file_chunk
+        WHERE file_id = #{fileId}
+          AND status = #{status}
     </select>
 
 </mapper>

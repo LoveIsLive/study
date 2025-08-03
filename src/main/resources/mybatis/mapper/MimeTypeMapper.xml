@@ -17,4 +17,9 @@
         SELECT id, `name` FROM mime_types WHERE `name` = #{name}
     </select>
 
+    <select id="selectAll" resultType="com.kwang.study.pojo.MimeType">
+        SELECT id, name FROM mime_types ORDER BY name;
+    </select>
+
+
 </mapper>

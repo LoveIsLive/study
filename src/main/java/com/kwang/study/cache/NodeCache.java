@@ -1,5 +1,6 @@
 package com.kwang.study.cache;
 
+import com.kwang.study.dto.NodeDetailDTO;
 import com.kwang.study.pojo.Node;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -23,7 +24,8 @@ public class NodeCache {
 
     public static final String NODE_KEY_PREFIX = "filesystem:node:";
     public static final String CHILDREN_KEY_PREFIX = "filesystem:children:";
-    public static final String ROOT_KEY = "filesystem:ROOT";
+    // 根目录内容的缓存key
+    public static final String ROOT_DIR_KEY = "null";
 
     // 缓存过期时间（10分钟）
     public static final long TIMEOUT_SECONDS = 10 * 60;
@@ -53,31 +55,6 @@ public class NodeCache {
     }
 
     /**
-     * 缓存目录的子节点列表
-     *
-     * @param parentId 父节点ID
-     * @param children 子节点列表
-     */
-    public void setChildrenCache(Long parentId, List<Node> children) {
-        if (parentId == null || children == null) return;
-        String key = CHILDREN_KEY_PREFIX + parentId;
-        redisTemplate.opsForValue().set(key, children, TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    }
-
-    /**
-     * 获取目录的子节点缓存
-     *
-     * @param parentId 父节点ID
-     * @return 子节点列表或null
-     */
-    @SuppressWarnings("unchecked")
-    public List<Node> getChildrenCache(Long parentId) {
-        if (parentId == null) return null;
-        String key = CHILDREN_KEY_PREFIX + parentId;
-        return (List<Node>) redisTemplate.opsForValue().get(key);
-    }
-
-    /**
      * 删除单个节点缓存
      *
      * @param id 节点ID
@@ -89,41 +66,42 @@ public class NodeCache {
     }
 
     /**
+     * 缓存目录的子节点列表
+     *
+     * @param parentId 父节点ID
+     * @param children 子节点列表
+     */
+    public void setChildrenCache(Long parentId, List<NodeDetailDTO> children) {
+        if (children == null) return;
+        String key = CHILDREN_KEY_PREFIX + (parentId == null ? ROOT_DIR_KEY : String.valueOf(parentId));
+        // 设置根目录永不超时
+        if (parentId == null) {
+            redisTemplate.opsForValue().set(key, children);
+        } else {
+            redisTemplate.opsForValue().set(key, children, TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * 获取目录的子节点详细信息缓存
+     *
+     * @param parentId 父节点ID
+     * @return 子节点列表或null
+     */
+    @SuppressWarnings("unchecked")
+    public List<NodeDetailDTO> getChildrenCache(Long parentId) {
+        String key = CHILDREN_KEY_PREFIX + (parentId == null ? ROOT_DIR_KEY : String.valueOf(parentId));
+        return (List<NodeDetailDTO>) redisTemplate.opsForValue().get(key);
+    }
+
+    /**
      * 删除目录的子节点缓存
      *
      * @param parentId 父节点ID
      */
     public void deleteChildrenCache(Long parentId) {
-        if (parentId == null) return;
-        String key = CHILDREN_KEY_PREFIX + parentId;
+        String key = CHILDREN_KEY_PREFIX + (parentId == null ? ROOT_DIR_KEY : String.valueOf(parentId));
         redisTemplate.delete(key);
-    }
-
-    /**
-     * 删除根目录缓存
-     */
-    public void deleteRootChildren() {
-        redisTemplate.delete(ROOT_KEY);
-    }
-
-    /**
-     * 缓存根目录的子节点列表 (永不过期)
-     *
-     * @param children 根目录子节点列表
-     */
-    public void setRootChildren(List<Node> children) {
-        if (children == null) return;
-        redisTemplate.opsForValue().set(ROOT_KEY, children);
-    }
-
-    /**
-     * 获取根目录的子节点缓存
-     *
-     * @return 根目录子节点列表或null
-     */
-    @SuppressWarnings("unchecked")
-    public List<Node> getRootChildren() {
-        return (List<Node>) redisTemplate.opsForValue().get(ROOT_KEY);
     }
 
     /**

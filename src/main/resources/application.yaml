@@ -1,6 +1,7 @@
 logging:
   config: "classpath:config/log4j2.xml"
 
+
 spring:
   application:
     name: study
@@ -14,9 +15,26 @@ spring:
     time-zone: GMT+8
     deserialization:
       fail-on-unknown-properties: false
+    serialization:
+      write-dates-as-timestamps: false
   redis:
     host: 192.168.56.10
     port: 6379
+#      cache, 生产环境下开启
+#      cache:
+#        cachecontrol:
+#          max-age: 365d
+#      chain:
+#        enabled: true
+#        strategy:
+#          content:
+#            enabled: true
+  servlet:
+    multipart:
+      max-request-size: 15MB
+      max-file-size: 10MB
+  mvc:
+    static-path-pattern: static/**
 
 mybatis:
   mapper-locations: "classpath:mybatis/mapper/*.xml"
@@ -30,6 +48,7 @@ kwang:
   filestorage:
     file-path: filedata
     chunk-path: filedata/chunk
+    chunk-size: 10485760 # 以字节为单位
 
 
 

@@ -33,7 +33,7 @@ public interface FileStorage {
 
 
     /*
-    打开一个文件
+    打开一个文件，若文件不存在则创建
      */
     OutputStream openFile(String key) throws IOException;
 }

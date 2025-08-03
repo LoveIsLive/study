@@ -1,24 +1,66 @@
 package com.kwang.study.filesystem;
 
+import com.kwang.study.enums.FileChunkStatus;
+import com.kwang.study.pojo.FileChunk;
+import com.kwang.study.utils.HashUtil;
 import org.apache.catalina.core.StandardContext;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
 
 public class FileTest {
     public static void main(String[] args) throws Exception {
-//        Path path = Path.of("content");
-//        Files.createDirectory(path);
-//        InputStream stream = Files.newInputStream(path);
-//        System.out.println(new String(stream.readAllBytes()));
-//        stream.close();
-//        System.out.println(path.toAbsolutePath().toUri());
+        LocalFileStorage fileStorage = new LocalFileStorage("filedata");
+        LocalFileStorage chunkStorage = new LocalFileStorage("filedata/chunk");
+        FileChunk chunk0 = new FileChunk();
+        chunk0.setKey("10-0");
+        FileChunk chunk1 = new FileChunk();
+        chunk1.setKey("10-1");
+        FileChunk chunk2 = new FileChunk();
+        chunk2.setKey("10-2");
+        FileChunk chunk3 = new FileChunk();
+        chunk3.setKey("10-3");
+        ArrayList<FileChunk> chunks = new ArrayList<>();
+        Collections.addAll(chunks, chunk0, chunk1, chunk2, chunk3);
+        MessageDigest sha256 = HashUtil.sha256();
 
-//        System.out.println(Paths.get("./filedata").toAbsolutePath());
-        System.out.println(String.valueOf(Integer.MAX_VALUE));
+        long startTime = System.currentTimeMillis();
+
+        try (OutputStream os = fileStorage.openFile("123456")) {
+            for (FileChunk chunk : chunks) {
+                try (InputStream is = chunkStorage.getFile(chunk.getKey())) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = is.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                        sha256.update(buffer, 0, bytesRead);
+                    }
+                }
+            }
+
+        } catch (IOException e) {
+
+        }
+
+        long endTime = System.currentTimeMillis();
+        double executionTimeSeconds = (endTime - startTime) / 1000.0;
+
+        System.out.println("执行耗时: " + executionTimeSeconds + " 秒");
+    }
+}
+
+class A {
+    public static void main(String[] args) {
+        Path path = Paths.get("/", "home");
+        System.out.println(path.toAbsolutePath());
     }
 }
