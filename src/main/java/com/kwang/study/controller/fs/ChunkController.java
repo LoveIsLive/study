@@ -1,14 +1,17 @@
 package com.kwang.study.controller.fs;
 
+import cn.hutool.core.util.ObjectUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.dto.fs.request.InitUploadBigFileRequestDTO;
 import com.kwang.study.dto.fs.request.UploadChunkRequestDTO;
+import com.kwang.study.dto.fs.result.UploadChunkResponseDTO;
 import com.kwang.study.pojo.fs.Node;
 import com.kwang.study.service.fs.ChunkService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +30,7 @@ import static com.kwang.study.constant.ApiPrefixConstant.FS_BASE_PREFIX;
 @RequestMapping(FS_BASE_PREFIX + "/chunk")
 @Validated
 @Slf4j
+@PreAuthorize("hasRole('ROLE_TEACHER')")
 public class ChunkController {
     @Autowired
     private ChunkService chunkService;
@@ -47,37 +51,21 @@ public class ChunkController {
     public ResponseEntity<?> uploadChunk(@Valid @RequestBody UploadChunkRequestDTO requestDTO) throws Exception {
         requestDTO.check();
 
-        long fileId = requestDTO.getFileId();
-        int totalChunks = requestDTO.getTotalChunks();
-
-        try (InputStream chunkInputStream = requestDTO.getChunk().getInputStream()) {
-            chunkService.uploadChunk(fileId, requestDTO.getChunkIndex(), chunkInputStream);
+        UploadChunkResponseDTO merge = chunkService.uploadChunkAndMerge(requestDTO.getFileId(), requestDTO.getChunkIndex(),
+                requestDTO.getTotalChunks(), requestDTO.getChunk().getInputStream());
+        if (Boolean.TRUE.equals(merge.getMerged())) {
+            return ResponseEntity.ok(R.success("上传完成，分片已完全合并"));
+        } else if (Boolean.FALSE.equals(merge.getMerged())) {
+            String progress = String.format("Chunk %d/%d uploaded.",
+                    merge.getUploadNum() == null ? 0 : merge.getUploadNum(), requestDTO.getTotalChunks());
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success(progress, "分片上传成功"));
+        } else if (Boolean.TRUE.equals(merge.getSuccess())){
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success("正在合并"));
+        } else {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(R.error(merge.getErrorMessage()));
         }
-        int uploadedCount = chunkService.countUploadedChunks(fileId);
-
-
-        // 双重检查锁定，防止高并发下重复调用mergeChunks
-        if (uploadedCount == totalChunks) {
-            Object val = mapLock.putIfAbsent(fileId, new Object());
-            if (val != null) {
-                log.info("并发合并，fileId: {}", fileId);
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success( "正在合并"));
-            }
-            try {
-                // 再次检查，因为可能在获取锁的期间，其他线程已经完成了合并
-                uploadedCount = chunkService.countUploadedChunks(fileId);
-                if (uploadedCount == totalChunks) {
-                    log.info("All chunks for fileId {} are uploaded. Starting merge.", fileId);
-                    chunkService.mergeChunks(fileId);
-                    return ResponseEntity.ok(R.success("Upload complete and file merged."));
-                }
-            } finally {
-                mapLock.remove(fileId);
-            }
-        }
-
-        String progress = String.format("Chunk %d/%d uploaded.", uploadedCount, totalChunks);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success(progress, "分片上传成功"));
     }
 
 }

@@ -16,6 +16,10 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addViewController("/fs/**")
                 .setViewName("forward:/static/fs/fs.html");
 
+        // 认证授权系统
+        registry.addViewController("/auth/**")
+                .setViewName("forward:/static/auth/login.html");
+
         // 主页
         registry.addViewController("/")
                 .setViewName("redirect:/fs");

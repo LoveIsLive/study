@@ -20,25 +20,25 @@ spring:
   redis:
     host: 192.168.56.10
     port: 6379
-#      cache, 生产环境下开启
-#      cache:
-#        cachecontrol:
-#          max-age: 365d
-#      chain:
-#        enabled: true
-#        strategy:
-#          content:
-#            enabled: true
   servlet:
     multipart:
       max-request-size: 15MB
       max-file-size: 10MB
   mvc:
     static-path-pattern: static/**
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true
+      chain:
+        strategy:
+          content:
+            enabled: false
+
 
 mybatis:
-  mapper-locations: "classpath:mybatis/mapper/*.xml"
-  type-aliases-package: "com.kwang.study.pojo"
+  mapper-locations: "classpath:mybatis/mapper/**/*.xml"
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl  # console 输出，部署时要改为log4j2
@@ -49,7 +49,9 @@ kwang:
     file-path: filedata
     chunk-path: filedata/chunk
     chunk-size: 10485760 # 以字节为单位
-
+  jwt:
+    security: 571595a57dd149a29e7881fa9d20316bf5df686ba7387344cbd87607961dfe2c
+    expiration: 86400000
 
 
 

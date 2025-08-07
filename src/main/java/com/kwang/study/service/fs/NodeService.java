@@ -131,7 +131,8 @@ public class NodeService {
      * 注意：仅仅小文件可以调用这个方法，不会出现OOM
      */
     @Transactional
-    public Node createFile(String name, Long parentId, InputStream fileStream, String permissions, String mimeTypeName) throws IOException {
+    public Node createFile(String name, Long parentId, InputStream fileStream,
+                           String permissions, String mimeTypeName) throws IOException {
         validateParent(parentId);
 
         int chunkSize = appConfig.getFileStorage().getChunkSize();

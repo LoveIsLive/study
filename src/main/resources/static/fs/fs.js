@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPath = '/';
     let pathMap = new Map([ [null, '/'] ]);
     let stompClient = null;
-    let sessionId = '';
+    let roles = getRoles();
+    const isTeacher = roles.includes("ROLE_TEACHER");
 
     // --- CONFIG ---
     const API_BASE_URL = 'http://localhost:8080/api/v1';
@@ -13,12 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const CHUNK_SIZE = 10 * 1024 * 1024; // 分块上传的阈值
 
     // --- DOM ELEMENTS ---
+    // 提前动态渲染一些元素
+    const newDiv = document.getElementById('new-div');
+    if (isTeacher) {
+        newDiv.innerHTML = `<button id="new-btn" class="btn btn-primary"><i class="fas fa-plus"></i> 新建</button>`;
+    }
+
     const fileListBody = document.getElementById('file-list');
     const breadcrumb = document.getElementById('breadcrumb');
     const loadingSpinner = document.getElementById('loading-spinner');
 
     const newItemModal = document.getElementById('new-item-modal');
-    const newBtn = document.getElementById('new-btn');
     const closeModalBtns = document.querySelectorAll('.close-btn');
 
     const showNewDirBtn = document.getElementById('show-new-dir-form');
@@ -45,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- API HELPERS ---
-    const fsApi = axios.create({ baseURL: FS_BASE_URL });
+    const fsApi = axiosCreate(FS_BASE_URL);
+
     const showLoading = (show) => {
         loadingSpinner.style.display = show ? 'flex' : 'none';
         fileListBody.style.display = show ? 'none' : 'table-row-group';
@@ -157,8 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.mime = node.mimeTypeId; // Assuming backend provides this
 
             // Build full path for this node and store it
-            const nodeFullPath = (currentPath === '/' ? '' : currentPath) + '/' + node.name;
+            const nodeFullPath = buildNewPath(currentPath, node.name);
             pathMap.set(node.id, nodeFullPath);
+
+            const teacherActions = isTeacher ? `
+            <i class="fas fa-edit action-icon rename-icon" title="重命名"></i>
+            <i class="fas fa-trash-alt action-icon delete-icon" title="删除"></i>
+        ` : '';
 
             const actions = `
                 <div class="actions-container">
@@ -170,8 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </a>
                       ` : ''}
                     <i class="fas fa-info-circle action-icon details-icon" title="属性"></i>
-                    <i class="fas fa-edit action-icon rename-icon" title="重命名"></i>
-                    <i class="fas fa-trash-alt action-icon delete-icon" title="删除"></i>
+                    ${teacherActions}
                 </div>
             `;
             const displayName = node.type === 100 ? node.name + "（正在上传）" : node.name;
@@ -185,8 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (node.type === 0) { // Is a directory
                 tr.addEventListener('dblclick', () => {
-                    const newPath = currentPath + node.name;
-                    renderDirAndUpdateUrl(node.id, newPath);
+                    renderDirAndUpdateUrl(node.id, buildNewPath(currentPath, node.name));
                 });
             }
 
@@ -194,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // TODO: 面包屑需要更改导航栏路径
     const updateBreadcrumb = () => {
         breadcrumb.innerHTML = '';
         const parts = currentPath.split('/').filter(p => p);
@@ -273,12 +282,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT HANDLERS ---
 
     // Modal Handling
-    newBtn.onclick = () => {
-        newDirForm.style.display = 'none';
-        uploadFileForm.style.display = 'none';
-        document.getElementById('new-item-options').style.display = 'flex';
-        newItemModal.style.display = 'block';
-    };
+    if (isTeacher) {
+        document.getElementById('new-btn').onclick = () => {
+            newDirForm.style.display = 'none';
+            uploadFileForm.style.display = 'none';
+            document.getElementById('new-item-options').style.display = 'flex';
+            newItemModal.style.display = 'block';
+        };
+    }
+
     closeModalBtns.forEach(btn => btn.onclick = () => {
         btn.closest('.modal').style.display = 'none';
     });
@@ -747,9 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 处理相对路径：如果不是以'/'开头，则与当前路径拼接
             if (!userInput.startsWith('/')) {
-                // 确保当前路径以'/'结尾，且拼接后没有'//'
-                const basePath = currentPath.endsWith('/') ? currentPath : currentPath + '/';
-                targetPath = basePath + userInput;
+                targetPath = buildNewPath(currentPath, userInput);
             }
 
             // 现在我们有了一个绝对路径，可以进行导航
@@ -766,7 +776,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const connectWebSocket = () => {
         const socket = new SockJS('/ws/search');
         stompClient = Stomp.over(socket);
-        stompClient.connect({}, (frame) => {
+        const headers = {
+            'Authorization': 'Bearer ' + token
+        };
+        stompClient.connect(headers, (frame) => {
             console.log('Connected: ' + frame);
 
             stompClient.subscribe('/user/queue/search-results', (message) => {
@@ -794,8 +807,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 searchResultsList.appendChild(item);
             });
         }, (error) => {
-            console.error('STOMP error:', error);
-            setTimeout(connectWebSocket, 5000); // Reconnect on error
+            console.error('STOMP connection error:', error);
+            // 如果连接错误是认证失败导致的，后端可能会主动关闭连接
+            // 这时可以检查错误类型，如果是认证问题，就跳转到登录页
+            if (error.headers && error.headers.message && error.headers.message.includes('AccessDenied')) {
+                // 自定义错误处理
+                toast('warning', '权限被拒绝');
+            } else {
+                setTimeout(connectWebSocket, 5000); // 尝试重连
+            }
         });
     };
 

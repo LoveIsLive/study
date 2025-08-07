@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kwang.study.mapper.auth.UserMapper">
+
+    <!-- 根据用户名查询用户及其角色信息 -->
+    <resultMap id="UserWithRolesMap" type="com.kwang.study.pojo.auth.User">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <!-- 其他User实体属性映射 -->
+        <collection property="roles" ofType="com.kwang.study.pojo.auth.Role"
+                    select="findRolesByUserId" column="id"/>
+    </resultMap>
+
+    <!-- 根据用户名查询用户 -->
+    <select id="findByUsername" parameterType="string" resultMap="UserWithRolesMap">
+        SELECT u.* FROM users u WHERE u.username = #{username}
+    </select>
+
+    <!-- 根据用户ID查询角色列表 -->
+    <select id="findRolesByUserId" parameterType="long" resultType="com.kwang.study.pojo.auth.Role">
+        SELECT r.* FROM roles r
+                            INNER JOIN user_roles ur ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId}
+    </select>
+
+</mapper>

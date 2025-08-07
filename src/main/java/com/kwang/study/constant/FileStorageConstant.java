@@ -10,6 +10,8 @@ public class FileStorageConstant {
     public static final List<Integer> COMMON_FILE_TYPE = List.of(NodeTypeEnum.FILE.getCode(),
             NodeTypeEnum.DIR.getCode());
 
+
+
     public static final List<Integer> ALL_FILE_TYPE = Arrays.stream(NodeTypeEnum.values())
             .map(NodeTypeEnum::getCode).collect(Collectors.toList());
 }

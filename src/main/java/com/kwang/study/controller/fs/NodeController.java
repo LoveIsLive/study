@@ -11,6 +11,7 @@ import com.kwang.study.service.fs.NodeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,6 +48,7 @@ public class NodeController {
      * @return 包含新创建的目录节点的响应
      */
     @PostMapping("/directories")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<Node>> createDirectory(@Valid @RequestBody CreateDirectoryDTO request) {
         request.check();
 
@@ -73,14 +75,13 @@ public class NodeController {
      * @throws IOException IO异常
      */
     @PostMapping("/files")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<Node>> uploadFile(@Valid @RequestBody UploadFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
 
-        try (InputStream inputStream = requestDTO.getFile().getInputStream()) {
-            Node node = nodeService.createFile(requestDTO.getName(), requestDTO.getParentId(),
-                    inputStream, requestDTO.getPermissions(), requestDTO.getMimeTypeName());
-            return ResponseEntity.status(201).body(R.success(node, "文件上传成功"));
-        }
+        Node node = nodeService.createFile(requestDTO.getName(), requestDTO.getParentId(),
+                requestDTO.getFile().getInputStream(), requestDTO.getPermissions(), requestDTO.getMimeTypeName());
+        return ResponseEntity.status(201).body(R.success(node, "文件上传成功"));
     }
 
     @GetMapping("/{id}/download")
@@ -92,6 +93,7 @@ public class NodeController {
 
     // 删除节点（文件或目录）
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<Void>> deleteNode(@PathVariable Long id) throws IOException {
         Node node = nodeService.getNodeById(id);
         if (node == null) {
@@ -115,6 +117,7 @@ public class NodeController {
      * @return 更新后的节点信息
      */
     @PatchMapping("/{id}/rename")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<Node>> renameNode(
             @PathVariable Long id,
             @RequestParam(value = "newName") @NotBlank(message = "新名称不能为空")

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kwang's File System</title>
+    <!--   认证守卫 -->
+    <script src="/static/common/js/auth_guard.js"></script>
+
     <link rel="stylesheet" href="/static/fs/fs.css">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="/static/lib/css/font-awesome-all.min.css">
@@ -11,8 +14,8 @@
 <body>
 <div class="file-manager">
     <header class="file-manager-header">
-        <div class="header-left">
-            <button id="new-btn" class="btn btn-primary"><i class="fas fa-plus"></i> 新建</button>
+        <div class="header-left" id="new-div">
+
         </div>
         <div class="header-center">
             <div class="path-container">
@@ -114,7 +117,11 @@
 <!-- SockJS and Stomp.js for WebSocket communication -->
 <script src="/static/lib/js/sockjs.min.js"></script>
 <script src="/static/lib/js/stomp.min.js"></script>
+<script src="/static/lib/js/jwt-decode.min.js"></script>
 <!-- Custom JS -->
+<script src="/static/common/js/common_utils.js"></script>
+<script src="/static/common/js/axios_create.js"></script>
 <script src="/static/fs/fs.js"></script>
+
 </body>
 </html>

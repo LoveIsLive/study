@@ -32,6 +32,6 @@ public class UploadChunkRequestDTO extends BaseRequestDTO {
     @Override
     public void check() {
         super.check();
-        Assert.isTrue(chunkIndex < totalChunks, "块索引不能大于快数量");
+        Assert.isTrue(chunkIndex < totalChunks, "块索引不能大于块数量");
     }
 }

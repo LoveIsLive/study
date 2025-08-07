@@ -2,7 +2,9 @@ package com.kwang.study.service.fs;
 
 import cn.hutool.core.collection.CollectionUtil;
 import com.kwang.study.cache.NodeCache;
+import com.kwang.study.common.R;
 import com.kwang.study.configuration.AppConfig;
+import com.kwang.study.dto.fs.result.UploadChunkResponseDTO;
 import com.kwang.study.enums.FileChunkStatus;
 import com.kwang.study.enums.NodeTypeEnum;
 import com.kwang.study.enums.PermissionsEnum;
@@ -19,6 +21,8 @@ import com.kwang.study.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -33,6 +37,7 @@ import java.security.MessageDigest;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 @Service
@@ -69,6 +74,8 @@ public class ChunkService {
 
     @Autowired
     private AsyncCleanupChunkService cleanupChunkService;
+
+    private final ConcurrentHashMap<Long, Object> mapLock = new ConcurrentHashMap<>();
 
     /**
      * 初始化一个大文件上传节点，该节点是中间状态。
@@ -109,6 +116,40 @@ public class ChunkService {
         return node;
     }
 
+    @Transactional
+    public UploadChunkResponseDTO uploadChunkAndMerge(Long fileId, Integer chunkIndex,
+                                                      Integer totalChunks, InputStream chunkStream) throws IOException {
+        UploadChunkResponseDTO responseDTO = new UploadChunkResponseDTO();
+        this.uploadChunk(fileId, chunkIndex, chunkStream);
+
+        int uploadedCount = this.countUploadedChunks(fileId);
+
+        // 双重检查锁定，防止高并发下重复调用mergeChunks
+        if (uploadedCount == totalChunks) {
+            Object val = mapLock.putIfAbsent(fileId, new Object());
+            if (val != null) {
+                log.info("并发合并，fileId: {}", fileId);
+            }
+            try {
+                // 再次检查，因为可能在获取锁的期间，其他线程已经完成了合并
+                uploadedCount = this.countUploadedChunks(fileId);
+                if (uploadedCount == totalChunks) {
+                    log.info("All chunks for fileId {} are uploaded. Starting merge.", fileId);
+                    this.mergeChunks(fileId);
+                    responseDTO.setMerged(Boolean.TRUE);
+                    responseDTO.setUploadNum(totalChunks);
+                }
+            } finally {
+                mapLock.remove(fileId);
+            }
+        } else {
+            responseDTO.setMerged(Boolean.FALSE);
+            responseDTO.setUploadNum(uploadedCount);
+        }
+        responseDTO.setSuccess(Boolean.TRUE);
+        return responseDTO;
+    }
+
     /**
      * 上传单个文件分片
      *
@@ -117,8 +158,7 @@ public class ChunkService {
      * @param chunkStream 分片内容的输入流
      * @throws IOException IO异常
      */
-    @Transactional
-    public void uploadChunk(Long fileId, Integer chunkIndex, InputStream chunkStream) throws IOException {
+    private void uploadChunk(Long fileId, Integer chunkIndex, InputStream chunkStream) throws IOException {
         Node node = nodeMapper.selectNodeById(fileId);
         if (node == null || !Objects.equals(NodeTypeEnum.CHUNK_INTERM.getCode(), node.getType())) {
             throw new IllegalArgumentException("Invalid fileId or the file is not in chunk uploading state.");
@@ -149,7 +189,7 @@ public class ChunkService {
      * @param fileId 关联的node.id
      * @return 已上传的分片数量
      */
-    public int countUploadedChunks(Long fileId) {
+    private int countUploadedChunks(Long fileId) {
         return fileChunkMapper.countChunksByStatus(fileId, FileChunkStatus.INIT.getCode());
     }
 
@@ -159,8 +199,7 @@ public class ChunkService {
      * @param fileId 关联的node.id
      * @throws IOException IO异常
      */
-    @Transactional
-    public void mergeChunks(Long fileId) throws IOException {
+    private void mergeChunks(Long fileId) throws IOException {
         Node node = nodeMapper.selectNodeById(fileId);
         if (node == null || !Objects.equals(NodeTypeEnum.CHUNK_INTERM.getCode(), node.getType())) {
             log.warn("Attempted to merge chunks for a non-existent or invalid node: {}", fileId);
