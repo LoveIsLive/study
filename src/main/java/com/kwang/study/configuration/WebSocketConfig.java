@@ -1,6 +1,6 @@
 package com.kwang.study.configuration;
 
-import com.kwang.study.interceptor.JwtChannelInterceptor;
+import com.kwang.study.auth.interceptor.JwtChannelInterceptor;
 import com.kwang.study.utils.CustomHandshakeHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;

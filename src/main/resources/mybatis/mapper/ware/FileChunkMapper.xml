@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.fs.mapper.FileChunkMapper">
+
+    <resultMap id="BaseResultMap" type="com.kwang.study.fs.pojo.FileChunk">
+        <id property="fileId" column="file_id"/>
+        <id property="chunkIndex" column="chunk_index"/>
+        <result property="key" column="key"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="size" column="size"/>
+    </resultMap>
+
+    <insert id="insertChunk">
+        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`, `size`)
+        VALUES (#{fileId}, #{chunkIndex}, #{key}, #{status}, #{size})
+    </insert>
+
+    <insert id="batchInsertChunks">
+        INSERT INTO file_chunk (file_id, chunk_index, `key`, `status`, `szie`)
+        VALUES
+        <foreach collection="chunks" item="chunk" separator=",">
+            (#{chunk.fileId}, #{chunk.chunkIndex}, #{chunk.key}, #{chunk.status}, #{size})
+        </foreach>
+    </insert>
+
+    <update id="updateAllStatusByFileId">
+        UPDATE file_chunk
+        SET `status` = #{status}
+        WHERE file_id = #{fileId}
+    </update>
+
+    <delete id="deleteByFileId">
+        DELETE FROM file_chunk WHERE file_id = #{fileId}
+    </delete>
+
+    <select id="selectAllByFileIdOrderByChunkIndex" resultMap="BaseResultMap">
+        SELECT * FROM file_chunk
+        WHERE file_id = #{fileId}
+        ORDER BY chunk_index ASC
+    </select>
+
+    <select id="countChunksByStatus" resultType="int">
+        SELECT COUNT(*) FROM file_chunk
+        WHERE file_id = #{fileId} AND `status` = #{status}
+    </select>
+
+    <select id="selectSizeSumByFileIdAndStatus" resultType="long">
+        SELECT COALESCE(SUM(size), 0)
+        FROM file_chunk
+        WHERE file_id = #{fileId}
+          AND status = #{status}
+    </select>
+
+</mapper>

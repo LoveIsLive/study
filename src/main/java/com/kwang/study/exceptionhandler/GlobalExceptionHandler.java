@@ -1,8 +1,6 @@
 package com.kwang.study.exceptionhandler;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.kwang.study.common.R;
-import com.kwang.study.exception.InvalidNodePermissionException;
-import com.kwang.study.exception.NodeNotFoundException;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -58,18 +56,6 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(R.error(HttpStatus.BAD_REQUEST.value(), message));
-    }
-
-    @ExceptionHandler(NodeNotFoundException.class)
-    public ResponseEntity<R<Void>> handleNodeNotFound() {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(R.error(HttpStatus.NOT_FOUND.value(), "Node not found"));
-    }
-
-    @ExceptionHandler(InvalidNodePermissionException.class)
-    public ResponseEntity<R<Void>> handleInvalidPermission() {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(R.error(HttpStatus.BAD_REQUEST.value(), "Invalid permission string"));
     }
 
     @ExceptionHandler(IOException.class)

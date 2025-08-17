@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.fs.mapper.HashRefNumMapper">
+
+    <resultMap id="BaseResultMap" type="com.kwang.study.fs.pojo.HashRefNum">
+        <id property="id" column="id"/>
+        <result property="hash" column="hash"/>
+        <result property="refPath" column="ref_path"/>
+        <result property="refNum" column="ref_num"/>
+        <result property="size" column="size"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, `hash`, ref_path, ref_num, `size`
+    </sql>
+
+    <insert id="insertHash" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO hash_ref_num(`hash`, ref_path, ref_num, `size`)
+        VALUES (#{hash}, #{refPath}, #{refNum}, #{size})
+    </insert>
+
+    <update id="incrementRefNum">
+        UPDATE hash_ref_num
+        SET ref_num = ref_num + 1
+        WHERE id = #{id} AND ref_num > 0
+    </update>
+
+    <update id="decrementRefNum">
+        UPDATE hash_ref_num
+        SET ref_num = ref_num - 1
+        WHERE id = #{id} AND ref_num > 0
+    </update>
+
+    <update id="batchDecrementRefNum">
+        UPDATE hash_ref_num
+        SET ref_num = ref_num - #{cnt}
+        WHERE id = #{id} AND ref_num >= #{cnt}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM hash_ref_num
+        WHERE id = #{id}
+    </delete>
+
+    <select id="selectByHash" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM hash_ref_num
+        WHERE `hash` = #{hash}
+    </select>
+
+    <select id="selectByHashForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM hash_ref_num
+        WHERE `hash` = #{hash} FOR UPDATE
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM hash_ref_num
+        WHERE `id` = #{id} FOR UPDATE
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM hash_ref_num
+        WHERE id = #{id}
+    </select>
+
+</mapper>

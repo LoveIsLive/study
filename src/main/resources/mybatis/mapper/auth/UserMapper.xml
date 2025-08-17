@@ -2,15 +2,15 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.kwang.study.mapper.auth.UserMapper">
+<mapper namespace="com.kwang.study.auth.mapper.UserMapper">
 
     <!-- 根据用户名查询用户及其角色信息 -->
-    <resultMap id="UserWithRolesMap" type="com.kwang.study.pojo.auth.User">
+    <resultMap id="UserWithRolesMap" type="com.kwang.study.auth.pojo.User">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
         <!-- 其他User实体属性映射 -->
-        <collection property="roles" ofType="com.kwang.study.pojo.auth.Role"
+        <collection property="roles" ofType="com.kwang.study.auth.pojo.Role"
                     select="findRolesByUserId" column="id"/>
     </resultMap>
 
@@ -20,7 +20,7 @@
     </select>
 
     <!-- 根据用户ID查询角色列表 -->
-    <select id="findRolesByUserId" parameterType="long" resultType="com.kwang.study.pojo.auth.Role">
+    <select id="findRolesByUserId" parameterType="long" resultType="com.kwang.study.auth.pojo.Role">
         SELECT r.* FROM roles r
                             INNER JOIN user_roles ur ON r.id = ur.role_id
         WHERE ur.user_id = #{userId}

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kwang's File System</title>
+    <!--   认证守卫 -->
+    <script src="/static/common/js/auth_guard.js"></script>
+
+    <link rel="stylesheet" href="/static/ware/ware.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="/static/lib/css/font-awesome-all.min.css">
+</head>
+<body>
+<div class="file-manager">
+    <header class="file-manager-header">
+        <div class="header-left" id="new-div">
+
+        </div>
+        <div class="header-center">
+            <div class="path-container">
+                <i class="fas fa-terminal"></i>
+                <input type="text" id="path-input" placeholder="输入路径，按Enter跳转. e.g. /dir1/subdir or ../">
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" placeholder="实时搜索文件...">
+            </div>
+        </div>
+    </header>
+
+    <div class="breadcrumb" id="breadcrumb">
+        <!-- Breadcrumb links will be inserted here by JS -->
+    </div>
+
+    <main class="file-manager-main">
+        <table class="file-table">
+            <thead>
+            <tr>
+                <th class="col-icon"></th>
+                <th class="col-name">名称</th>
+                <th class="col-size">大小</th>
+                <th class="col-modified">修改日期</th>
+                <th class="col-actions">操作</th>
+            </tr>
+            </thead>
+            <tbody id="file-list">
+            <!-- File and directory rows will be inserted here -->
+            </tbody>
+        </table>
+        <div id="loading-spinner" class="spinner-container" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal for New Directory/File -->
+<div id="new-item-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">×</span>
+        <h2>新建</h2>
+        <div id="new-item-options">
+            <button id="show-new-dir-form" class="btn"><i class="fas fa-folder-plus"></i> 新建目录</button>
+            <button id="show-upload-file-form" class="btn"><i class="fas fa-file-upload"></i> 上传文件</button>
+        </div>
+        <!-- New Directory Form -->
+        <form id="new-dir-form" style="display: none;">
+            <h3>新建目录</h3>
+            <input type="text" id="new-dir-name" placeholder="目录名称" required>
+            <button type="submit" class="btn btn-primary">创建</button>
+        </form>
+        <!-- Upload File Form -->
+        <form id="upload-file-form" style="display: none;">
+            <h3>上传文件</h3>
+            <div class="form-group icon-input-container">
+                <label for="file-input-name">名称</label>
+                <input type="text" id="file-input-name" name="name" class="form-control icon-input" required placeholder="请输入文件名称">
+            </div>
+            <div id="drag-drop-area" class="">
+                <p>将文件拖拽到此处，或点击选择文件</p>
+                <input type="file" id="file-input" hidden>
+                <p id="file-name-display"></p>
+            </div>
+            <select id="mime-type-select" required>
+                <option value="" disabled selected>请选择文件类型</option>
+            </select>
+            <button type="submit" class="btn btn-primary">上传</button>
+            <div id="upload-progress-container" style="display: none;">
+                <p id="upload-status"></p>
+                <div class="progress-bar">
+                    <div id="progress-bar-inner" style="width: 0%;"></div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for Search Results -->
+<div id="search-results-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">×</span>
+        <h2>搜索结果</h2>
+        <div id="search-results-list">
+            <!-- Search results will be appended here -->
+        </div>
+        <p id="search-status-message"></p>
+    </div>
+</div>
+
+<!-- Scripts -->
+<!-- SweetAlert2 for beautiful alerts -->
+<script src="/static/lib/js/sweetalert2.all.min.js"></script>
+<!-- Axios for simplified HTTP requests -->
+<script src="/static/lib/js/axios.min.js"></script>
+<!-- SockJS and Stomp.js for WebSocket communication -->
+<script src="/static/lib/js/sockjs.min.js"></script>
+<script src="/static/lib/js/stomp.min.js"></script>
+<script src="/static/lib/js/jwt-decode.min.js"></script>
+<!-- Custom JS -->
+<script src="/static/common/js/common_utils.js"></script>
+<script src="/static/common/js/axios_create.js"></script>
+<script src="/static/ware/ware.js"></script>
+
+</body>
+</html>
