@@ -91,6 +91,7 @@ public class WareService {
     /**
      * 获取节点的详细信息（包含MIME类型）
      */
+    @Transactional
     public GenericObjectResult getNodeDetails(String path) throws IOException {
         String actualPath = buildActualPath(path);
         return fsService.getObjectDesc(actualPath);
@@ -172,6 +173,7 @@ public class WareService {
     /**
      * 初始化分块上传，之后的分块上传需要带上result的uploadId.
      */
+    @Transactional
     public InitMultiUploadResult initMultiUpload(String path, String mimeTypeName) throws IOException {
         String actualPath = buildActualPath(path);
         return fsService.initMultiUpload(actualPath, mimeTypeName);
@@ -180,11 +182,13 @@ public class WareService {
     /**
      * 上传分块，该方法在所有分块上传完毕后，会自动合并。
      */
+    @Transactional
     public UploadChunkResult uploadChunkAndAutoMerge(String uploadId, Integer chunkIndex, Integer totalChunks,
                                               InputStream chunkStream) throws IOException {
         return fsService.uploadChunkAndAutoMerge(uploadId, chunkIndex, totalChunks, chunkStream);
     }
 
+    @Transactional
     public MimeTypeResult getAllMimeTypeNames() {
         return fsService.getAllMimeTypeNames();
     }
