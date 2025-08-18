@@ -146,6 +146,38 @@
         </if>
     </select>
 
+    <select id="selectNodeByPath" resultMap="BaseResultMap">
+        WITH RECURSIVE path_cte AS (
+            -- 锚点: 找到路径的第一部分对应的顶级节点 (parent_id is null)
+            SELECT
+                id,
+                1 AS path_level
+            FROM node
+            WHERE
+                parent_id IS NULL AND
+                name = SUBSTRING_INDEX(TRIM(LEADING '/' FROM #{path}), '/', 1)
+
+            UNION ALL
+
+            -- 递归: 逐级向下查找子节点
+            SELECT
+                n.id,
+                pc.path_level + 1
+            FROM node n
+                     JOIN path_cte pc ON n.parent_id = pc.id
+            WHERE
+                    n.name = SUBSTRING_INDEX(SUBSTRING_INDEX(TRIM(LEADING '/' FROM #{path}), '/', pc.path_level + 1), '/', -1)
+        )
+        SELECT
+            n.id, n.parent_id, n.name, n.type, n.size, n.create_time, n.modify_time, n.hash_id, n.mime_type_id
+        FROM
+            node n
+                JOIN path_cte pc ON n.id = pc.id
+        WHERE
+                pc.path_level = (LENGTH(#{path}) - LENGTH(REPLACE(#{path}, '/', '')))
+            LIMIT 1;
+    </select>
+
     <select id="selectNodeDetailByPath" resultMap="NodeDetailResultMap">
         WITH RECURSIVE path_cte AS (
             -- 锚点: 找到路径的第一部分对应的顶级节点 (parent_id is null)

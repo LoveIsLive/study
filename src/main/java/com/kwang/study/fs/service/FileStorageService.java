@@ -115,5 +115,9 @@ public interface FileStorageService {
      */
     VoidResult searchNodesBFS(String path, String namePattern, Consumer<SearchNodeResult> resultConsumer);
 
+    /**
+     * 获取所有支持的媒体类型
+     * @return 媒体类型名称
+     */
     MimeTypeResult getAllMimeTypeNames();
 }

@@ -78,7 +78,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new InvalidPathException();
         ResolvedPath resolvedPath = parsePath(path);
 
-        NodeDetail parentNode = nodeMapper.selectNodeDetailByPath(resolvedPath.getParentPath());
+        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
         if (parentNode == null) {
             throw new PathNotFoundException(resolvedPath.getParentPath());
         }
@@ -118,7 +118,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         ResolvedPath resolvedPath = parsePath(path);
-        NodeDetail parentNode = nodeMapper.selectNodeDetailByPath(resolvedPath.getParentPath());
+        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
         if (parentNode == null) {
             throw new PathNotFoundException(resolvedPath.getParentPath());
         }
@@ -175,20 +175,20 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isOrdinaryPath(path))
             throw new InvalidPathException();
 
-        NodeDetail nodeDetail = nodeMapper.selectNodeDetailByPath(path);
-        if (nodeDetail == null) {
+        Node node = nodeMapper.selectNodeByPath(path);
+        if (node == null) {
             throw new PathNotFoundException(path);
         }
-        if (!Objects.equals(nodeDetail.getType(), ObjectTypeEnum.FILE.getCode())) {
+        if (!Objects.equals(node.getType(), ObjectTypeEnum.FILE.getCode())) {
             throw new NotAFileException(path);
         }
 
         // 1. 删除节点记录
-        nodeMapper.deleteNodeById(nodeDetail.getId());
+        nodeMapper.deleteNodeById(node.getId());
 
         // 2. 处理哈希引用计数
-        if (nodeDetail.getHashId() != null) {
-            HashRefNum hashRefNum = hashRefNumMapper.selectByIdForUpdate(nodeDetail.getHashId());
+        if (node.getHashId() != null) {
+            HashRefNum hashRefNum = hashRefNumMapper.selectByIdForUpdate(node.getHashId());
             if (hashRefNum != null) {
                 if (hashRefNum.getRefNum() <= 1) {
                     fileStorage.deleteFile(hashRefNum.getRefPath());
@@ -208,19 +208,19 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isOrdinaryPath(path))
             throw new InvalidPathException();
 
-        NodeDetail nodeDetail = nodeMapper.selectNodeDetailByPath(path);
-        if (nodeDetail == null) {
+        Node node = nodeMapper.selectNodeByPath(path);
+        if (node == null) {
             throw new PathNotFoundException(path);
         }
-        if (!Objects.equals(nodeDetail.getType(), ObjectTypeEnum.DIR.getCode())) {
+        if (!Objects.equals(node.getType(), ObjectTypeEnum.DIR.getCode())) {
             throw new NotADirectoryException(path);
         }
 
         // 1. 获取所有后代节点ID
-        List<Long> descendantIdResult = nodeMapper.selectAllDescendantIds(nodeDetail.getId());
+        List<Long> descendantIdResult = nodeMapper.selectAllDescendantIds(node.getId());
         List<Long> descendantIds = new ArrayList<>(descendantIdResult);
         // 加上自身ID
-        descendantIds.add(nodeDetail.getId());
+        descendantIds.add(node.getId());
 
         // 2. 批量查询所有后代中的文件节点，以处理其哈希引用
         List<Node> allDeleteNodes = nodeMapper.selectNodesByIds(descendantIds);
@@ -270,7 +270,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             }
         }
 
-        NodeDetail originalNode = nodeMapper.selectNodeDetailByPath(path);
+        Node originalNode = nodeMapper.selectNodeByPath(path);
         if (originalNode == null) {
             throw new PathNotFoundException(path);
         }
@@ -354,7 +354,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new IllegalArgumentException("不合法的目录名称" + newName);
         }
 
-        NodeDetail originalNode = nodeMapper.selectNodeDetailByPath(path);
+        Node originalNode = nodeMapper.selectNodeByPath(path);
         if (originalNode == null) {
             throw new PathNotFoundException(path);
         }
@@ -381,26 +381,26 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isValidPath(path))
             throw new InvalidPathException();
 
-        NodeDetail nodeDetail = null;
+        Node node = null;
         if (!"/".equals(path)) {
-            nodeDetail = nodeMapper.selectNodeDetailByPath(path);
-            if (nodeDetail == null)
+            node = nodeMapper.selectNodeByPath(path);
+            if (node == null)
                 throw new PathNotFoundException(path);
-            if (!Objects.equals(nodeDetail.getType(), ObjectTypeEnum.DIR.getCode())) {
+            if (!Objects.equals(node.getType(), ObjectTypeEnum.DIR.getCode())) {
                 throw new NotADirectoryException(path);
             }
         }
 
-        List<NodeDetail> children = nodeMapper.selectChildrenDetailByParentId(nodeDetail == null ?
-                null : nodeDetail.getId());
+        List<NodeDetail> children = nodeMapper.selectChildrenDetailByParentId(node == null ?
+                null : node.getId());
         DirObjectResult result = new DirObjectResult();
         result.setSuccess(Boolean.TRUE);
-        if (nodeDetail != null) {
-            BeanUtils.copyProperties(nodeDetail, result);
+        if (node != null) {
+            BeanUtils.copyProperties(node, result);
         }
-        result.setFileObjectDescs(children.stream().map(node -> {
+        result.setFileObjectDescs(children.stream().map(n -> {
             DirObjectResult.FileObjectDesc desc = new DirObjectResult.FileObjectDesc();
-            BeanUtils.copyProperties(node, desc);
+            BeanUtils.copyProperties(n, desc);
             return desc;
         }).collect(Collectors.toList()));
         return result;
@@ -412,18 +412,18 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isOrdinaryPath(path))
             throw new InvalidPathException();
 
-        NodeDetail nodeDetail = nodeMapper.selectNodeDetailByPath(path);
-        if (nodeDetail == null) {
+        Node node = nodeMapper.selectNodeByPath(path);
+        if (node == null) {
             throw new PathNotFoundException(path);
         }
-        if (!Objects.equals(nodeDetail.getType(), ObjectTypeEnum.FILE.getCode())) {
+        if (!Objects.equals(node.getType(), ObjectTypeEnum.FILE.getCode())) {
             throw new NotAFileException(path);
         }
         FileObjectResult result = new FileObjectResult();
         result.setSuccess(Boolean.TRUE);
-        BeanUtils.copyProperties(nodeDetail, result);
-        if (nodeDetail.getHashId() != null) {
-            HashRefNum hashRefNum = hashRefNumMapper.selectById(nodeDetail.getHashId());
+        BeanUtils.copyProperties(node, result);
+        if (node.getHashId() != null) {
+            HashRefNum hashRefNum = hashRefNumMapper.selectById(node.getHashId());
             if (hashRefNum != null) {
                 result.setContent(fileStorage.getFile(hashRefNum.getRefPath()));
             }
@@ -432,6 +432,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     }
 
     @Override
+    @Transactional
     public GenericObjectResult getObjectDesc(String path) throws IOException {
         if (!isOrdinaryPath(path))
             throw new InvalidPathException();
@@ -467,7 +468,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         ResolvedPath resolvedPath = parsePath(path);
-        NodeDetail parentNode = nodeMapper.selectNodeDetailByPath(resolvedPath.getParentPath());
+        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
         if (parentNode == null) {
             throw new PathNotFoundException(resolvedPath.getParentPath());
         }
@@ -549,18 +550,18 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isValidPath(path))
             throw new InvalidPathException();
 
-        NodeDetail nodeDetail = null;
+        Node node = null;
         if (!"/".equals(path)) {
-            nodeDetail = nodeMapper.selectNodeDetailByPath(path);
-            if (nodeDetail == null)
+            node = nodeMapper.selectNodeByPath(path);
+            if (node == null)
                 throw new PathNotFoundException(path);
-            if (!Objects.equals(nodeDetail.getType(), ObjectTypeEnum.DIR.getCode())) {
+            if (!Objects.equals(node.getType(), ObjectTypeEnum.DIR.getCode())) {
                 throw new NotADirectoryException(path);
             }
         }
 
         Queue<SearchQueueItem> directoryQueue = new LinkedList<>();
-        Long startNodeId = nodeDetail == null ? null : nodeDetail.getId();
+        Long startNodeId = node == null ? null : node.getId();
         // 初始化队列
         if (startNodeId == null) {
             directoryQueue.add(new SearchQueueItem(null, "/"));

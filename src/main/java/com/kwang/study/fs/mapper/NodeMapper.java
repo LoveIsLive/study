@@ -88,6 +88,14 @@ public interface NodeMapper {
     List<NodeDetail> selectChildrenDetailByParentId(@Param("parentId") Long parentId);
 
     /**
+     * 根据完整的Unix路径查询节点信息。
+     * 使用递归CTE实现，高效查询。
+     * @param path 完整的Unix路径，例如 "/home/user/file.txt"
+     * @return 节点详细信息，如果路径不存在则返回null
+     */
+    Node selectNodeByPath(@Param("path") String path);
+
+    /**
      * 根据完整的Unix路径查询节点详细信息。
      * 使用递归CTE实现，高效查询。
      * @param path 完整的Unix路径，例如 "/home/user/file.txt"
