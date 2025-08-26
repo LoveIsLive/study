@@ -14,6 +14,7 @@ import com.kwang.study.fs.pojo.HashRefNum;
 import com.kwang.study.fs.pojo.Node;
 import com.kwang.study.fs.pojo.NodeDetail;
 import com.kwang.study.fs.service.FileStorageService;
+import com.kwang.study.fs.service.async.AsyncCleanupFileService;
 import com.kwang.study.fs.storage.FileStorage;
 import com.kwang.study.fs.util.ChunkUtil;
 import com.kwang.study.fs.util.HashUtil;
@@ -66,6 +67,9 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
     @Autowired
     private AsyncCleanupChunkService cleanupChunkService;
+
+    @Autowired
+    private AsyncCleanupFileService cleanupFileService;
 
     private final ConcurrentHashMap<Long, Object> mapLock = new ConcurrentHashMap<>();
 
@@ -233,6 +237,8 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                 .filter(n -> n.getHashId() != null)
                 .collect(Collectors.groupingBy(Node::getHashId, Collectors.counting()));
 
+        ArrayList<String> keys = new ArrayList<>();
+
         for (Map.Entry<Long, Long> entry : hashIdCounts.entrySet()) {
             Long hashId = entry.getKey();
             long countToDelete = entry.getValue();
@@ -240,13 +246,16 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             HashRefNum lockedHashRef = hashRefNumMapper.selectByIdForUpdate(hashId);
             if (lockedHashRef != null) {
                 if (lockedHashRef.getRefNum() <= countToDelete) {
-                    fileStorage.deleteFile(lockedHashRef.getRefPath());
+                    keys.add(lockedHashRef.getRefPath());
                     hashRefNumMapper.deleteById(lockedHashRef.getId());
                 } else {
                     hashRefNumMapper.batchDecrementRefNum(hashId, countToDelete);
                 }
             }
         }
+
+        // 异步删除物理文件
+        cleanupFileService.cleanup(keys);
 
         // 4. 批量删除数据库中的所有节点（包括目录和已经被处理过的文件节点记录）
         nodeMapper.batchDeleteNodeByIds(descendantIds);

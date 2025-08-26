@@ -28,22 +28,20 @@ public class AsyncCleanupChunkService {
     public void cleanup(List<FileChunk> chunks) {
         if (CollectionUtils.isEmpty(chunks)) return;
         Long fileId = chunks.get(0).getFileId();
-        CompletableFuture.runAsync(() -> {
-            try {
-                // 删除物理分片文件
-                for (FileChunk chunk : chunks) {
-                    try {
-                        chunkStorage.deleteFile(chunk.getKey());
-                    } catch (IOException e) {
-                        log.error("Failed to delete chunk file: {}", chunk.getKey(), e);
-                    }
+        try {
+            // 删除物理分片文件
+            for (FileChunk chunk : chunks) {
+                try {
+                    chunkStorage.deleteFile(chunk.getKey());
+                } catch (IOException e) {
+                    log.error("Failed to delete chunk file: {}", chunk.getKey(), e);
                 }
-                // 删除数据库分片记录
-                fileChunkMapper.deleteByFileId(fileId);
-                log.info("Successfully cleaned up chunks for fileId: {}", fileId);
-            } catch (Exception e) {
-                log.error("Error during async chunk cleanup for fileId: {}", fileId, e);
             }
-        });
+            // 删除数据库分片记录
+            fileChunkMapper.deleteByFileId(fileId);
+            log.info("Successfully cleaned up chunks for fileId: {}", fileId);
+        } catch (Exception e) {
+            log.error("Error during async chunk cleanup for fileId: {}", fileId, e);
+        }
     }
 }

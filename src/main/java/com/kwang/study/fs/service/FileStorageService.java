@@ -120,4 +120,6 @@ public interface FileStorageService {
      * @return 媒体类型名称
      */
     MimeTypeResult getAllMimeTypeNames();
+
+
 }

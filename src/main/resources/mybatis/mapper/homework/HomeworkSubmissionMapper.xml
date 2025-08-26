@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.homework.mapper.HomeworkSubmissionMapper">
+
+    <resultMap id="SubmissionResultMap" type="com.kwang.study.homework.pojo.HomeworkSubmission">
+        <id property="id" column="id"/>
+        <result property="homeworkId" column="homework_id"/>
+        <result property="studentId" column="student_id"/>
+        <result property="content" column="content"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+
+        <!-- 多对一关联查询作业信息 -->
+        <association property="homework" javaType="com.kwang.study.homework.pojo.Homework"
+                     select="com.kwang.study.homework.mapper.HomeworkMapper.findById"
+                     column="homework_id"/>
+
+        <!-- 一对多关联查询附件 -->
+        <collection property="attachments" ofType="com.kwang.study.homework.pojo.Attachment"
+                    select="com.kwang.study.homework.mapper.AttachmentMapper.findByOwner"
+                    column="{ownerId=id, ownerType='submission'}"/>
+
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO homework_submission (homework_id, student_id, content)
+        VALUES (#{homeworkId}, #{studentId}, #{content})
+    </insert>
+
+    <select id="findById" resultMap="SubmissionResultMap">
+        SELECT * FROM homework_submission WHERE id = #{id}
+    </select>
+
+    <select id="findAllByStudentId" resultMap="SubmissionResultMap">
+        SELECT * FROM homework_submission WHERE student_id = #{studentId} ORDER BY create_time DESC
+    </select>
+
+    <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionResultMap">
+        SELECT * FROM homework_submission WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    </select>
+
+    <select id="findIdsByHomeworkId" resultType="java.lang.Long">
+        SELECT id FROM homework_submission WHERE homework_id = #{homeworkId}
+    </select>
+
+    <delete id="deleteByHomeworkId">
+        DELETE FROM homework_submission WHERE homework_id = #{homeworkId}
+    </delete>
+
+</mapper>

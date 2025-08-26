@@ -1,4 +1,4 @@
-package com.kwang.study.configuration;
+package com.kwang.study.config;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;

@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static com.kwang.study.constant.ApiPrefixConstant.WARE_BASE_PREFIX;
+import static com.kwang.study.constant.RedisKeyPrefixConstant.DOWNLOAD_ID_PREFIX;
 
 @RestController
 @RequestMapping(WARE_BASE_PREFIX + "/home")
@@ -39,8 +40,6 @@ public class WareController {
 
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
-
-    public static final String DOWNLOAD_ID_CACHE_PREFIX = "download:token:";
 
     /**
      * 创建目录
@@ -141,7 +140,7 @@ public class WareController {
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
 
-        String tokenPath = redisTemplate.opsForValue().get(DOWNLOAD_ID_CACHE_PREFIX + token);
+        String tokenPath = redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
         if (!Objects.equals(path, tokenPath)) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.getWriter().print("没有权限");
@@ -196,7 +195,7 @@ public class WareController {
     public ResponseEntity<R<String>> produceDownloadUUID(@RequestParam("path") String path) {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
         String downloadId = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(DOWNLOAD_ID_CACHE_PREFIX + downloadId, path, 30, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, path, 30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
     }
 

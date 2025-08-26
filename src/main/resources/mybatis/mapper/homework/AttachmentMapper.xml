@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.homework.mapper.AttachmentMapper">
+
+    <insert id="batchInsert">
+        INSERT INTO attachment (owner_id, owner_type, file_name, file_path, file_size, mime_type, uploader_id)
+        VALUES
+        <foreach collection="attachments" item="item" separator=",">
+            (#{item.ownerId}, #{item.ownerType}, #{item.fileName}, #{item.filePath}, #{item.fileSize}, #{item.mimeType}, #{item.uploaderId})
+        </foreach>
+    </insert>
+
+    <select id="findByOwner" resultType="com.kwang.study.homework.pojo.Attachment">
+        SELECT id, owner_id, owner_type, file_name, file_path, file_size, mime_type, uploader_id, create_time
+        FROM attachment
+        WHERE owner_id = #{ownerId} AND owner_type = #{ownerType}
+    </select>
+
+    <delete id="deleteByOwner">
+        DELETE FROM attachment WHERE owner_id = #{ownerId} AND owner_type = #{ownerType}
+    </delete>
+
+    <delete id="deleteByOwners">
+        DELETE FROM attachment
+        WHERE owner_type = #{ownerType}
+        AND owner_id IN
+        <foreach item="item" collection="ownerIds" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </delete>
+
+</mapper>

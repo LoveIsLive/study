@@ -1,4 +1,4 @@
-package com.kwang.study.configuration;
+package com.kwang.study.config;
 
 import com.kwang.study.auth.interceptor.JwtChannelInterceptor;
 import com.kwang.study.utils.CustomHandshakeHandler;

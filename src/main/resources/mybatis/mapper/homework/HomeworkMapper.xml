@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.homework.mapper.HomeworkMapper">
+
+    <resultMap id="HomeworkResultMap" type="com.kwang.study.homework.pojo.Homework">
+        <id property="id" column="id"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <!-- 一对多关联查询附件 -->
+        <collection property="attachments" ofType="com.kwang.study.homework.pojo.Attachment"
+                    select="com.kwang.study.homework.mapper.AttachmentMapper.findByOwner"
+                    column="{ownerId=id, ownerType='homework'}"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO homework (teacher_id, title, content)
+        VALUES (#{teacherId}, #{title}, #{content})
+    </insert>
+
+    <select id="findById" resultMap="HomeworkResultMap">
+        SELECT id, teacher_id, title, content, create_time, update_time
+        FROM homework
+        WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="HomeworkResultMap">
+        SELECT id, teacher_id, title, content, create_time, update_time
+        FROM homework
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="findAllByTeacherId" resultMap="HomeworkResultMap">
+        SELECT id, teacher_id, title, content, create_time, update_time
+        FROM homework
+        WHERE teacher_id = #{teacherId}
+        ORDER BY create_time DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM homework WHERE id = #{id}
+    </delete>
+
+</mapper>

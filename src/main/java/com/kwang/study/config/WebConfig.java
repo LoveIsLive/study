@@ -1,4 +1,4 @@
-package com.kwang.study.configuration;
+package com.kwang.study.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
