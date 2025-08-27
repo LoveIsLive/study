@@ -1,11 +1,14 @@
 package com.kwang.study.homework.controller;
 
+import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
 import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,13 +32,14 @@ public class HomeworkController {
     /**
      * 教师发布作业
      * 使用 multipart/form-data 格式提交
-     * 表单字段：teacherId, title, content
+     * 表单字段：title, content
      * 文件字段：files
      */
     @PostMapping("/publish")
     public ResponseEntity<Homework> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
                                                     @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
-        // 在真实项目中，teacherId应该从Spring Security的Authentication对象中获取，而不是由前端传递
+        // 获取认证身份
+        dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
         Homework createdHomework = homeworkService.createHomework(dto, smallFiles);
         return ResponseEntity.ok(createdHomework);
     }
@@ -43,9 +47,9 @@ public class HomeworkController {
     /**
      * 教师查看自己发布的作业列表
      */
-    @GetMapping("/teacher/{teacherId}")
-    public ResponseEntity<List<Homework>> getTeacherHomeworks(@PathVariable Long teacherId) {
-        // 同样，teacherId 应来自认证信息，并进行权限校验
+    @GetMapping("/teacher/all")
+    public ResponseEntity<List<Homework>> getTeacherHomeworks() {
+        Long teacherId = AuthenticationUserUtil.getCurrentUserId();
         List<Homework> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
         return ResponseEntity.ok(homeworks);
     }
@@ -57,7 +61,6 @@ public class HomeworkController {
      */
     @DeleteMapping("/{homeworkId}")
     public ResponseEntity<R<Void>> deleteHomework(@PathVariable Long homeworkId) {
-        // 权限校验应该在Service层做，或者通过Spring Security的pre/post annotations
         homeworkService.deleteHomework(homeworkId);
         return ResponseEntity.ok(R.success(null));
     }

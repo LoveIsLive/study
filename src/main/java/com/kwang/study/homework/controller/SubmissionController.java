@@ -1,8 +1,10 @@
 package com.kwang.study.homework.controller;
 
 
+import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
+import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.pojo.HomeworkSubmission;
 import com.kwang.study.homework.service.HomeworkService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,26 +30,38 @@ public class SubmissionController {
     /**
      * 学生提交作业
      * 使用 multipart/form-data 格式提交
-     * 表单字段：homeworkId, studentId, content
+     * 表单字段：homeworkId, content
      * 文件字段：files
      */
     @PostMapping("/submit")
     public ResponseEntity<R<HomeworkSubmission>> submitHomework(@Valid @RequestPart("dto") SubmissionCreateDTO dto,
                                                              @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
-        // studentId 应从认证信息获取
+        // 获取认证信息
+        dto.setStudentId(AuthenticationUserUtil.getCurrentUserId());
         HomeworkSubmission submission = homeworkService.createSubmission(dto, files);
         return ResponseEntity.ok(R.success(submission));
     }
 
     /**
-     * 学生查看自己的提交记录列表
+     * 教师查看特定作业的所有提交
+     * TODO: 后续角色权限控制
+     * @param homeworkId 作业ID
+     * @return 该作业的所有提交列表
      */
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<R<List<HomeworkSubmission>>> getStudentSubmissions(@PathVariable Long studentId) {
-        // studentId 应从认证信息获取，并进行权限校验
-        List<HomeworkSubmission> submissions = homeworkService.getSubmissionsByStudent(studentId);
+    @GetMapping("/{homeworkId}/submissions")
+    public ResponseEntity<R<List<HomeworkSubmission>>> getHomeworkSubmissions(@PathVariable Long homeworkId) {
+        List<HomeworkSubmission> submissions = homeworkService.getHomeworkSubmissions(homeworkId);
         return ResponseEntity.ok(R.success(submissions));
     }
 
-
+    /**
+     * 学生查看自己的提交记录列表
+     */
+    @GetMapping("/student/all")
+    public ResponseEntity<R<List<HomeworkSubmission>>> getStudentSubmissions() {
+        // 获取认证信息
+        Long studentId = AuthenticationUserUtil.getCurrentUserId();
+        List<HomeworkSubmission> submissions = homeworkService.getSubmissionsByStudent(studentId);
+        return ResponseEntity.ok(R.success(submissions));
+    }
 }

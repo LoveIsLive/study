@@ -1,5 +1,6 @@
 package com.kwang.study.auth.service;
 
+import com.kwang.study.auth.custom.CustomUserDetails;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,14 +31,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .map(role -> new SimpleGrantedAuthority(role.getName()))
                 .collect(Collectors.toList());
 
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                user.isEnabled(),
-                true,
-                true,
-                true,
-                authorities);
+        return new CustomUserDetails(user.getId(), user.getUsername(),
+                user.getPassword(), user.isEnabled(), authorities);
     }
 
 }

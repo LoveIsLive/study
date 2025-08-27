@@ -11,8 +11,7 @@ import java.util.List;
 @Data
 public class HomeworkCreateDTO {
 
-    @NotNull(message = "Teacher ID cannot be null")
-    private Long teacherId; // 临时，实际应从认证信息获取
+    private Long teacherId;
 
     @NotBlank(message = "Title is mandatory")
     @Size(max = 255, message = "Title cannot exceed 255 characters")

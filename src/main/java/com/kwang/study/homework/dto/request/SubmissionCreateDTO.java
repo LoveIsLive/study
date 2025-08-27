@@ -11,8 +11,7 @@ public class SubmissionCreateDTO {
     @NotNull(message = "Homework ID cannot be null")
     private Long homeworkId;
 
-    @NotNull(message = "Student ID cannot be null")
-    private Long studentId; // 临时，实际应从认证信息获取
+    private Long studentId;
 
     private String content;
 

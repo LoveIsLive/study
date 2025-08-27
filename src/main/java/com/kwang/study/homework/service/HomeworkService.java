@@ -193,7 +193,17 @@ public class HomeworkService {
     }
 
     /**
+     * 教师查看作业的所有提交记录
+     * @param homeworkId 作业ID
+     * @return 提交记录列表
+     */
+    public List<HomeworkSubmission> getHomeworkSubmissions(Long homeworkId) {
+        return submissionMapper.findAllByHomeworkId(homeworkId);
+    }
+
+    /**
      * 学生查看所有可做的作业列表
+     * TODO: 简易。后续去要将老师和学生对应起来
      * @return 作业列表
      */
     public List<Homework> getAllHomeworksForStudent() {
@@ -202,6 +212,7 @@ public class HomeworkService {
 
     /**
      * 教师删除作业
+     * TODO: 教师只能删除自己的作业，这里需要做一下权限校验
      * @param homeworkId 作业ID
      */
     @Transactional

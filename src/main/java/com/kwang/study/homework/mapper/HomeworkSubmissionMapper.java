@@ -15,6 +15,8 @@ public interface HomeworkSubmissionMapper {
 
     List<HomeworkSubmission> findAllByStudentId(@Param("studentId") Long studentId);
 
+    List<HomeworkSubmission> findAllByHomeworkId(@Param("homeworkId") Long homeworkId);
+
     HomeworkSubmission findByHomeworkIdAndStudentId(@Param("homeworkId") Long homeworkId, @Param("studentId") Long studentId);
 
     List<Long> findIdsByHomeworkId(@Param("homeworkId") Long homeworkId);

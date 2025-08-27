@@ -38,12 +38,16 @@ public class SecurityConfig {
                         .antMatchers(AUTH_BASE_PREFIX + "/login",
                                 "/auth/**",
                                 "/ware/**",
+                                "/homework/**",
                                 "/",
                                 STATIC_BASE_PREFIX + "/**",
                                 "/favicon.ico"
                                 ).permitAll()
                         // 特殊端点
-                        .antMatchers(WARE_BASE_PREFIX + "/home/download").permitAll()
+                        .antMatchers(
+                                WARE_BASE_PREFIX + "/home/download",
+                                ATTACHE_DOWNLOAD_BASE_PREFIX + "/download"
+                        ).permitAll()
                         // 允许websocket握手阶段
                         .antMatchers("/ws/search/**").permitAll()
                         .anyRequest().authenticated()
@@ -53,7 +57,7 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .formLogin().disable()
                 .httpBasic().disable()
-                .oauth2Login().disable()
+//                .oauth2Login().disable()
                 .csrf().disable();
 
         return http.build();

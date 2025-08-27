@@ -12,13 +12,17 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addViewController("/favicon.ico")
                 .setViewName("forward:/static/favicon.ico");
 
-        // 课程仓库系统
+        // 课程仓库模块
         registry.addViewController("/ware/**")
                 .setViewName("forward:/static/ware/ware.html");
 
-        // 认证授权系统
+        // 认证授权模块
         registry.addViewController("/auth/**")
                 .setViewName("forward:/static/auth/login.html");
+
+        // 作业区模块
+        registry.addViewController("/homework/**")
+                .setViewName("forward:/static/homework/homework.html");
 
         // 主页
         registry.addViewController("/")

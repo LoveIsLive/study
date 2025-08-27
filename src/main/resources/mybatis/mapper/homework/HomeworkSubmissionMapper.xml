@@ -35,6 +35,10 @@
         SELECT * FROM homework_submission WHERE student_id = #{studentId} ORDER BY create_time DESC
     </select>
 
+    <select id="findAllByHomeworkId" resultMap="SubmissionResultMap">
+        SELECT * FROM homework_submission WHERE homework_id = #{homework_id} ORDER BY create_time DESC
+    </select>
+
     <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionResultMap">
         SELECT * FROM homework_submission WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
     </select>
