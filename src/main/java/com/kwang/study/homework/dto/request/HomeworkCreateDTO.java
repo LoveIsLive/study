@@ -10,7 +10,9 @@ import java.util.List;
 
 @Data
 public class HomeworkCreateDTO {
-
+    /**
+     * 教师ID，从当前登陆用户获取，非前端传入
+     */
     private Long teacherId;
 
     @NotBlank(message = "Title is mandatory")

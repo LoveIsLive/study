@@ -11,6 +11,9 @@ public class SubmissionCreateDTO {
     @NotNull(message = "Homework ID cannot be null")
     private Long homeworkId;
 
+    /**
+     * 学生ID，从当前登陆用户获取，非前端传入
+     */
     private Long studentId;
 
     private String content;

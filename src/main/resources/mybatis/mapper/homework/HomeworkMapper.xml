@@ -12,7 +12,7 @@
         <!-- 一对多关联查询附件 -->
         <collection property="attachments" ofType="com.kwang.study.homework.pojo.Attachment"
                     select="com.kwang.study.homework.mapper.AttachmentMapper.findByOwner"
-                    column="{ownerId=id, ownerType='homework'}"/>
+                    column="{ownerId=id, ownerType=owner_type}"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
@@ -21,19 +21,19 @@
     </insert>
 
     <select id="findById" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time
+        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
         FROM homework
         WHERE id = #{id}
     </select>
 
     <select id="findAll" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time
+        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
         FROM homework
         ORDER BY create_time DESC
     </select>
 
     <select id="findAllByTeacherId" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time
+        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
         FROM homework
         WHERE teacher_id = #{teacherId}
         ORDER BY create_time DESC

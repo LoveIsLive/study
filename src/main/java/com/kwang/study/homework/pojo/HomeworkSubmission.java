@@ -14,7 +14,7 @@ public class HomeworkSubmission {
     private LocalDateTime updateTime;
 
     // 关联附件列表 (非数据库字段)
-    private List<Attachment> attachments;
+    private List<AttachmentDetail> attachments;
 
     // 关联作业信息 (非数据库字段)
     private Homework homework;

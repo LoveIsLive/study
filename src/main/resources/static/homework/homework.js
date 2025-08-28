@@ -1,90 +1,92 @@
+// homework.js
 document.addEventListener('DOMContentLoaded', () => {
     // --- 状态管理 ---
-    let currentUser = null;
-    let userRoles = getRoles();
-    let isTeacher = userRoles.includes("ROLE_TEACHER");
-    let isStudent = userRoles.includes("ROLE_STUDENT");
+    let currentView = 'list'; // 'list' | 'detail'
+    let currentHomeworkId = null;
+    let currentTab = 'all-homework';
+    let roles = getRoles();
+    let userName = getUserName();
 
-    // 当前视图状态
-    let currentView = isTeacher ? 'teacher' : 'student';
-    let currentTab = isTeacher ? 'my-homeworks' : 'all-homeworks';
-
-    // 数据缓存
-    let homeworksCache = [];
-    let submissionsCache = [];
-    let currentHomeworkDetail = null;
+    const isTeacher = roles.includes("ROLE_TEACHER");
+    const isStudent = roles.includes("ROLE_STUDENT");
 
     // --- 配置 ---
     const API_BASE_URL = 'http://localhost:8080/api/v1';
-    const HOMEWORK_API_URL = API_BASE_URL + '/homework';
-    const SUBMISSION_API_URL = API_BASE_URL + '/submission';
-    const UPLOAD_API_URL = API_BASE_URL + '/attach/upload';
-    const DOWNLOAD_API_URL = API_BASE_URL + '/attach/download';
+    const HOMEWORK_API = axiosCreate(API_BASE_URL + '/homework');
+    const SUBMISSION_API = axiosCreate(API_BASE_URL + '/submission');
+    const UPLOAD_API = axiosCreate(API_BASE_URL + '/attach/upload');
+    const DOWNLOAD_API = axiosCreate(API_BASE_URL + '/attach/download');
 
     const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB 分块上传阈值
 
     // --- DOM 元素 ---
+    const userRoleBadge = document.getElementById('user-role-badge');
+    const userNameSpan = document.getElementById('user-name');
     const teacherView = document.getElementById('teacher-view');
     const studentView = document.getElementById('student-view');
+    const homeworkDetailView = document.getElementById('homework-detail-view');
     const loadingSpinner = document.getElementById('loading-spinner');
-    const emptyState = document.getElementById('empty-state');
-    const emptyMessage = document.getElementById('empty-message');
 
-    // 用户信息
-    const userRoleBadge = document.getElementById('user-role-badge');
-    const userName = document.getElementById('user-name');
-
-    // 教师视图元素
+    // 教师相关元素
     const publishHomeworkBtn = document.getElementById('publish-homework-btn');
-    const myHomeworksTab = document.getElementById('my-homeworks-tab');
-    const allSubmissionsTab = document.getElementById('all-submissions-tab');
-    const myHomeworksSection = document.getElementById('my-homeworks-section');
-    const allSubmissionsSection = document.getElementById('all-submissions-section');
     const teacherHomeworkList = document.getElementById('teacher-homework-list');
-    const allSubmissionsList = document.getElementById('all-submissions-list');
+    const homeworkCountSpan = document.getElementById('homework-count');
 
-    // 学生视图元素
-    const allHomeworksTab = document.getElementById('all-homeworks-tab');
-    const mySubmissionsTab = document.getElementById('my-submissions-tab');
-    const allHomeworksSection = document.getElementById('all-homeworks-section');
-    const mySubmissionsSection = document.getElementById('my-submissions-section');
+    // 学生相关元素
     const studentHomeworkList = document.getElementById('student-homework-list');
-    const studentSubmissionsList = document.getElementById('student-submissions-list');
-    const statusFilter = document.getElementById('status-filter');
+    const studentSubmissionList = document.getElementById('student-submission-list');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
 
-    // 模态框
-    const publishHomeworkModal = document.getElementById('publish-homework-modal');
-    const homeworkDetailModal = document.getElementById('homework-detail-modal');
-    const submitHomeworkModal = document.getElementById('submit-homework-modal');
-    const submissionDetailModal = document.getElementById('submission-detail-modal');
+    // 详情页面元素
+    const backBtn = document.getElementById('back-btn');
+    const detailTitle = document.getElementById('detail-title');
+    const homeworkDetailContent = document.getElementById('homework-detail-content');
+    const submissionsSection = document.getElementById('submissions-section');
+    const submissionsList = document.getElementById('submissions-list');
+    const studentSubmissionSection = document.getElementById('student-submission-section');
+    const existingSubmission = document.getElementById('existing-submission');
+    const mySubmissionContent = document.getElementById('my-submission-content');
+    const submitFormSection = document.getElementById('submit-form-section');
 
-    // --- API 客户端 ---
-    const homeworkAPI = axiosCreate(HOMEWORK_API_URL);
-    const submissionAPI = axiosCreate(SUBMISSION_API_URL);
-    const uploadAPI = axiosCreate(UPLOAD_API_URL);
-    const downloadAPI = axiosCreate(DOWNLOAD_API_URL);
+    // 模态框相关元素
+    const publishModal = document.getElementById('publish-modal');
+    const publishForm = document.getElementById('publish-homework-form');
+    const cancelPublishBtn = document.getElementById('cancel-publish');
+    const closeModalBtns = document.querySelectorAll('.close-btn');
+
+    // 文件上传相关元素
+    const homeworkFileArea = document.getElementById('homework-file-area');
+    const homeworkUploadZone = document.getElementById('homework-upload-zone');
+    const homeworkFileInput = document.getElementById('homework-file-input');
+    const homeworkFileList = document.getElementById('homework-file-list');
+
+    const submissionFileArea = document.getElementById('submission-file-area');
+    const submissionUploadZone = document.getElementById('submission-upload-zone');
+    const submissionFileInput = document.getElementById('submission-file-input');
+    const submissionFileList = document.getElementById('submission-file-list');
+
+    const uploadProgress = document.getElementById('upload-progress');
+    const progressBarFill = document.getElementById('progress-bar-fill');
+    const uploadStatus = document.getElementById('upload-status');
+
+    // 提交表单
+    const submitHomeworkForm = document.getElementById('submit-homework-form');
 
     // --- 工具函数 ---
     const showLoading = (show) => {
         loadingSpinner.style.display = show ? 'flex' : 'none';
     };
 
-    const showEmptyState = (show, message = '暂无内容') => {
-        emptyState.style.display = show ? 'block' : 'none';
-        emptyMessage.textContent = message;
-    };
-
-    const toast = (icon, title) => {
-        Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon,
-            title,
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true
-        });
-    };
+    const toast = (icon, title) => Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon,
+        title,
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleString('zh-CN');
@@ -98,855 +100,737 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const getFileIcon = (mimeType) => {
+        if (!mimeType) return 'fas fa-file';
+
+        if (mimeType.startsWith('image/')) return 'fas fa-file-image';
+        if (mimeType.startsWith('video/')) return 'fas fa-file-video';
+        if (mimeType.startsWith('audio/')) return 'fas fa-file-audio';
+        if (mimeType.includes('pdf')) return 'fas fa-file-pdf';
+        if (mimeType.includes('word')) return 'fas fa-file-word';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'fas fa-file-excel';
+        if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'fas fa-file-powerpoint';
+        if (mimeType.includes('zip') || mimeType.includes('rar')) return 'fas fa-file-archive';
+
+        return 'fas fa-file';
+    };
+
     // --- 初始化 ---
-    const initializeApp = async () => {
-        try {
-            // 设置用户信息
-            const userInfo = getUserInfo();
-            currentUser = userInfo;
-            userName.textContent = userInfo.username || '用户';
+    const initializeApp = () => {
+        // 设置用户信息
+        if (isTeacher) {
+            userRoleBadge.textContent = '教师';
+            userRoleBadge.className = 'role-badge teacher';
+            teacherView.style.display = 'block';
+            loadTeacherHomeworks();
+        } else if (isStudent) {
+            userRoleBadge.textContent = '学生';
+            userRoleBadge.className = 'role-badge student';
+            studentView.style.display = 'block';
+            loadAllHomeworks();
+        }
 
+        userNameSpan.textContent = userName;
+    };
+
+    // --- 视图切换 ---
+    const showView = (viewName) => {
+        teacherView.style.display = 'none';
+        studentView.style.display = 'none';
+        homeworkDetailView.style.display = 'none';
+
+        currentView = viewName;
+
+        if (viewName === 'list') {
             if (isTeacher) {
-                userRoleBadge.textContent = '教师';
-                userRoleBadge.className = 'role-badge teacher';
                 teacherView.style.display = 'block';
-                await loadTeacherData();
             } else if (isStudent) {
-                userRoleBadge.textContent = '学生';
-                userRoleBadge.className = 'role-badge student';
                 studentView.style.display = 'block';
-                await loadStudentData();
             }
-
-            setupEventListeners();
-        } catch (error) {
-            console.error('初始化失败:', error);
-            toast('error', '初始化失败');
+        } else if (viewName === 'detail') {
+            homeworkDetailView.style.display = 'block';
         }
     };
 
-    // --- 数据加载 ---
-    const loadTeacherData = async () => {
-        showLoading(true);
-        try {
-            await loadTeacherHomeworks();
-            if (currentTab === 'all-submissions') {
-                await loadAllSubmissions();
-            }
-        } catch (error) {
-            console.error('加载教师数据失败:', error);
-            toast('error', '加载数据失败');
-        } finally {
-            showLoading(false);
+    // --- 标签页切换 ---
+    const switchTab = (tabName) => {
+        tabBtns.forEach(btn => btn.classList.remove('active'));
+        tabPanes.forEach(pane => pane.classList.remove('active'));
+
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+
+        currentTab = tabName;
+
+        if (tabName === 'all-homework') {
+            loadAllHomeworks();
+        } else if (tabName === 'my-submissions') {
+            loadStudentSubmissions();
         }
     };
 
-    const loadStudentData = async () => {
-        showLoading(true);
-        try {
-            await loadAllHomeworks();
-            if (currentTab === 'my-submissions') {
-                await loadStudentSubmissions();
-            }
-        } catch (error) {
-            console.error('加载学生数据失败:', error);
-            toast('error', '加载数据失败');
-        } finally {
-            showLoading(false);
-        }
-    };
-
+    // --- API 调用函数 ---
     const loadTeacherHomeworks = async () => {
+        showLoading(true);
         try {
-            const response = await homeworkAPI.get('/teacher/all');
-            homeworksCache = response.data || [];
-            renderTeacherHomeworks();
+            const response = await HOMEWORK_API.get('/teacher/all');
+            const homeworks = response.data;
+            renderTeacherHomeworks(homeworks);
+            homeworkCountSpan.textContent = `共 ${homeworks.length} 个作业`;
         } catch (error) {
-            console.error('加载教师作业失败:', error);
-            throw error;
+            console.error('Failed to load teacher homeworks:', error);
+            toast('error', '加载作业列表失败');
+        } finally {
+            showLoading(false);
         }
     };
 
     const loadAllHomeworks = async () => {
+        showLoading(true);
         try {
-            const response = await homeworkAPI.get('/all');
-            homeworksCache = response.data || [];
-            renderStudentHomeworks();
+            const response = await HOMEWORK_API.get('/all');
+            const homeworks = response.data;
+            renderStudentHomeworks(homeworks);
         } catch (error) {
-            console.error('加载所有作业失败:', error);
-            throw error;
-        }
-    };
-
-    const loadAllSubmissions = async () => {
-        try {
-            // 注意：这里需要后端提供一个获取所有提交的接口
-            // 当前后端接口中没有这个，需要添加
-            console.warn('需要后端提供获取所有提交的接口');
-            submissionsCache = [];
-            renderAllSubmissions();
-        } catch (error) {
-            console.error('加载所有提交失败:', error);
-            throw error;
+            console.error('Failed to load all homeworks:', error);
+            toast('error', '加载作业列表失败');
+        } finally {
+            showLoading(false);
         }
     };
 
     const loadStudentSubmissions = async () => {
+        showLoading(true);
         try {
-            const response = await submissionAPI.get('/student/all');
-            submissionsCache = response.data.data || [];
-            renderStudentSubmissions();
+            const response = await SUBMISSION_API.get('/student/all');
+            const submissions = response.data.data;
+            renderStudentSubmissions(submissions);
         } catch (error) {
-            console.error('加载学生提交失败:', error);
-            throw error;
+            console.error('Failed to load student submissions:', error);
+            toast('error', '加载提交记录失败');
+        } finally {
+            showLoading(false);
+        }
+    };
+
+    const loadHomeworkSubmissions = async (homeworkId) => {
+        showLoading(true);
+        try {
+            const response = await SUBMISSION_API.get(`/${homeworkId}/submissions`);
+            const submissions = response.data.data;
+            renderHomeworkSubmissions(submissions);
+        } catch (error) {
+            console.error('Failed to load homework submissions:', error);
+            toast('error', '加载提交列表失败');
+        } finally {
+            showLoading(false);
+        }
+    };
+
+    const loadStudentSubmission = async (homeworkId) => {
+        try {
+            const response = await SUBMISSION_API.get(`/student/${homeworkId}/submission`);
+            const submission = response.data.data;
+            if (submission) {
+                renderStudentSubmission(submission);
+                existingSubmission.style.display = 'block';
+                submitFormSection.style.display = 'none';
+            } else {
+                existingSubmission.style.display = 'none';
+                submitFormSection.style.display = 'block';
+            }
+        } catch (error) {
+            if (error.response?.status === 404) {
+                // 没有提交记录
+                existingSubmission.style.display = 'none';
+                submitFormSection.style.display = 'block';
+            } else {
+                console.error('Failed to load student submission:', error);
+                toast('error', '加载提交记录失败');
+            }
+        }
+    };
+
+    const deleteHomework = async (homeworkId) => {
+        const result = await Swal.fire({
+            title: '确认删除',
+            text: '删除后无法恢复，确定要删除这个作业吗？',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: '删除',
+            cancelButtonText: '取消'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await HOMEWORK_API.delete(`/${homeworkId}`);
+                toast('success', '作业删除成功');
+                loadTeacherHomeworks();
+            } catch (error) {
+                console.error('Failed to delete homework:', error);
+                toast('error', '删除作业失败');
+            }
         }
     };
 
     // --- 渲染函数 ---
-    const renderTeacherHomeworks = () => {
-        if (homeworksCache.length === 0) {
-            teacherHomeworkList.innerHTML = '';
-            showEmptyState(true, '您还没有发布任何作业');
-            return;
-        }
-
-        showEmptyState(false);
-        teacherHomeworkList.innerHTML = homeworksCache.map(homework => `
-            <div class="homework-card fade-in">
-                <div class="homework-header-info">
-                    <div>
-                        <h3 class="homework-title">${homework.title}</h3>
-                        <div class="homework-meta">
-                            <span><i class="fas fa-calendar"></i> ${formatDate(homework.createTime)}</span>
-                            ${homework.attachments ? `<span><i class="fas fa-paperclip"></i> ${homework.attachments.length} 个附件</span>` : ''}
-                        </div>
-                    </div>
-                </div>
-                <div class="homework-content">
-                    ${homework.content || '暂无详细说明'}
-                </div>
-                ${homework.attachments && homework.attachments.length > 0 ? `
-                    <div class="homework-attachments">
-                        <span class="attachment-count">
-                            <i class="fas fa-paperclip"></i>
-                            ${homework.attachments.length} 个附件
-                        </span>
-                    </div>
-                ` : ''}
-                <div class="homework-actions">
-                    <button class="btn btn-primary" onclick="viewHomeworkDetail(${homework.id})">
-                        <i class="fas fa-eye"></i> 查看详情
-                    </button>
-                    <button class="btn btn-outline" onclick="viewHomeworkSubmissions(${homework.id})">
-                        <i class="fas fa-users"></i> 查看提交
-                    </button>
-                    <button class="btn btn-danger" onclick="deleteHomework(${homework.id})">
-                        <i class="fas fa-trash"></i> 删除
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    };
-
-    const renderStudentHomeworks = () => {
-        if (homeworksCache.length === 0) {
-            studentHomeworkList.innerHTML = '';
-            showEmptyState(true, '暂无作业');
-            return;
-        }
-
-        showEmptyState(false);
-
-        // 应用筛选
-        let filteredHomeworks = homeworksCache;
-        const filterValue = statusFilter.value;
-
-        if (filterValue === 'submitted') {
-            filteredHomeworks = homeworksCache.filter(hw => hw.submitted);
-        } else if (filterValue === 'not-submitted') {
-            filteredHomeworks = homeworksCache.filter(hw => !hw.submitted);
-        }
-
-        studentHomeworkList.innerHTML = filteredHomeworks.map(homework => {
-            const isSubmitted = homework.submitted; // 假设后端会返回这个字段
-            return `
-                <div class="homework-card ${isSubmitted ? 'submitted' : 'not-submitted'} fade-in">
-                    <div class="homework-header-info">
-                        <div>
-                            <h3 class="homework-title">${homework.title}</h3>
-                            <div class="homework-meta">
-                                <span><i class="fas fa-user"></i> ${homework.teacherName || '教师'}</span>
-                                <span><i class="fas fa-calendar"></i> ${formatDate(homework.createTime)}</span>
-                                ${homework.attachments ? `<span><i class="fas fa-paperclip"></i> ${homework.attachments.length} 个附件</span>` : ''}
-                            </div>
-                        </div>
-                        <span class="homework-status ${isSubmitted ? 'status-submitted' : 'status-not-submitted'}">
-                            ${isSubmitted ? '已提交' : '未提交'}
-                        </span>
-                    </div>
-                    <div class="homework-content">
-                        ${homework.content || '暂无详细说明'}
-                    </div>
-                    ${homework.attachments && homework.attachments.length > 0 ? `
-                        <div class="homework-attachments">
-                            <span class="attachment-count">
-                                <i class="fas fa-paperclip"></i>
-                                ${homework.attachments.length} 个附件
-                            </span>
-                        </div>
-                    ` : ''}
-                    <div class="homework-actions">
-                        <button class="btn btn-primary" onclick="viewHomeworkDetail(${homework.id})">
-                            <i class="fas fa-eye"></i> 查看详情
-                        </button>
-                        ${isSubmitted ? `
-                            <button class="btn btn-success" onclick="viewMySubmission(${homework.id})">
-                                <i class="fas fa-check"></i> 查看提交
-                            </button>
-                        ` : `
-                            <button class="btn btn-outline" onclick="submitHomework(${homework.id})">
-                                <i class="fas fa-upload"></i> 提交作业
-                            </button>
-                        `}
-                    </div>
+    const renderTeacherHomeworks = (homeworks) => {
+        if (homeworks.length === 0) {
+            teacherHomeworkList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>还没有发布作业</h3>
+                    <p>点击"发布作业"按钮来创建第一个作业</p>
                 </div>
             `;
-        }).join('');
-    };
-
-    const renderAllSubmissions = () => {
-        if (submissionsCache.length === 0) {
-            allSubmissionsList.innerHTML = '<div class="empty-state"><p>暂无提交记录</p></div>';
             return;
         }
 
-        allSubmissionsList.innerHTML = submissionsCache.map(submission => `
-            <div class="submission-item">
-                <div class="submission-header">
-                    <div class="submission-info">
-                        <h4>${submission.homework?.title || '作业'}</h4>
-                        <div class="submission-meta">
-                            <span><i class="fas fa-user"></i> ${submission.studentName || '学生'}</span>
-                            <span><i class="fas fa-calendar"></i> ${formatDate(submission.createTime)}</span>
-                            ${submission.attachments ? `<span><i class="fas fa-paperclip"></i> ${submission.attachments.length} 个附件</span>` : ''}
+        teacherHomeworkList.innerHTML = homeworks.map(homework => `
+            <div class="homework-item" data-id="${homework.id}">
+                <div class="homework-header-info">
+                    <div>
+                        <div class="homework-title">${homework.title}</div>
+                        <div class="homework-meta">
+                            <span><i class="fas fa-calendar"></i> ${formatDate(homework.createTime)}</span>
                         </div>
                     </div>
+                    <div class="homework-actions">
+                        <button class="action-btn view-submissions" data-id="${homework.id}">
+                            <i class="fas fa-users"></i> 查看提交
+                        </button>
+                        <button class="action-btn delete" data-id="${homework.id}">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </div>
                 </div>
-                <div class="submission-content">
-                    ${submission.content || '无提交内容'}
-                </div>
-                <div class="submission-actions">
-                    <button class="btn btn-primary" onclick="viewSubmissionDetail(${submission.id})">
-                        <i class="fas fa-eye"></i> 查看详情
-                    </button>
-                </div>
+                ${homework.content ? `<div class="homework-content">${homework.content}</div>` : ''}
+                ${renderAttachments(homework.attachments)}
             </div>
         `).join('');
     };
 
-    const renderStudentSubmissions = () => {
-        if (submissionsCache.length === 0) {
-            studentSubmissionsList.innerHTML = '<div class="empty-state"><p>您还没有提交任何作业</p></div>';
+    const renderStudentHomeworks = (homeworks) => {
+        if (homeworks.length === 0) {
+            studentHomeworkList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>暂无作业</h3>
+                    <p>老师还没有发布作业</p>
+                </div>
+            `;
             return;
         }
 
-        studentSubmissionsList.innerHTML = submissionsCache.map(submission => `
-            <div class="submission-item">
-                <div class="submission-header">
-                    <div class="submission-info">
-                        <h4>${submission.homework?.title || '作业'}</h4>
-                        <div class="submission-meta">
-                            <span><i class="fas fa-calendar"></i> ${formatDate(submission.createTime)}</span>
-                            ${submission.attachments ? `<span><i class="fas fa-paperclip"></i> ${submission.attachments.length} 个附件</span>` : ''}
+        studentHomeworkList.innerHTML = homeworks.map(homework => `
+            <div class="homework-item" data-id="${homework.id}">
+                <div class="homework-header-info">
+                    <div>
+                        <div class="homework-title">${homework.title}</div>
+                        <div class="homework-meta">
+                            <span><i class="fas fa-calendar"></i> ${formatDate(homework.createTime)}</span>
                         </div>
                     </div>
+                    <div class="homework-actions">
+                        <button class="action-btn view-homework" data-id="${homework.id}">
+                            <i class="fas fa-eye"></i> 查看详情
+                        </button>
+                    </div>
                 </div>
-                <div class="submission-content">
-                    ${submission.content || '无提交内容'}
-                </div>
-                <div class="submission-actions">
-                    <button class="btn btn-primary" onclick="viewSubmissionDetail(${submission.id})">
-                        <i class="fas fa-eye"></i> 查看详情
-                    </button>
-                </div>
+                ${homework.content ? `<div class="homework-content">${homework.content}</div>` : ''}
+                ${renderAttachments(homework.attachments)}
             </div>
         `).join('');
     };
 
-    // --- 事件处理 ---
-    const setupEventListeners = () => {
-        // 标签页切换
-        if (isTeacher) {
-            myHomeworksTab?.addEventListener('click', () => switchTab('my-homeworks'));
-            allSubmissionsTab?.addEventListener('click', () => switchTab('all-submissions'));
-            publishHomeworkBtn?.addEventListener('click', () => openPublishModal());
+    const renderStudentSubmissions = (submissions) => {
+        if (submissions.length === 0) {
+            studentSubmissionList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>暂无提交记录</h3>
+                    <p>您还没有提交任何作业</p>
+                </div>
+            `;
+            return;
         }
 
-        if (isStudent) {
-            allHomeworksTab?.addEventListener('click', () => switchTab('all-homeworks'));
-            mySubmissionsTab?.addEventListener('click', () => switchTab('my-submissions'));
-            statusFilter?.addEventListener('change', renderStudentHomeworks);
+        studentSubmissionList.innerHTML = submissions.map(submission => `
+            <div class="submission-item">
+                <div class="homework-header-info">
+                    <div>
+                        <div class="homework-title">${submission.homework.title}</div>
+                        <div class="homework-meta">
+                            <span><i class="fas fa-calendar"></i> 提交时间: ${formatDate(submission.createTime)}</span>
+                        </div>
+                    </div>
+                </div>
+                ${submission.content ? `<div class="homework-content">${submission.content}</div>` : ''}
+                ${renderAttachments(submission.attachments)}
+            </div>
+        `).join('');
+    };
+
+    const renderHomeworkSubmissions = (submissions) => {
+        if (submissions.length === 0) {
+            submissionsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-times"></i>
+                    <h3>暂无学生提交</h3>
+                    <p>还没有学生提交这个作业</p>
+                </div>
+            `;
+            return;
         }
 
-        // 模态框关闭
-        document.querySelectorAll('.close-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.target.closest('.modal').style.display = 'none';
-            });
+        submissionsList.innerHTML = submissions.map(submission => `
+            <div class="submission-item">
+                <div class="homework-header-info">
+                    <div>
+                        <div class="homework-title">学生ID: ${submission.studentId}</div>
+                        <div class="homework-meta">
+                            <span><i class="fas fa-calendar"></i> 提交时间: ${formatDate(submission.createTime)}</span>
+                        </div>
+                    </div>
+                </div>
+                ${submission.content ? `<div class="homework-content">${submission.content}</div>` : ''}
+                ${renderAttachments(submission.attachments)}
+            </div>
+        `).join('');
+    };
+
+    const renderStudentSubmission = (submission) => {
+        mySubmissionContent.innerHTML = `
+            <div class="submission-item">
+                <div class="homework-meta">
+                    <span><i class="fas fa-calendar"></i> 提交时间: ${formatDate(submission.createTime)}</span>
+                </div>
+                ${submission.content ? `<div class="homework-content">${submission.content}</div>` : ''}
+                ${renderAttachments(submission.attachments)}
+            </div>
+        `;
+    };
+
+    const renderAttachments = (attachments) => {
+        if (!attachments || attachments.length === 0) return '';
+
+        return `
+            <div class="attachments">
+                <div class="attachments-title">
+                    <i class="fas fa-paperclip"></i> 附件 (${attachments.length})
+                </div>
+                <div class="attachment-list">
+                    ${attachments.map(attachment => `
+                        <a href="#" class="attachment-item" data-path="${attachment.filePath}">
+                            <i class="${getFileIcon(attachment.mimeTypeName)}"></i>
+                            <span>${attachment.fileName}</span>
+                            <small>(${formatFileSize(attachment.fileSize)})</small>
+                        </a>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    };
+
+    // --- 文件上传处理 ---
+    let selectedFiles = [];
+    let uploadedFiles = [];
+
+    const setupFileUpload = (uploadZone, fileInput, fileList, filesArray) => {
+        // 点击上传区域
+        uploadZone.addEventListener('click', () => {
+            fileInput.click();
         });
 
-        // 点击模态框外部关闭
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelection(e.target.files, filesArray, fileList);
         });
 
-        // 发布作业表单
-        setupPublishHomeworkForm();
-
-        // 提交作业表单
-        setupSubmitHomeworkForm();
-    };
-
-    const switchTab = async (tabName) => {
-        currentTab = tabName;
-
-        if (isTeacher) {
-            // 教师标签页切换
-            myHomeworksTab.classList.toggle('active', tabName === 'my-homeworks');
-            allSubmissionsTab.classList.toggle('active', tabName === 'all-submissions');
-
-            myHomeworksSection.style.display = tabName === 'my-homeworks' ? 'block' : 'none';
-            allSubmissionsSection.style.display = tabName === 'all-submissions' ? 'block' : 'none';
-
-            if (tabName === 'all-submissions' && submissionsCache.length === 0) {
-                await loadAllSubmissions();
-            }
-        } else if (isStudent) {
-            // 学生标签页切换
-            allHomeworksTab.classList.toggle('active', tabName === 'all-homeworks');
-            mySubmissionsTab.classList.toggle('active', tabName === 'my-submissions');
-
-            allHomeworksSection.style.display = tabName === 'all-homeworks' ? 'block' : 'none';
-            mySubmissionsSection.style.display = tabName === 'my-submissions' ? 'block' : 'none';
-
-            if (tabName === 'my-submissions' && submissionsCache.length === 0) {
-                await loadStudentSubmissions();
-            }
-        }
-    };
-
-    // --- 发布作业相关 ---
-    const openPublishModal = () => {
-        publishHomeworkModal.style.display = 'block';
-        resetPublishForm();
-    };
-
-    const resetPublishForm = () => {
-        document.getElementById('publish-homework-form').reset();
-        document.getElementById('small-files-list').innerHTML = '';
-        document.getElementById('large-files-list').innerHTML = '';
-        smallFiles = [];
-        largeFiles = [];
-        largeFileUploadIds = [];
-    };
-
-    let smallFiles = [];
-    let largeFiles = [];
-    let largeFileUploadIds = [];
-
-    const setupPublishHomeworkForm = () => {
-        const form = document.getElementById('publish-homework-form');
-        const smallFileInput = document.getElementById('small-file-input');
-        const largeFileInput = document.getElementById('large-file-input');
-        const smallFileDropZone = document.getElementById('small-file-drop-zone');
-        const largeFileDropZone = document.getElementById('large-file-drop-zone');
-
-        // 小文件处理
-        smallFileDropZone.addEventListener('click', () => smallFileInput.click());
-        smallFileInput.addEventListener('change', (e) => handleSmallFiles(e.target.files));
-        setupDropZone(smallFileDropZone, handleSmallFiles);
-
-        // 大文件处理
-        largeFileDropZone.addEventListener('click', () => largeFileInput.click());
-        largeFileInput.addEventListener('change', (e) => handleLargeFiles(e.target.files));
-        setupDropZone(largeFileDropZone, handleLargeFiles);
-
-        // 表单提交
-        form.addEventListener('submit', handlePublishHomework);
-
-        // 取消按钮
-        document.getElementById('cancel-publish-btn').addEventListener('click', () => {
-            publishHomeworkModal.style.display = 'none';
-        });
-    };
-
-    const setupDropZone = (dropZone, handler) => {
+        // 拖拽上传
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
+            uploadZone.addEventListener(eventName, (e) => {
                 e.preventDefault();
                 e.stopPropagation();
             });
         });
 
         ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => {
-                dropZone.classList.add('dragover');
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.parentElement.classList.add('dragover');
             });
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => {
-                dropZone.classList.remove('dragover');
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.parentElement.classList.remove('dragover');
             });
         });
 
-        dropZone.addEventListener('drop', (e) => {
-            handler(e.dataTransfer.files);
+        uploadZone.addEventListener('drop', (e) => {
+            handleFileSelection(e.dataTransfer.files, filesArray, fileList);
         });
     };
 
-    const handleSmallFiles = (files) => {
+    const handleFileSelection = (files, filesArray, fileList) => {
         Array.from(files).forEach(file => {
-            if (file.size <= CHUNK_SIZE) {
-                smallFiles.push(file);
-                addFileToList('small-files-list', file, () => removeSmallFile(file));
-            } else {
-                toast('warning', `文件 ${file.name} 过大，请使用大文件上传`);
-            }
+            filesArray.push(file);
         });
+        renderFileList(filesArray, fileList);
     };
 
-    const handleLargeFiles = async (files) => {
-        const fileArray = Array.from(files);
-        const initData = fileArray.map(file => ({
-            originalFileName: file.name,
-            fileSize: file.size
-        }));
-
-        try {
-            const response = await uploadAPI.post('/batch-init', { files: initData });
-            const results = response.data.data;
-
-            fileArray.forEach((file, index) => {
-                const result = results[index];
-                largeFiles.push(file);
-                largeFileUploadIds.push(result.uploadId);
-                addFileToList('large-files-list', file, () => removeLargeFile(file, index));
-            });
-        } catch (error) {
-            console.error('初始化大文件上传失败:', error);
-            toast('error', '初始化大文件上传失败');
-        }
-    };
-
-    const addFileToList = (listId, file, removeHandler) => {
-        const list = document.getElementById(listId);
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            <div class="file-info">
-                <i class="fas fa-file"></i>
-                <span class="file-name">${file.name}</span>
-                <span class="file-size">(${formatFileSize(file.size)})</span>
-            </div>
-            <div class="file-actions">
-                <button type="button" class="btn btn-danger" onclick="this.parentElement.parentElement.remove()">
+    const renderFileList = (filesArray, fileList) => {
+        fileList.innerHTML = filesArray.map((file, index) => `
+            <div class="file-item">
+                <div class="file-info">
+                    <i class="file-icon ${getFileIcon(file.type)}"></i>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+                <button type="button" class="remove-file" data-index="${index}">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-        `;
-
-        fileItem.querySelector('.btn-danger').addEventListener('click', removeHandler);
-        list.appendChild(fileItem);
+        `).join('');
     };
 
-    const removeSmallFile = (file) => {
-        const index = smallFiles.indexOf(file);
-        if (index > -1) {
-            smallFiles.splice(index, 1);
-        }
+    const removeFile = (index, filesArray, fileList) => {
+        filesArray.splice(index, 1);
+        renderFileList(filesArray, fileList);
     };
 
-    const removeLargeFile = (file, index) => {
-        largeFiles.splice(index, 1);
-        largeFileUploadIds.splice(index, 1);
-    };
+    // 设置文件上传
+    setupFileUpload(homeworkUploadZone, homeworkFileInput, homeworkFileList, selectedFiles);
+    setupFileUpload(submissionUploadZone, submissionFileInput, submissionFileList, uploadedFiles);
 
-    const handlePublishHomework = async (e) => {
-        e.preventDefault();
+    // 文件移除事件
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-file')) {
+            const index = parseInt(e.target.closest('.remove-file').dataset.index);
+            const fileList = e.target.closest('.file-list');
 
-        const formData = new FormData();
-        const dto = {
-            teacherId: currentUser.id,
-            title: document.getElementById('homework-title').value,
-            content: document.getElementById('homework-content').value,
-            attachmentUploadIds: largeFileUploadIds
-        };
-
-        formData.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
-
-        // 添加小文件
-        smallFiles.forEach(file => {
-            formData.append('files', file);
-        });
-
-        try {
-            showLoading(true);
-
-            // 如果有大文件，先上传大文件
-            if (largeFiles.length > 0) {
-                await uploadLargeFiles();
+            if (fileList.id === 'homework-file-list') {
+                removeFile(index, selectedFiles, homeworkFileList);
+            } else if (fileList.id === 'submission-file-list') {
+                removeFile(index, uploadedFiles, submissionFileList);
             }
-
-            const response = await homeworkAPI.post('/publish', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            toast('success', '作业发布成功');
-            publishHomeworkModal.style.display = 'none';
-            await loadTeacherHomeworks();
-        } catch (error) {
-            console.error('发布作业失败:', error);
-            toast('error', error.response?.data?.message || '发布作业失败');
-        } finally {
-            showLoading(false);
         }
-    };
+    });
 
-    const uploadLargeFiles = async () => {
-        for (let i = 0; i < largeFiles.length; i++) {
-            const file = largeFiles[i];
-            const uploadId = largeFileUploadIds[i];
-            await uploadFileInChunks(file, uploadId);
+    // --- 文件上传逻辑 ---
+    const uploadFiles = async (files) => {
+        if (files.length === 0) return [];
+
+        const smallFiles = files.filter(file => file.size <= CHUNK_SIZE);
+        const largeFiles = files.filter(file => file.size > CHUNK_SIZE);
+
+        const uploadIds = [];
+
+        // 处理大文件分块上传
+        if (largeFiles.length > 0) {
+            try {
+                const initResponse = await UPLOAD_API.post('/batch-init', {
+                    files: largeFiles.map(file => ({
+                        fileName: file.name,
+                        fileSize: file.size
+                    }))
+                });
+
+                const initResults = initResponse.data.data;
+
+                // 并发上传大文件
+                await Promise.all(largeFiles.map(async (file, index) => {
+                    const uploadId = initResults[index].uploadId;
+                    await uploadFileInChunks(file, uploadId);
+                    uploadIds.push(uploadId);
+                }));
+            } catch (error) {
+                console.error('Large file upload failed:', error);
+                throw error;
+            }
         }
+
+        return { smallFiles, uploadIds };
     };
 
     const uploadFileInChunks = async (file, uploadId) => {
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-            const start = chunkIndex * CHUNK_SIZE;
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, file.size);
             const chunk = file.slice(start, end);
 
             const formData = new FormData();
             formData.append('uploadId', uploadId);
-            formData.append('chunkIndex', chunkIndex);
+            formData.append('chunkIndex', i);
             formData.append('totalChunks', totalChunks);
             formData.append('chunk', chunk);
 
-            await uploadAPI.post('/chunk', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+            await UPLOAD_API.post('/chunk', formData, {
+                onUploadProgress: (progressEvent) => {
+                    const chunkProgress = (progressEvent.loaded / progressEvent.total) * 100;
+                    const totalProgress = ((i + chunkProgress / 100) / totalChunks) * 100;
+                    updateUploadProgress(totalProgress);
+                }
             });
         }
     };
 
-    // --- 提交作业相关 ---
-    const setupSubmitHomeworkForm = () => {
-        const form = document.getElementById('submit-homework-form');
-        const smallFileInput = document.getElementById('submission-small-file-input');
-        const largeFileInput = document.getElementById('submission-large-file-input');
-        const smallFileDropZone = document.getElementById('submission-small-file-drop-zone');
-        const largeFileDropZone = document.getElementById('submission-large-file-drop-zone');
-
-        // 文件处理（类似发布作业）
-        smallFileDropZone.addEventListener('click', () => smallFileInput.click());
-        smallFileInput.addEventListener('change', (e) => handleSubmissionSmallFiles(e.target.files));
-        setupDropZone(smallFileDropZone, handleSubmissionSmallFiles);
-
-        largeFileDropZone.addEventListener('click', () => largeFileInput.click());
-        largeFileInput.addEventListener('change', (e) => handleSubmissionLargeFiles(e.target.files));
-        setupDropZone(largeFileDropZone, handleSubmissionLargeFiles);
-
-        // 表单提交
-        form.addEventListener('submit', handleSubmitHomework);
-
-        // 取消按钮
-        document.getElementById('cancel-submit-btn').addEventListener('click', () => {
-            submitHomeworkModal.style.display = 'none';
-        });
+    const updateUploadProgress = (progress) => {
+        progressBarFill.style.width = `${progress}%`;
+        uploadStatus.textContent = `上传进度: ${Math.round(progress)}%`;
     };
 
-    let submissionSmallFiles = [];
-    let submissionLargeFiles = [];
-    let submissionLargeFileUploadIds = [];
-
-    const handleSubmissionSmallFiles = (files) => {
-        Array.from(files).forEach(file => {
-            if (file.size <= CHUNK_SIZE) {
-                submissionSmallFiles.push(file);
-                addFileToList('submission-small-files-list', file, () => removeSubmissionSmallFile(file));
-            } else {
-                toast('warning', `文件 ${file.name} 过大，请使用大文件上传`);
-            }
-        });
-    };
-
-    const handleSubmissionLargeFiles = async (files) => {
-        const fileArray = Array.from(files);
-        const initData = fileArray.map(file => ({
-            originalFileName: file.name,
-            fileSize: file.size
-        }));
-
+    // --- 下载处理 ---
+    const downloadFile = async (filePath, fileName) => {
         try {
-            const response = await uploadAPI.post('/batch-init', { files: initData });
-            const results = response.data.data;
-
-            fileArray.forEach((file, index) => {
-                const result = results[index];
-                submissionLargeFiles.push(file);
-                submissionLargeFileUploadIds.push(result.uploadId);
-                addFileToList('submission-large-files-list', file, () => removeSubmissionLargeFile(file, index));
-            });
-        } catch (error) {
-            console.error('初始化大文件上传失败:', error);
-            toast('error', '初始化大文件上传失败');
-        }
-    };
-
-    const removeSubmissionSmallFile = (file) => {
-        const index = submissionSmallFiles.indexOf(file);
-        if (index > -1) {
-            submissionSmallFiles.splice(index, 1);
-        }
-    };
-
-    const removeSubmissionLargeFile = (file, index) => {
-        submissionLargeFiles.splice(index, 1);
-        submissionLargeFileUploadIds.splice(index, 1);
-    };
-
-    const handleSubmitHomework = async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData();
-        const dto = {
-            homeworkId: parseInt(document.getElementById('submit-homework-id').value),
-            content: document.getElementById('submission-content').value,
-            attachmentUploadIds: submissionLargeFileUploadIds
-        };
-
-        formData.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
-
-        // 添加小文件
-        submissionSmallFiles.forEach(file => {
-            formData.append('files', file);
-        });
-
-        try {
-            showLoading(true);
-
-            // 如果有大文件，先上传大文件
-            if (submissionLargeFiles.length > 0) {
-                await uploadSubmissionLargeFiles();
-            }
-
-            const response = await submissionAPI.post('/submit', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            toast('success', '作业提交成功');
-            submitHomeworkModal.style.display = 'none';
-            await loadStudentData(); // 重新加载数据
-        } catch (error) {
-            console.error('提交作业失败:', error);
-            toast('error', error.response?.data?.message || '提交作业失败');
-        } finally {
-            showLoading(false);
-        }
-    };
-
-    const uploadSubmissionLargeFiles = async () => {
-        for (let i = 0; i < submissionLargeFiles.length; i++) {
-            const file = submissionLargeFiles[i];
-            const uploadId = submissionLargeFileUploadIds[i];
-            await uploadFileInChunks(file, uploadId);
-        }
-    };
-
-    // --- 全局函数（供HTML调用） ---
-    window.viewHomeworkDetail = async (homeworkId) => {
-        try {
-            const homework = homeworksCache.find(h => h.id === homeworkId);
-            if (!homework) return;
-
-            currentHomeworkDetail = homework;
-
-            document.getElementById('homework-detail-title').innerHTML = `
-                <i class="fas fa-clipboard-list"></i> ${homework.title}
-            `;
-
-            document.getElementById('homework-detail-content').innerHTML = `
-                <div class="homework-info">
-                    <div class="homework-meta">
-                        <p><i class="fas fa-user"></i> <strong>发布教师:</strong> ${homework.teacherName || '教师'}</p>
-                        <p><i class="fas fa-calendar"></i> <strong>发布时间:</strong> ${formatDate(homework.createTime)}</p>
-                        ${homework.updateTime !== homework.createTime ? `<p><i class="fas fa-edit"></i> <strong>更新时间:</strong> ${formatDate(homework.updateTime)}</p>` : ''}
-                    </div>
-                </div>
-                <div class="homework-content">
-                    <h4>作业内容:</h4>
-                    <p>${homework.content || '暂无详细说明'}</p>
-                </div>
-                ${homework.attachments && homework.attachments.length > 0 ? `
-                    <div class="attachments-list">
-                        <h4>附件:</h4>
-                        ${homework.attachments.map(attachment => `
-                            <div class="attachment-item">
-                                <div class="attachment-info">
-                                    <i class="fas fa-file"></i>
-                                    <span class="attachment-name">${attachment.fileName}</span>
-                                    <span class="attachment-size">(${formatFileSize(attachment.fileSize)})</span>
-                                </div>
-                                <div class="attachment-actions">
-                                    <button class="btn btn-primary" onclick="downloadAttachment('${attachment.filePath}', '${attachment.fileName}')">
-                                        <i class="fas fa-download"></i> 下载
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            `;
-
-            homeworkDetailModal.style.display = 'block';
-        } catch (error) {
-            console.error('查看作业详情失败:', error);
-            toast('error', '查看作业详情失败');
-        }
-    };
-
-    window.submitHomework = (homeworkId) => {
-        const homework = homeworksCache.find(h => h.id === homeworkId);
-        if (!homework) return;
-
-        document.getElementById('submit-homework-id').value = homeworkId;
-        document.getElementById('submit-homework-title').textContent = homework.title;
-        document.getElementById('submit-homework-content').innerHTML = homework.content || '暂无详细说明';
-
-        // 重置表单
-        document.getElementById('submit-homework-form').reset();
-        document.getElementById('submission-small-files-list').innerHTML = '';
-        document.getElementById('submission-large-files-list').innerHTML = '';
-        submissionSmallFiles = [];
-        submissionLargeFiles = [];
-        submissionLargeFileUploadIds = [];
-
-        submitHomeworkModal.style.display = 'block';
-    };
-
-    window.viewMySubmission = async (homeworkId) => {
-        try {
-            const submission = submissionsCache.find(s => s.homeworkId === homeworkId);
-            if (submission) {
-                viewSubmissionDetail(submission.id);
-            } else {
-                toast('warning', '未找到提交记录');
-            }
-        } catch (error) {
-            console.error('查看提交失败:', error);
-            toast('error', '查看提交失败');
-        }
-    };
-
-    window.viewSubmissionDetail = async (submissionId) => {
-        try {
-            const submission = submissionsCache.find(s => s.id === submissionId);
-            if (!submission) return;
-
-            document.getElementById('submission-detail-content').innerHTML = `
-                <div class="homework-info">
-                    <h3>${submission.homework?.title || '作业'}</h3>
-                    <div class="submission-meta">
-                        <p><i class="fas fa-user"></i> <strong>提交学生:</strong> ${submission.studentName || '学生'}</p>
-                        <p><i class="fas fa-calendar"></i> <strong>提交时间:</strong> ${formatDate(submission.createTime)}</p>
-                        ${submission.updateTime !== submission.createTime ? `<p><i class="fas fa-edit"></i> <strong>更新时间:</strong> ${formatDate(submission.updateTime)}</p>` : ''}
-                    </div>
-                </div>
-                <div class="submission-content">
-                    <h4>提交内容:</h4>
-                    <p>${submission.content || '无提交内容'}</p>
-                </div>
-                ${submission.attachments && submission.attachments.length > 0 ? `
-                    <div class="attachments-list">
-                        <h4>附件:</h4>
-                        ${submission.attachments.map(attachment => `
-                            <div class="attachment-item">
-                                <div class="attachment-info">
-                                    <i class="fas fa-file"></i>
-                                    <span class="attachment-name">${attachment.fileName}</span>
-                                    <span class="attachment-size">(${formatFileSize(attachment.fileSize)})</span>
-                                </div>
-                                <div class="attachment-actions">
-                                    <button class="btn btn-primary" onclick="downloadAttachment('${attachment.filePath}', '${attachment.fileName}')">
-                                        <i class="fas fa-download"></i> 下载
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            `;
-
-            submissionDetailModal.style.display = 'block';
-        } catch (error) {
-            console.error('查看提交详情失败:', error);
-            toast('error', '查看提交详情失败');
-        }
-    };
-
-    window.viewHomeworkSubmissions = async (homeworkId) => {
-        // 这里需要后端提供获取特定作业的所有提交的接口
-        console.warn('需要后端提供获取特定作业所有提交的接口');
-        toast('info', '功能开发中');
-    };
-
-    window.deleteHomework = async (homeworkId) => {
-        const result = await Swal.fire({
-            title: '确认删除',
-            text: '确定要删除这个作业吗？此操作不可撤销！',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: '确定删除',
-            cancelButtonText: '取消'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                await homeworkAPI.delete(`/${homeworkId}`);
-                toast('success', '作业删除成功');
-                await loadTeacherHomeworks();
-            } catch (error) {
-                console.error('删除作业失败:', error);
-                toast('error', error.response?.data?.message || '删除作业失败');
-            }
-        }
-    };
-
-    window.downloadAttachment = async (filePath, fileName) => {
-        try {
-            const response = await downloadAPI.get('/get/downloadId', {
+            const response = await DOWNLOAD_API.get('/get/downloadId', {
                 params: { path: filePath }
             });
+
             const token = response.data.data;
+            const downloadUrl = `${API_BASE_URL}/attach/download/download?path=${encodeURIComponent(filePath)}&token=${token}`;
 
             const link = document.createElement('a');
-            link.href = `${DOWNLOAD_API_URL}/download?path=${encodeURIComponent(filePath)}&token=${token}`;
+            link.href = downloadUrl;
             link.download = fileName;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         } catch (error) {
-            console.error('下载文件失败:', error);
-            toast('error', '下载文件失败');
+            console.error('Download failed:', error);
+            toast('error', '下载失败');
         }
     };
 
-    // --- 启动应用 ---
+    // --- 事件监听器 ---
+
+    // 发布作业按钮
+    if (publishHomeworkBtn) {
+        publishHomeworkBtn.addEventListener('click', () => {
+            publishModal.style.display = 'block';
+        });
+    }
+
+    // 关闭模态框
+    closeModalBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').style.display = 'none';
+        });
+    });
+
+    if (cancelPublishBtn) {
+        cancelPublishBtn.addEventListener('click', () => {
+            publishModal.style.display = 'none';
+        });
+    }
+
+    // 点击模态框外部关闭
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
+
+    // 标签页切换
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.dataset.tab;
+            switchTab(tabName);
+        });
+    });
+
+    // 返回按钮
+    backBtn.addEventListener('click', () => {
+        showView('list');
+    });
+
+    // 发布作业表单提交
+    publishForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        const title = document.getElementById('homework-title').value;
+        const content = document.getElementById('homework-content').value;
+
+        try {
+            uploadProgress.style.display = 'block';
+            updateUploadProgress(0);
+
+            // 处理文件上传
+            const { smallFiles, uploadIds } = await uploadFiles(selectedFiles);
+
+            // 构建DTO
+            const dto = {
+                title,
+                content,
+                attachmentUploadIds: uploadIds
+            };
+
+            formData.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
+
+            // 添加小文件
+            smallFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            updateUploadProgress(80);
+
+            await HOMEWORK_API.post('/publish', formData, {
+                onUploadProgress: (progressEvent) => {
+                    const progress = 80 + (progressEvent.loaded / progressEvent.total) * 20;
+                    updateUploadProgress(progress);
+                }
+            });
+
+            updateUploadProgress(100);
+            toast('success', '作业发布成功');
+
+            // 重置表单
+            publishForm.reset();
+            selectedFiles.length = 0;
+            renderFileList(selectedFiles, homeworkFileList);
+            publishModal.style.display = 'none';
+            uploadProgress.style.display = 'none';
+
+            // 刷新列表
+            loadTeacherHomeworks();
+
+        } catch (error) {
+            console.error('Publish homework failed:', error);
+            toast('error', '发布作业失败');
+            uploadProgress.style.display = 'none';
+        }
+    });
+
+    // 提交作业表单
+    submitHomeworkForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const content = document.getElementById('submission-content').value;
+
+        try {
+            uploadProgress.style.display = 'block';
+            updateUploadProgress(0);
+
+            // 处理文件上传
+            const { smallFiles, uploadIds } = await uploadFiles(uploadedFiles);
+
+            const formData = new FormData();
+            const dto = {
+                homeworkId: currentHomeworkId,
+                content,
+                attachmentUploadIds: uploadIds
+            };
+
+            formData.append('dto', new Blob([JSON.stringify(dto)], { type: 'application/json' }));
+
+            // 添加小文件
+            smallFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            updateUploadProgress(80);
+
+            await SUBMISSION_API.post('/submit', formData, {
+                onUploadProgress: (progressEvent) => {
+                    const progress = 80 + (progressEvent.loaded / progressEvent.total) * 20;
+                    updateUploadProgress(progress);
+                }
+            });
+
+            updateUploadProgress(100);
+            toast('success', '作业提交成功');
+
+            // 重置表单
+            submitHomeworkForm.reset();
+            uploadedFiles.length = 0;
+            renderFileList(uploadedFiles, submissionFileList);
+            uploadProgress.style.display = 'none';
+
+            // 重新加载提交状态
+            loadStudentSubmission(currentHomeworkId);
+
+        } catch (error) {
+            console.error('Submit homework failed:', error);
+            toast('error', '提交作业失败');
+            uploadProgress.style.display = 'none';
+        }
+    });
+
+    // 作业列表点击事件
+    document.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // 查看提交按钮（教师）
+        if (target.closest('.view-submissions')) {
+            const homeworkId = target.closest('.view-submissions').dataset.id;
+            const homeworkItem = target.closest('.homework-item');
+            const title = homeworkItem.querySelector('.homework-title').textContent;
+
+            currentHomeworkId = homeworkId;
+            detailTitle.textContent = title;
+
+            // 显示作业信息
+            const content = homeworkItem.querySelector('.homework-content')?.textContent || '无内容';
+            const attachments = homeworkItem.querySelector('.attachments')?.outerHTML || '';
+            homeworkDetailContent.innerHTML = `
+                <p>${content}</p>
+                ${attachments}
+            `;
+
+            // 显示提交列表
+            submissionsSection.style.display = 'block';
+            studentSubmissionSection.style.display = 'none';
+
+            showView('detail');
+            await loadHomeworkSubmissions(homeworkId);
+        }
+
+        // 查看详情按钮（学生）
+        if (target.closest('.view-homework')) {
+            const homeworkId = target.closest('.view-homework').dataset.id;
+            const homeworkItem = target.closest('.homework-item');
+            const title = homeworkItem.querySelector('.homework-title').textContent;
+
+            currentHomeworkId = homeworkId;
+            detailTitle.textContent = title;
+
+            // 显示作业信息
+            const content = homeworkItem.querySelector('.homework-content')?.textContent || '无内容';
+            const attachments = homeworkItem.querySelector('.attachments')?.outerHTML || '';
+            homeworkDetailContent.innerHTML = `
+                <p>${content}</p>
+                ${attachments}
+            `;
+
+            // 显示学生提交区域
+            submissionsSection.style.display = 'none';
+            studentSubmissionSection.style.display = 'block';
+
+            showView('detail');
+            await loadStudentSubmission(homeworkId);
+        }
+
+        // 删除作业按钮
+        if (target.closest('.delete')) {
+            const homeworkId = target.closest('.delete').dataset.id;
+            await deleteHomework(homeworkId);
+        }
+
+        // 附件下载
+        if (target.closest('.attachment-item')) {
+            e.preventDefault();
+            const attachmentItem = target.closest('.attachment-item');
+            const filePath = attachmentItem.dataset.path;
+            const fileName = attachmentItem.querySelector('span').textContent;
+            await downloadFile(filePath, fileName);
+        }
+    });
+
+    // 初始化应用
     initializeApp();
 });

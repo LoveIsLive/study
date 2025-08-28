@@ -18,7 +18,7 @@ public class Attachment {
     private String fileName;
     private String filePath;
     private Long fileSize;
-    private String mimeType;
+    private Integer mimeTypeId;
     private Long uploaderId;
     private LocalDateTime createTime;
 }

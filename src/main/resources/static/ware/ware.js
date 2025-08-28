@@ -779,6 +779,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateToPath('/');
         } else if (initialPath.startsWith(WARE_PREFIX + '/')) {
             navigateToPath(initialPath.substring(WARE_PREFIX.length));
+        } else {
+            window.location = WARE_PREFIX;
         }
     }
     fetchMimeTypes();

@@ -1,5 +1,6 @@
 package com.kwang.study.homework.mapper;
 
+import com.kwang.study.homework.pojo.AttachmentDetail;
 import com.kwang.study.homework.pojo.Attachment;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -10,7 +11,7 @@ public interface AttachmentMapper {
 
     void batchInsert(@Param("attachments") List<Attachment> attachments);
 
-    List<Attachment> findByOwner(@Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
+    List<AttachmentDetail> findByOwner(@Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
 
     int deleteByOwner(@Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
 

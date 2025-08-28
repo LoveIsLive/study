@@ -1,0 +1,18 @@
+package com.kwang.study.homework.pojo;
+
+import lombok.*;
+
+/**
+ * @author kwang
+ * @date 2025/08/28
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class AttachmentDetail extends Attachment {
+    /**
+     * mime类型名称
+     */
+    private String mimeTypeName;
+}

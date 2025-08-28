@@ -14,10 +14,20 @@
     1. 提交作业
     2. 查看自己提交的作业列表
 虽然目前系统只有两个角色，后续可能会有root->学校->班级->学生层次。
-不同角色进入作业区展示不同的样式。比如：
-教师，进入作业区应该先展示自己发布的作业列表，并有发布作业的按钮。点击作业后，能看到所有学生的提交。
-学生，进入作业区应该先展示所有作业列表（包括已经提交的和未提交的）。点击作业后，只能看到自己的提交（若未提交显示还未提交作业）。
+不同角色进入作业区展示不同的样式与功能。详细描述：
+教师：
+    1.进入作业区，展示自己发布的作业列表，并有发布作业的按钮。
+    2.作业列表中，每一项都会展示作业的描述信息，并可以查看/下载作业的附件信息，我希望每一项都是独立的一行
+    3.作业列表中，可以点击进入以查看该作业的所有学生提交（不要以模态框实现，并且能够返回到之前的页面）
+    4.学生提交列表中应该以类似于作业列表一样的UI展示，并可以查看/下载作业的附件信息
+    5.教师可以删除作业
+学生：
+    1.进入作业区，获取所有作业列表，并有一个查看自己所有提交的tab，切换后应该是展示自己的所有提交
+    2.作业列表展示与教师的保持一致。
+    3.但学生点击进入作业列表项后，只展示自己的作业提交（不要以模态框实现，并且能够返回到之前的页面），如果未提交则需要能够进行提交作业。
+
 你需要扩展性地考虑不同角色的展示。
+尽可能美化UI
 
 # sql表
 CREATE TABLE `homework` (
@@ -102,7 +112,7 @@ public class HomeworkController {
      * 教师发布作业
      * 使用 multipart/form-data 格式提交
      * 表单字段：title, content
-     * 小文件字段：files
+     * 文件字段：files
      */
     @PostMapping("/publish")
     public ResponseEntity<Homework> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
@@ -144,19 +154,36 @@ public class Homework {
     private LocalDateTime updateTime;
 
     // 关联附件列表 (非数据库字段)
-    private List<Attachment> attachments;
+    private List<AttachmentDetail> attachments;
+}
+
+public class AttachmentDetail extends Attachment {
+    /**
+     * mime类型名称
+     */
+    private String mimeTypeName;
+}
+public class Attachment {
+    private Long id;
+    private Long ownerId;
+    private String ownerType;
+    private String fileName;
+    private String filePath;
+    private Long fileSize;
+    private Integer mimeTypeId;
+    private Long uploaderId;
+    private LocalDateTime createTime;
 }
 
 @RestController
 @RequestMapping(SUBMISSION_BASE_PREFIX)
 @Validated
 public class SubmissionController {
-
     /**
      * 学生提交作业
      * 使用 multipart/form-data 格式提交
      * 表单字段：homeworkId, content
-     * 小文件字段：files
+     * 文件字段：files
      */
     @PostMapping("/submit")
     public ResponseEntity<R<HomeworkSubmission>> submitHomework(@Valid @RequestPart("dto") SubmissionCreateDTO dto,
@@ -165,6 +192,7 @@ public class SubmissionController {
 
     /**
      * 教师查看特定作业的所有提交
+     * TODO: 后续角色权限控制
      * @param homeworkId 作业ID
      * @return 该作业的所有提交列表
      */
@@ -178,6 +206,13 @@ public class SubmissionController {
     @GetMapping("/student/all")
     public ResponseEntity<R<List<HomeworkSubmission>>> getStudentSubmissions() {
     }
+
+    /**
+     * 学生查看自己某个作业的提交
+     */
+    @GetMapping("/student/{homeworkId}/submission")
+    public ResponseEntity<R<HomeworkSubmission>> getStudentSubmission(@PathVariable Long homeworkId) {
+    }
 }
 
 public class HomeworkSubmission {
@@ -189,7 +224,7 @@ public class HomeworkSubmission {
     private LocalDateTime updateTime;
 
     // 关联附件列表 (非数据库字段)
-    private List<Attachment> attachments;
+    private List<AttachmentDetail> attachments;
 
     // 关联作业信息 (非数据库字段)
     private Homework homework;
@@ -199,7 +234,9 @@ public class HomeworkSubmission {
 ## 文件上传
 其中的附件设计到文件上传功能，需要实现“小文件直接传输，大文件分块上传”的功能，需要根据以下代码：
 public class HomeworkCreateDTO {
-
+    /**
+     * 教师ID，从当前登陆用户获取，非前端传入
+     */
     private Long teacherId;
 
     @NotBlank(message = "Title is mandatory")
@@ -210,6 +247,7 @@ public class HomeworkCreateDTO {
 
     private List<String> attachmentUploadIds; // 大附件的uploadId, 小附件不使用此
 }
+
 @RestController
 @RequestMapping(ATTACHE_UPLOAD_BASE_PREFIX)
 @Validated
@@ -266,9 +304,8 @@ public class FileDownloadController {
 ## 任务描述
 你需要完成作业模块的前端设计，使用原生html css js和上述前端环境。
 要求：
--完成后端接口对应的前端功能
+-根据后端接口描述，完成作业区描述的功能设计
 -尽可能设计优美的UI
--如果有一些后端缺少的接口，请指出。要求作业区功能自洽。
 
 ## 参考
 教学系统之前完成了课程仓库模块，下面是html和js代码可供你参考。（课程仓库设计为类似于unix文件系统的样式，注意你的作业区模块要设计的更符合常规设计）
@@ -1182,6 +1219,8 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateToPath('/');
         } else if (initialPath.startsWith(WARE_PREFIX + '/')) {
             navigateToPath(initialPath.substring(WARE_PREFIX.length));
+        } else {
+            window.location = WARE_PREFIX;
         }
     }
     fetchMimeTypes();

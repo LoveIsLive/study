@@ -622,6 +622,15 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         return result;
     }
 
+    @Override
+    public MimeTypeIdResult getMimeTypeId(String mimeTypeName) {
+        MimeTypeIdResult result = new MimeTypeIdResult();
+        Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
+        result.setSuccess(Boolean.TRUE);
+        result.setMimeTypeId(mimeTypeId);
+        return result;
+    }
+
     /**
      * 上传单个文件分片
      *

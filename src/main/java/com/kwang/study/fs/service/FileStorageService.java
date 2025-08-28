@@ -121,5 +121,5 @@ public interface FileStorageService {
      */
     MimeTypeResult getAllMimeTypeNames();
 
-
+    MimeTypeIdResult getMimeTypeId(String mimeTypeName);
 }

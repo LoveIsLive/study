@@ -1,10 +1,11 @@
 package com.kwang.study.homework.service;
 
-import cn.hutool.core.collection.ListUtil;
+import com.kwang.study.fs.dto.result.MimeTypeIdResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
 import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
+import com.kwang.study.homework.pojo.AttachmentDetail;
 import com.kwang.study.homework.mapper.AttachmentMapper;
 import com.kwang.study.homework.mapper.HomeworkMapper;
 import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
@@ -17,13 +18,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 import cn.hutool.core.lang.UUID;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -91,20 +92,25 @@ public class HomeworkService {
                                 .get(UPLOAD_ID_PREFIX + uploadId);
                         // Note: 忽略为空的
                         if (uploadInfo == null) return null;
+                        MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(uploadInfo.getMimeTypeName());
+                        Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
+                                "Mime type not found: " + uploadInfo.getMimeTypeName());
                         return Attachment.builder()
                                 .ownerId(homework.getId())
                                 .ownerType(HOMEWORK_ATTACHMENT_OWNER_TYPE)
                                 .fileName(uploadInfo.getFileName())
                                 .filePath(uploadInfo.getFilePath())
                                 .fileSize(uploadInfo.getFileSize())
-                                .mimeType(uploadInfo.getMimeTypeName())
+                                .mimeTypeId(mimeTypeId.getMimeTypeId())
                                 .uploaderId(dto.getTeacherId())
                                 .build();
                     }).filter(Objects::nonNull).collect(Collectors.toList());
             attachmentList.addAll(attachments);
         }
 
-        attachmentMapper.batchInsert(attachmentList);
+        if (!CollectionUtils.isEmpty(attachmentList)) {
+            attachmentMapper.batchInsert(attachmentList);
+        }
 
         // 4. 返回完整的作业信息 (包含附件)
         return homeworkMapper.findById(homework.getId());
@@ -164,20 +170,25 @@ public class HomeworkService {
                                 .get(UPLOAD_ID_PREFIX + uploadId);
                         // Note: 忽略为空的
                         if (uploadInfo == null) return null;
+                        MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(uploadInfo.getMimeTypeName());
+                        Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
+                                "Mime type not found: " + uploadInfo.getMimeTypeName());
                         return Attachment.builder()
                                 .ownerId(submission.getId())
                                 .ownerType(HOMEWORK_ATTACHMENT_OWNER_TYPE)
                                 .fileName(uploadInfo.getFileName())
                                 .filePath(uploadInfo.getFilePath())
                                 .fileSize(uploadInfo.getFileSize())
-                                .mimeType(uploadInfo.getMimeTypeName())
+                                .mimeTypeId(mimeTypeId.getMimeTypeId())
                                 .uploaderId(dto.getStudentId())
                                 .build();
                     }).filter(Objects::nonNull).collect(Collectors.toList());
             attachmentList.addAll(attachments);
         }
 
-        attachmentMapper.batchInsert(attachmentList);
+        if (!CollectionUtils.isEmpty(attachmentList)) {
+            attachmentMapper.batchInsert(attachmentList);
+        }
 
         // 4. 返回完整的提交信息 (包含附件和作业信息)
         return submissionMapper.findById(submission.getId());
@@ -190,6 +201,10 @@ public class HomeworkService {
      */
     public List<HomeworkSubmission> getSubmissionsByStudent(Long studentId) {
         return submissionMapper.findAllByStudentId(studentId);
+    }
+
+    public HomeworkSubmission getSubmissionByStudent(Long studentId, Long homeworkId) {
+        return submissionMapper.findByHomeworkIdAndStudentId(homeworkId, studentId);
     }
 
     /**
@@ -227,14 +242,14 @@ public class HomeworkService {
         List<String> filePathsToDelete = new ArrayList<>();
 
         // 2.1 查找作业本身的附件
-        List<Attachment> homeworkAttachments = attachmentMapper.findByOwner(homeworkId, HOMEWORK_ATTACHMENT_OWNER_TYPE);
+        List<AttachmentDetail> homeworkAttachments = attachmentMapper.findByOwner(homeworkId, HOMEWORK_ATTACHMENT_OWNER_TYPE);
         homeworkAttachments.forEach(att -> filePathsToDelete.add(att.getFilePath()));
 
         // 2.2 查找所有提交记录及其附件
         List<Long> submissionIds = submissionMapper.findIdsByHomeworkId(homeworkId);
         if (submissionIds != null && !submissionIds.isEmpty()) {
             for (Long submissionId : submissionIds) {
-                List<Attachment> submissionAttachments = attachmentMapper.findByOwner(submissionId, SUBMISSION_ATTACHMENT_OWNER_TYPE);
+                List<AttachmentDetail> submissionAttachments = attachmentMapper.findByOwner(submissionId, SUBMISSION_ATTACHMENT_OWNER_TYPE);
                 submissionAttachments.forEach(att -> filePathsToDelete.add(att.getFilePath()));
             }
             // 批量删除提交记录的附件
@@ -274,8 +289,13 @@ public class HomeworkService {
             String originalFilename = file.getOriginalFilename();
             String filePath = HomeworkService.produceAttachPath(originalFilename);
 
+            String contentType = file.getContentType();
+            MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(contentType);
+            Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
+                    "Mime type not found: " + contentType);
+
             // 调用文件存储服务上传文件
-            fileStorageService.createFile(filePath, file.getInputStream(), file.getContentType());
+            fileStorageService.createFile(filePath, file.getInputStream(), contentType);
 
             // 构建附件对象
             Attachment attachment = Attachment.builder()
@@ -284,7 +304,7 @@ public class HomeworkService {
                     .fileName(originalFilename)
                     .filePath(filePath)
                     .fileSize(file.getSize())
-                    .mimeType(file.getContentType())
+                    .mimeTypeId(mimeTypeId.getMimeTypeId())
                     .uploaderId(uploaderId)
                     .build();
             attachments.add(attachment);

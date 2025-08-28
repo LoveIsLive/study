@@ -64,4 +64,15 @@ public class SubmissionController {
         List<HomeworkSubmission> submissions = homeworkService.getSubmissionsByStudent(studentId);
         return ResponseEntity.ok(R.success(submissions));
     }
+
+    /**
+     * 学生查看自己某个作业的提交
+     */
+    @GetMapping("/student/{homeworkId}/submission")
+    public ResponseEntity<R<HomeworkSubmission>> getStudentSubmission(@PathVariable Long homeworkId) {
+        // 获取认证信息
+        Long studentId = AuthenticationUserUtil.getCurrentUserId();
+        HomeworkSubmission submission = homeworkService.getSubmissionByStudent(studentId, homeworkId);
+        return ResponseEntity.ok(R.success(submission));
+    }
 }
