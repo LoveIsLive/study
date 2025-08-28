@@ -1,642 +1,356 @@
-/* homework.css */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
+/* --- 通用样式 --- */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f4f7f9;
+    margin: 0;
     color: #333;
 }
 
-.homework-container {
+.app-container {
     max-width: 1200px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: white;
-    box-shadow: 0 0 30px rgba(0,0,0,0.1);
+    margin: 2rem auto;
+    padding: 0 2rem;
 }
 
-/* 头部样式 */
-.homework-header {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    color: white;
-    padding: 1.5rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.homework-header h1 {
-    font-size: 1.8rem;
-    font-weight: 600;
-}
-
-.homework-header h1 i {
-    margin-right: 0.5rem;
-    color: #fbbf24;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.role-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.role-badge.teacher {
-    background: #10b981;
-    color: white;
-}
-
-.role-badge.student {
-    background: #3b82f6;
-    color: white;
-}
-
-/* 主要内容区域 */
-.homework-main {
-    padding: 2rem;
-}
-
-.view-container {
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* 操作栏 */
-.action-bar {
+.app-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-.stats-info {
-    color: #64748b;
-    font-weight: 500;
-}
-
-/* 按钮样式 */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-}
-
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    color: white;
-}
-
-.btn-secondary {
-    background: #6b7280;
-    color: white;
-}
-
-.btn-danger {
-    background: #ef4444;
-    color: white;
-}
-
-.btn-success {
-    background: #10b981;
-    color: white;
-}
-
-/* 标签页 */
-.tab-container {
-    margin-bottom: 2rem;
-}
-
-.tabs {
-    display: flex;
-    background: #f1f5f9;
-    border-radius: 12px;
-    padding: 0.25rem;
-    gap: 0.25rem;
-}
-
-.tab-btn {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    border: none;
-    background: transparent;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-weight: 500;
-    color: #64748b;
-}
-
-.tab-btn.active {
-    background: white;
-    color: #4f46e5;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.tab-btn:hover:not(.active) {
-    background: rgba(255,255,255,0.5);
-}
-
-.tab-content {
-    position: relative;
-}
-
-.tab-pane {
-    display: none;
-}
-
-.tab-pane.active {
-    display: block;
-}
-
-/* 作业列表 */
-.homework-list, .submission-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.homework-item, .submission-item {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.homework-item:hover, .submission-item:hover {
-    border-color: #4f46e5;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-    transform: translateY(-1px);
-}
-
-.homework-header-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-
-.homework-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin-bottom: 0.5rem;
-}
-
-.homework-meta {
-    display: flex;
-    gap: 1rem;
-    color: #64748b;
-    font-size: 0.9rem;
-}
-
-.homework-content {
-    color: #475569;
-    line-height: 1.6;
-    margin-bottom: 1rem;
-}
-
-.homework-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.action-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid #d1d5db;
-    background: white;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.9rem;
-}
-
-.action-btn:hover {
-    background: #f3f4f6;
-}
-
-.action-btn.delete {
-    color: #ef4444;
-    border-color: #fecaca;
-}
-
-.action-btn.delete:hover {
-    background: #fef2f2;
-}
-
-/* 附件样式 */
-.attachments {
-    margin-top: 1rem;
-}
-
-.attachments-title {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #64748b;
-    margin-bottom: 0.5rem;
-}
-
-.attachment-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.attachment-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: #f1f5f9;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    color: #475569;
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.attachment-item:hover {
-    background: #e2e8f0;
-    color: #1e293b;
-}
-
-.attachment-item i {
-    color: #64748b;
-}
-
-/* 详情页面 */
-.detail-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    border-bottom: 1px solid #e0e0e0;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #e2e8f0;
 }
 
-.detail-header h2 {
-    color: #1e293b;
-    font-size: 1.5rem;
-}
-
-.detail-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-.info-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 1.5rem;
-}
-
-.info-card h3 {
-    color: #1e293b;
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-}
-
-/* 表单样式 */
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #374151;
-}
-
-.form-group input,
-.form-group textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: border-color 0.2s ease;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-    outline: none;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
-
-/* 文件上传区域 */
-.file-upload-area {
-    border: 2px dashed #d1d5db;
-    border-radius: 12px;
-    padding: 1rem;
-    transition: all 0.2s ease;
-}
-
-.file-upload-area.dragover {
-    border-color: #4f46e5;
-    background: rgba(79, 70, 229, 0.05);
-}
-
-.upload-zone {
-    text-align: center;
-    padding: 2rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.upload-zone:hover {
-    background: #f8fafc;
-}
-
-.upload-zone i {
-    font-size: 2rem;
-    color: #9ca3af;
-    margin-bottom: 0.5rem;
-}
-
-.upload-zone p {
-    color: #6b7280;
+.app-header h1 {
+    color: #2c3e50;
     margin: 0;
 }
 
-.file-list {
-    margin-top: 1rem;
-}
-
-.file-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: #f1f5f9;
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
-}
-
-.file-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.file-icon {
-    color: #64748b;
-}
-
-.file-name {
-    font-weight: 500;
-    color: #1e293b;
-}
-
-.file-size {
-    color: #64748b;
-    font-size: 0.9rem;
-}
-
-.remove-file {
-    background: none;
+/* --- 按钮样式 --- */
+.btn {
+    padding: 10px 18px;
     border: none;
-    color: #ef4444;
+    border-radius: 6px;
     cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 4px;
-    transition: background 0.2s ease;
+    font-size: 1rem;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
-
-.remove-file:hover {
-    background: #fef2f2;
+.btn-primary {
+    background-color: #007bff;
+    color: white;
 }
-
-/* 进度条 */
-.upload-progress {
-    margin-top: 1rem;
+.btn-primary:hover {
+    background-color: #0056b3;
 }
-
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
 }
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #4f46e5, #7c3aed);
-    transition: width 0.3s ease;
-    width: 0%;
+.btn-secondary:hover {
+    background-color: #5a6268;
 }
-
-#upload-status {
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+.btn-danger:hover {
+    background-color: #c82333;
+}
+.action-btn {
+    background: transparent;
+    border: none;
+    color: #007bff;
+    cursor: pointer;
     font-size: 0.9rem;
-    color: #64748b;
-    text-align: center;
+}
+.action-btn:hover {
+    text-decoration: underline;
 }
 
-/* 模态框 */
+/* --- 列表和卡片样式 --- */
+.list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.item-card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem 2rem;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.item-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    cursor: pointer;
+}
+.card-title:hover {
+    color: #007bff;
+}
+.card-meta {
+    font-size: 0.85rem;
+    color: #888;
+    text-align: right;
+}
+.card-content {
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    white-space: pre-wrap; /* 保留换行和空格 */
+}
+.card-attachments h4, .submission-form-card h4 {
+    font-size: 1rem;
+    color: #333;
+    margin-bottom: 0.8rem;
+    font-weight: 600;
+}
+.attachment-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #007bff;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+.attachment-item:hover {
+    text-decoration: underline;
+}
+.card-footer {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+/* --- 视图切换 & 标题 --- */
+.view {
+    animation: fadeIn 0.5s ease-in-out;
+}
+.view-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.view-header h2 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- Tab 样式 (学生) --- */
+.tabs-container {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #ddd;
+}
+.tab-btn {
+    padding: 12px 20px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size: 1.1rem;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px; /* 完美对齐 */
+}
+.tab-btn.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+}
+
+/* --- 模态框样式 --- */
 .modal {
     display: none;
     position: fixed;
     z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
 }
-
 .modal-content {
-    background: white;
+    background-color: #fefefe;
     margin: 5% auto;
-    padding: 0;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    padding: 30px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 8px;
+    position: relative;
+    animation: slideIn 0.4s;
 }
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e2e8f0;
+.modal-content.large {
+    max-width: 800px;
 }
-
-.modal-header h2 {
-    margin: 0;
-    color: #1e293b;
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
-
 .close-btn {
-    font-size: 1.5rem;
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
     cursor: pointer;
-    color: #9ca3af;
-    transition: color 0.2s ease;
+}
+.close-btn:hover, .close-btn:focus {
+    color: black;
 }
 
-.close-btn:hover {
-    color: #374151;
+/* --- 表单样式 --- */
+.form-group {
+    margin-bottom: 1.5rem;
 }
-
-.modal form {
-    padding: 2rem;
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
 }
-
+.form-group input[type="text"], .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Important */
+    font-size: 1rem;
+}
+.form-group textarea {
+    resize: vertical;
+}
 .form-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
+    text-align: right;
     margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
 }
 
-/* 加载动画 */
-.spinner-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem;
-    color: #64748b;
+/* --- 文件上传区域 --- */
+.drag-drop-area {
+    border: 2px dashed #ccc;
+    border-radius: 6px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s, background-color 0.3s;
 }
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #e5e7eb;
-    border-top: 4px solid #4f46e5;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+.drag-drop-area:hover, .drag-drop-area.dragover {
+    border-color: #007bff;
+    background-color: #f0f8ff;
+}
+.drag-drop-area .fa-cloud-upload-alt {
+    font-size: 3rem;
+    color: #007bff;
     margin-bottom: 1rem;
 }
+.file-list-preview {
+    margin-top: 1rem;
+}
+.file-preview-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+.file-preview-item .file-name {
+    font-size: 0.9rem;
+}
+.file-preview-item .remove-file-btn {
+    color: #dc3545;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+.upload-progress-container .progress-item {
+    margin-bottom: 10px;
+}
+.upload-progress-container .progress-bar {
+    width: 100%;
+    background-color: #e9ecef;
+    border-radius: .25rem;
+    height: 1rem;
+}
+.upload-progress-container .progress-bar-inner {
+    height: 100%;
+    background-color: #28a745;
+    border-radius: .25rem;
+    transition: width .2s;
+    text-align: center;
+    color: white;
+    font-size: 0.8rem;
+    line-height: 1rem;
+}
 
+
+/* --- 加载动画 --- */
+.spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4rem;
+}
+.spinner {
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #007bff;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
-/* 提交状态 */
-.submission-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
+/* --- 学生提交详情页卡片 --- */
+.submission-detail-card, .submission-form-card {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.submission-detail-card p {
+    white-space: pre-wrap;
+    line-height: 1.7;
 }
 
-.submission-status.submitted {
-    background: #dcfce7;
-    color: #166534;
-}
-
-.submission-status.not-submitted {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .homework-main {
-        padding: 1rem;
-    }
-
-    .homework-header {
-        padding: 1rem;
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-    }
-
-    .action-bar {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-    }
-
-    .homework-header-info {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .homework-actions {
-        flex-wrap: wrap;
-    }
-
-    .modal-content {
-        margin: 2% auto;
-        width: 95%;
-    }
-
-    .form-actions {
-        flex-direction: column;
-    }
-}
-
-/* 空状态 */
-.empty-state {
+/* 占位符提示 */
+.placeholder-text {
     text-align: center;
-    padding: 3rem 1rem;
-    color: #64748b;
-}
-
-.empty-state i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    color: #d1d5db;
-}
-
-.empty-state h3 {
-    margin-bottom: 0.5rem;
-    color: #374151;
-}
-
-.empty-state p {
-    margin-bottom: 1.5rem;
+    color: #888;
+    padding: 3rem;
+    background: #fafafa;
+    border-radius: 8px;
 }

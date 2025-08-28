@@ -3,208 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>作业区 - 教学系统</title>
+    <title>作业区</title>
     <!-- 认证守卫 -->
     <script src="/static/common/js/auth_guard.js"></script>
 
-    <!-- Font Awesome for icons -->
+    <!-- 外部库 -->
     <link rel="stylesheet" href="/static/lib/css/font-awesome-all.min.css">
+
+    <!-- 自定义样式 -->
     <link rel="stylesheet" href="/static/homework/homework.css">
 </head>
 <body>
-<div class="homework-container">
-    <!-- 头部导航 -->
-    <header class="homework-header">
-        <div class="header-left">
-            <h1><i class="fas fa-clipboard-list"></i> 作业区</h1>
-        </div>
-        <div class="header-right">
-            <div class="user-info">
-                <span id="user-role-badge" class="role-badge"></span>
-                <span id="user-name"></span>
-            </div>
-        </div>
+
+<div id="homework-app" class="app-container">
+    <!-- 页面主标题 -->
+    <header class="app-header">
+        <h1 id="main-title">作业区</h1>
+        <div id="header-actions"></div>
     </header>
-
-    <!-- 主要内容区域 -->
-    <main class="homework-main">
-        <!-- 教师视图 -->
-        <div id="teacher-view" class="view-container" style="display: none;">
-            <!-- 教师操作栏 -->
-            <div class="action-bar">
-                <button id="publish-homework-btn" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> 发布作业
-                </button>
-                <div class="stats-info">
-                    <span id="homework-count">共 0 个作业</span>
-                </div>
-            </div>
-
-            <!-- 作业列表 -->
-            <div class="homework-list" id="teacher-homework-list">
-                <!-- 作业项将通过JS动态生成 -->
-            </div>
-        </div>
-
-        <!-- 学生视图 -->
-        <div id="student-view" class="view-container" style="display: none;">
-            <!-- 学生标签页 -->
-            <div class="tab-container">
-                <div class="tabs">
-                    <button class="tab-btn active" data-tab="all-homework">
-                        <i class="fas fa-list"></i> 所有作业
-                    </button>
-                    <button class="tab-btn" data-tab="my-submissions">
-                        <i class="fas fa-user-check"></i> 我的提交
-                    </button>
-                </div>
-            </div>
-
-            <!-- 标签页内容 -->
-            <div class="tab-content">
-                <!-- 所有作业标签页 -->
-                <div id="all-homework-tab" class="tab-pane active">
-                    <div class="homework-list" id="student-homework-list">
-                        <!-- 作业项将通过JS动态生成 -->
-                    </div>
-                </div>
-
-                <!-- 我的提交标签页 -->
-                <div id="my-submissions-tab" class="tab-pane">
-                    <div class="submission-list" id="student-submission-list">
-                        <!-- 提交项将通过JS动态生成 -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 作业详情页面 -->
-        <div id="homework-detail-view" class="view-container" style="display: none;">
-            <div class="detail-header">
-                <button id="back-btn" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> 返回
-                </button>
-                <h2 id="detail-title"></h2>
-            </div>
-
-            <div class="detail-content">
-                <div class="homework-info">
-                    <div class="info-card">
-                        <h3>作业信息</h3>
-                        <div id="homework-detail-content"></div>
-                    </div>
-                </div>
-
-                <!-- 教师查看提交列表 -->
-                <div id="submissions-section" class="submissions-section" style="display: none;">
-                    <h3>学生提交</h3>
-                    <div id="submissions-list" class="submission-list">
-                        <!-- 提交列表将通过JS动态生成 -->
-                    </div>
-                </div>
-
-                <!-- 学生提交区域 -->
-                <div id="student-submission-section" class="student-submission-section" style="display: none;">
-                    <div id="existing-submission" style="display: none;">
-                        <h3>我的提交</h3>
-                        <div id="my-submission-content"></div>
-                    </div>
-
-                    <div id="submit-form-section">
-                        <h3>提交作业</h3>
-                        <form id="submit-homework-form">
-                            <div class="form-group">
-                                <label for="submission-content">提交内容</label>
-                                <textarea id="submission-content" name="content" rows="6"
-                                          placeholder="请输入您的作业内容..."></textarea>
-                            </div>
-
-                            <div class="form-group">
-                                <label>附件上传</label>
-                                <div id="submission-file-area" class="file-upload-area">
-                                    <div class="upload-zone" id="submission-upload-zone">
-                                        <i class="fas fa-cloud-upload-alt"></i>
-                                        <p>拖拽文件到此处或点击选择文件</p>
-                                        <input type="file" id="submission-file-input" multiple hidden>
-                                    </div>
-                                    <div id="submission-file-list" class="file-list"></div>
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-paper-plane"></i> 提交作业
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
 
     <!-- 加载动画 -->
     <div id="loading-spinner" class="spinner-container" style="display: none;">
         <div class="spinner"></div>
-        <p>加载中...</p>
     </div>
-</div>
 
-<!-- 发布作业模态框 -->
-<div id="publish-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>发布作业</h2>
-            <span class="close-btn">&times;</span>
+    <!-- 主内容区 -->
+    <main id="app-main-content">
+
+        <!-- 视图: 作业列表 (教师和学生共用) -->
+        <div id="view-homework-list" class="view" style="display: none;">
+            <!-- 学生视图下的Tab切换 -->
+            <div id="student-tabs" class="tabs-container" style="display: none;">
+                <button class="tab-btn active" data-tab="all-homework">所有作业</button>
+                <button class="tab-btn" data-tab="my-submissions">我的提交</button>
+            </div>
+            <div id="homework-list-container" class="list-container">
+                <!-- 作业项将动态插入此处 -->
+            </div>
+            <div id="my-submission-list-container" class="list-container" style="display: none;">
+                <!-- 我的提交列表将动态插入此处 -->
+            </div>
         </div>
-        <form id="publish-homework-form">
-            <div class="form-group">
-                <label for="homework-title">作业标题 *</label>
-                <input type="text" id="homework-title" name="title" required
-                       placeholder="请输入作业标题">
-            </div>
 
-            <div class="form-group">
-                <label for="homework-content">作业内容</label>
-                <textarea id="homework-content" name="content" rows="6"
-                          placeholder="请输入作业要求和说明..."></textarea>
+        <!-- 视图: 教师查看指定作业的所有提交 -->
+        <div id="view-submission-list" class="view" style="display: none;">
+            <div class="view-header">
+                <button id="back-to-homework-list-btn" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 返回作业列表</button>
+                <h2 id="submission-list-title"></h2>
             </div>
+            <div id="submission-list-container" class="list-container">
+                <!-- 提交项将动态插入此处 -->
+            </div>
+        </div>
 
-            <div class="form-group">
-                <label>附件上传</label>
-                <div id="homework-file-area" class="file-upload-area">
-                    <div class="upload-zone" id="homework-upload-zone">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>拖拽文件到此处或点击选择文件</p>
-                        <input type="file" id="homework-file-input" multiple hidden>
+        <!-- 视图: 学生查看/提交单个作业 -->
+        <div id="view-student-submission-detail" class="view" style="display: none;">
+            <div class="view-header">
+                <button id="back-to-student-homework-list-btn" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 返回作业列表</button>
+                <h2 id="student-submission-homework-title"></h2>
+            </div>
+            <div id="submission-detail-container">
+                <!-- 将显示已有提交或提交表单 -->
+            </div>
+        </div>
+
+
+        <!-- 模态框: 发布/编辑作业 -->
+        <div id="publish-homework-modal" class="modal">
+            <div class="modal-content large">
+                <span class="close-btn">&times;</span>
+                <h2>发布新作业</h2>
+                <form id="publish-homework-form">
+                    <div class="form-group">
+                        <label for="homework-title">作业标题</label>
+                        <input type="text" id="homework-title" required placeholder="请输入作业标题">
                     </div>
-                    <div id="homework-file-list" class="file-list"></div>
-                </div>
+                    <div class="form-group">
+                        <label for="homework-content">作业内容</label>
+                        <textarea id="homework-content" rows="6" placeholder="请输入详细作业要求..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>附件上传</label>
+                        <div id="publish-drag-drop-area" class="drag-drop-area">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>将文件拖拽到此处，或点击选择文件</p>
+                            <input type="file" id="publish-file-input" multiple hidden>
+                        </div>
+                        <div id="publish-file-list" class="file-list-preview"></div>
+                    </div>
+                    <div id="publish-upload-progress-container" class="upload-progress-container" style="display: none;">
+                        <!-- 进度条将动态添加 -->
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> 立即发布</button>
+                    </div>
+                </form>
             </div>
-
-            <div class="upload-progress" id="upload-progress" style="display: none;">
-                <div class="progress-bar">
-                    <div id="progress-bar-fill" class="progress-fill"></div>
-                </div>
-                <p id="upload-status">准备上传...</p>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" id="cancel-publish">取消</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-paper-plane"></i> 发布作业
-                </button>
-            </div>
-        </form>
-    </div>
+        </div>
+    </main>
 </div>
 
-<!-- Scripts -->
-<script src="/static/lib/js/sweetalert2.all.min.js"></script>
+
+<!-- 外部库JS -->
 <script src="/static/lib/js/axios.min.js"></script>
+<script src="/static/lib/js/sweetalert2.all.min.js"></script>
 <script src="/static/lib/js/jwt-decode.min.js"></script>
+
+<!-- 通用工具JS -->
 <script src="/static/common/js/common_utils.js"></script>
 <script src="/static/common/js/axios_create.js"></script>
+
+<!-- 模块JS -->
 <script src="/static/homework/homework.js"></script>
+
 </body>
 </html>

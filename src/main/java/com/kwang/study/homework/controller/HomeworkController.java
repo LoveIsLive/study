@@ -7,8 +7,6 @@ import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,22 +34,22 @@ public class HomeworkController {
      * 文件字段：files
      */
     @PostMapping("/publish")
-    public ResponseEntity<Homework> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
+    public ResponseEntity<R<Homework>> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
                                                     @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
         // 获取认证身份
         dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
         Homework createdHomework = homeworkService.createHomework(dto, smallFiles);
-        return ResponseEntity.ok(createdHomework);
+        return ResponseEntity.ok(R.success(createdHomework));
     }
 
     /**
      * 教师查看自己发布的作业列表
      */
     @GetMapping("/teacher/all")
-    public ResponseEntity<List<Homework>> getTeacherHomeworks() {
+    public ResponseEntity<R<List<Homework>>> getTeacherHomeworks() {
         Long teacherId = AuthenticationUserUtil.getCurrentUserId();
         List<Homework> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
-        return ResponseEntity.ok(homeworks);
+        return ResponseEntity.ok(R.success(homeworks));
     }
 
     /**
@@ -71,8 +69,8 @@ public class HomeworkController {
      * 学生查看所有作业列表
      */
     @GetMapping("/all")
-    public ResponseEntity<List<Homework>> getAllHomeworks() {
+    public ResponseEntity<R<List<Homework>>> getAllHomeworks() {
         List<Homework> homeworks = homeworkService.getAllHomeworksForStudent();
-        return ResponseEntity.ok(homeworks);
+        return ResponseEntity.ok(R.success(homeworks));
     }
 }
