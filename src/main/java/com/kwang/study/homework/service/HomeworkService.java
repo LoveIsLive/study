@@ -5,13 +5,10 @@ import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
 import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
-import com.kwang.study.homework.pojo.AttachmentDetail;
+import com.kwang.study.homework.pojo.*;
 import com.kwang.study.homework.mapper.AttachmentMapper;
 import com.kwang.study.homework.mapper.HomeworkMapper;
 import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
-import com.kwang.study.homework.pojo.Attachment;
-import com.kwang.study.homework.pojo.Homework;
-import com.kwang.study.homework.pojo.HomeworkSubmission;
 import com.kwang.study.homework.service.async.AsyncCleanupFileObjService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,7 +60,7 @@ public class HomeworkService {
      * @throws IOException 文件IO异常
      */
     @Transactional
-    public Homework createHomework(HomeworkCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
+    public HomeworkDetail createHomework(HomeworkCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
         // 1. 创建并插入作业主体
         Homework homework = new Homework();
         homework.setTeacherId(dto.getTeacherId()); // 实际应从用户登录信息中获取
@@ -121,8 +118,17 @@ public class HomeworkService {
      * @param teacherId 教师ID
      * @return 作业列表
      */
-    public List<Homework> getHomeworksByTeacher(Long teacherId) {
+    public List<HomeworkDetail> getHomeworksByTeacher(Long teacherId) {
         return homeworkMapper.findAllByTeacherId(teacherId);
+    }
+
+    /**
+     * 查看某一个作业
+     * @param homeworkId 作业ID
+     * @return 作业对象
+     */
+    public HomeworkDetail getHomeworkById(Long homeworkId) {
+        return homeworkMapper.findById(homeworkId);
     }
 
     // --- 学生功能 ---
@@ -135,9 +141,9 @@ public class HomeworkService {
      * @throws IOException 文件IO异常
      */
     @Transactional
-    public HomeworkSubmission createSubmission(SubmissionCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
+    public HomeworkSubmissionDetail createSubmission(SubmissionCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
         // 校验是否重复提交
-        HomeworkSubmission existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), dto.getStudentId());
+        HomeworkSubmissionDetail existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), dto.getStudentId());
         if (existing != null) {
             throw new IllegalStateException("You have already submitted this homework.");
         }
@@ -145,7 +151,7 @@ public class HomeworkService {
         // 1. 创建并插入提交主体
         HomeworkSubmission submission = new HomeworkSubmission();
         submission.setHomeworkId(dto.getHomeworkId());
-        submission.setStudentId(dto.getStudentId()); // 实际应从用户登录信息中获取
+        submission.setStudentId(dto.getStudentId());
         submission.setContent(dto.getContent());
         submissionMapper.insert(submission);
 
@@ -199,11 +205,11 @@ public class HomeworkService {
      * @param studentId 学生ID
      * @return 提交记录列表
      */
-    public List<HomeworkSubmission> getSubmissionsByStudent(Long studentId) {
+    public List<HomeworkSubmissionDetail> getSubmissionsByStudent(Long studentId) {
         return submissionMapper.findAllByStudentId(studentId);
     }
 
-    public HomeworkSubmission getSubmissionByStudent(Long studentId, Long homeworkId) {
+    public HomeworkSubmissionDetail getSubmissionByStudent(Long studentId, Long homeworkId) {
         return submissionMapper.findByHomeworkIdAndStudentId(homeworkId, studentId);
     }
 
@@ -212,7 +218,7 @@ public class HomeworkService {
      * @param homeworkId 作业ID
      * @return 提交记录列表
      */
-    public List<HomeworkSubmission> getHomeworkSubmissions(Long homeworkId) {
+    public List<HomeworkSubmissionDetail> getHomeworkSubmissions(Long homeworkId) {
         return submissionMapper.findAllByHomeworkId(homeworkId);
     }
 
@@ -221,7 +227,7 @@ public class HomeworkService {
      * TODO: 简易。后续去要将老师和学生对应起来
      * @return 作业列表
      */
-    public List<Homework> getAllHomeworksForStudent() {
+    public List<HomeworkDetail> getAllHomeworksForStudent() {
         return homeworkMapper.findAll();
     }
 

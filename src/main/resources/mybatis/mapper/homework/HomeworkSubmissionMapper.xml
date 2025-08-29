@@ -18,29 +18,51 @@
         <!-- 一对多关联查询附件 -->
         <collection property="attachments" ofType="com.kwang.study.homework.pojo.Attachment"
                     select="com.kwang.study.homework.mapper.AttachmentMapper.findByOwner"
-                    column="{ownerId=id, ownerType=ownerType}"/>
+                    column="{ownerId=id, ownerType=owner_type}"/>
 
     </resultMap>
+
+    <resultMap id="SubmissionDetailResultMap" type="com.kwang.study.homework.pojo.HomeworkSubmissionDetail" extends="SubmissionResultMap">
+        <result property="studentName" column="student_name"/>
+    </resultMap>
+
+    <sql id="Join_Base_Column_List">
+        s.id, s.homework_id, s.student_id, s.content, s.create_time, s.update_time, 'submission' AS owner_type
+    </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO homework_submission (homework_id, student_id, content)
         VALUES (#{homeworkId}, #{studentId}, #{content})
     </insert>
 
-    <select id="findById" resultMap="SubmissionResultMap">
-        SELECT *, 'submission' AS ownerType FROM homework_submission WHERE id = #{id}
+    <select id="findById" resultMap="SubmissionDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        FROM homework_submission s
+        LEFT JOIN users u ON s.student_id = u.id
+        WHERE s.id = #{id}
     </select>
 
-    <select id="findAllByStudentId" resultMap="SubmissionResultMap">
-        SELECT *, 'submission' AS ownerType FROM homework_submission WHERE student_id = #{studentId} ORDER BY create_time DESC
+    <select id="findAllByStudentId" resultMap="SubmissionDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        FROM homework_submission s
+        LEFT JOIN users u ON s.student_id = u.id
+        WHERE s.student_id = #{studentId}
+        ORDER BY create_time DESC
     </select>
 
-    <select id="findAllByHomeworkId" resultMap="SubmissionResultMap">
-        SELECT *, 'submission' AS ownerType FROM homework_submission WHERE homework_id = #{homeworkId} ORDER BY create_time DESC
+    <select id="findAllByHomeworkId" resultMap="SubmissionDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        FROM homework_submission s
+        LEFT JOIN users u ON s.student_id = u.id
+        WHERE s.homework_id = #{homeworkId}
+        ORDER BY create_time DESC
     </select>
 
-    <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionResultMap">
-        SELECT *, 'submission' AS ownerType FROM homework_submission WHERE homework_id = #{homeworkId} AND student_id = #{studentId}
+    <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        FROM homework_submission s
+        LEFT JOIN users u ON s.student_id = u.id
+        WHERE s.homework_id = #{homeworkId} AND s.student_id = #{studentId}
     </select>
 
     <select id="findIdsByHomeworkId" resultType="java.lang.Long">

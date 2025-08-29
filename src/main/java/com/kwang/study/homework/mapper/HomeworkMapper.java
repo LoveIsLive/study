@@ -2,6 +2,7 @@ package com.kwang.study.homework.mapper;
 
 
 import com.kwang.study.homework.pojo.Homework;
+import com.kwang.study.homework.pojo.HomeworkDetail;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -11,11 +12,11 @@ public interface HomeworkMapper {
 
     int insert(Homework homework);
 
-    Homework findById(@Param("id") Long id);
+    HomeworkDetail findById(@Param("id") Long id);
 
-    List<Homework> findAllByTeacherId(@Param("teacherId") Long teacherId);
+    List<HomeworkDetail> findAllByTeacherId(@Param("teacherId") Long teacherId);
 
-    List<Homework> findAll();
+    List<HomeworkDetail> findAll();
 
     int deleteById(@Param("id") Long id);
 }

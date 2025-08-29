@@ -55,7 +55,7 @@ public class FileDownloadController {
             return;
         }
 
-        FileObjectResult fileObject = fileStorageService.getFileObject(HOMEWORK_FILE_PREFIX + path);
+        FileObjectResult fileObject = fileStorageService.getFileObject(path);
 
         DownloadUtils.downloadFile(fileObject, mode, request, response);
     }

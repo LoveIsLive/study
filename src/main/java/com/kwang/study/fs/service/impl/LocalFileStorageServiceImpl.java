@@ -79,7 +79,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public VoidResult createDirectory(String path) {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
         ResolvedPath resolvedPath = parsePath(path);
 
         Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
@@ -115,7 +115,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (fileStream == null)
             throw new IllegalArgumentException("输入流为空");
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
         Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
         if (mimeTypeId == null) {
             throw new IllegalArgumentException("文件类型名称未知");
@@ -177,7 +177,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public VoidResult deleteFileObject(String path) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Node node = nodeMapper.selectNodeByPath(path);
         if (node == null) {
@@ -210,7 +210,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public VoidResult deleteDirObject(String path) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Node node = nodeMapper.selectNodeByPath(path);
         if (node == null) {
@@ -267,7 +267,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public VoidResult updateFileObject(String path, String newName, InputStream fileStream, String mimeTypeName) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
         if (newName == null && fileStream == null && mimeTypeName == null)
             return VoidResult.success();
 
@@ -356,7 +356,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public VoidResult updateDirObject(String path, String newName) {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
         if (newName == null)
             return VoidResult.success();
         if (!isValidName(newName)) {
@@ -388,7 +388,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public DirObjectResult getDirectoryObject(String path) {
         if (!isValidPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Node node = null;
         if (!"/".equals(path)) {
@@ -419,7 +419,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public FileObjectResult getFileObject(String path) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Node node = nodeMapper.selectNodeByPath(path);
         if (node == null) {
@@ -444,7 +444,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public GenericObjectResult getObjectDesc(String path) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         NodeDetail nodeDetail = nodeMapper.selectNodeDetailByPath(path);
         if (nodeDetail == null) {
@@ -469,7 +469,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Transactional
     public InitMultiUploadResult initMultiUpload(String path, String mimeTypeName) throws IOException {
         if (!isOrdinaryPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
         if (mimeTypeId == null) {
@@ -557,7 +557,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     @Override
     public VoidResult searchNodesBFS(String path, String namePattern, Consumer<SearchNodeResult> resultConsumer) {
         if (!isValidPath(path))
-            throw new InvalidPathException();
+            throw new InvalidPathException(path);
 
         Node node = null;
         if (!"/".equals(path)) {

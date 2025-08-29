@@ -6,6 +6,7 @@ import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
 import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.pojo.HomeworkSubmission;
+import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -34,11 +35,11 @@ public class SubmissionController {
      * 文件字段：files
      */
     @PostMapping("/submit")
-    public ResponseEntity<R<HomeworkSubmission>> submitHomework(@Valid @RequestPart("dto") SubmissionCreateDTO dto,
-                                                             @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
+    public ResponseEntity<R<HomeworkSubmissionDetail>> submitHomework(@Valid @RequestPart("dto") SubmissionCreateDTO dto,
+                                                                      @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
         // 获取认证信息
         dto.setStudentId(AuthenticationUserUtil.getCurrentUserId());
-        HomeworkSubmission submission = homeworkService.createSubmission(dto, files);
+        HomeworkSubmissionDetail submission = homeworkService.createSubmission(dto, files);
         return ResponseEntity.ok(R.success(submission));
     }
 
@@ -49,8 +50,8 @@ public class SubmissionController {
      * @return 该作业的所有提交列表
      */
     @GetMapping("/{homeworkId}/submissions")
-    public ResponseEntity<R<List<HomeworkSubmission>>> getHomeworkSubmissions(@PathVariable Long homeworkId) {
-        List<HomeworkSubmission> submissions = homeworkService.getHomeworkSubmissions(homeworkId);
+    public ResponseEntity<R<List<HomeworkSubmissionDetail>>> getHomeworkSubmissions(@PathVariable Long homeworkId) {
+        List<HomeworkSubmissionDetail> submissions = homeworkService.getHomeworkSubmissions(homeworkId);
         return ResponseEntity.ok(R.success(submissions));
     }
 
@@ -58,10 +59,10 @@ public class SubmissionController {
      * 学生查看自己的提交记录列表
      */
     @GetMapping("/student/all")
-    public ResponseEntity<R<List<HomeworkSubmission>>> getStudentSubmissions() {
+    public ResponseEntity<R<List<HomeworkSubmissionDetail>>> getStudentSubmissions() {
         // 获取认证信息
         Long studentId = AuthenticationUserUtil.getCurrentUserId();
-        List<HomeworkSubmission> submissions = homeworkService.getSubmissionsByStudent(studentId);
+        List<HomeworkSubmissionDetail> submissions = homeworkService.getSubmissionsByStudent(studentId);
         return ResponseEntity.ok(R.success(submissions));
     }
 
@@ -69,10 +70,10 @@ public class SubmissionController {
      * 学生查看自己某个作业的提交
      */
     @GetMapping("/student/{homeworkId}/submission")
-    public ResponseEntity<R<HomeworkSubmission>> getStudentSubmission(@PathVariable Long homeworkId) {
+    public ResponseEntity<R<HomeworkSubmissionDetail>> getStudentSubmission(@PathVariable Long homeworkId) {
         // 获取认证信息
         Long studentId = AuthenticationUserUtil.getCurrentUserId();
-        HomeworkSubmission submission = homeworkService.getSubmissionByStudent(studentId, homeworkId);
+        HomeworkSubmissionDetail submission = homeworkService.getSubmissionByStudent(studentId, homeworkId);
         return ResponseEntity.ok(R.success(submission));
     }
 }

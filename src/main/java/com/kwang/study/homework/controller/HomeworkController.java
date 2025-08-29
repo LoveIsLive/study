@@ -4,6 +4,7 @@ import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
 import com.kwang.study.homework.pojo.Homework;
+import com.kwang.study.homework.pojo.HomeworkDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,11 +35,11 @@ public class HomeworkController {
      * 文件字段：files
      */
     @PostMapping("/publish")
-    public ResponseEntity<R<Homework>> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
-                                                    @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
+    public ResponseEntity<R<HomeworkDetail>> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
+                                                             @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
         // 获取认证身份
         dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
-        Homework createdHomework = homeworkService.createHomework(dto, smallFiles);
+        HomeworkDetail createdHomework = homeworkService.createHomework(dto, smallFiles);
         return ResponseEntity.ok(R.success(createdHomework));
     }
 
@@ -46,10 +47,19 @@ public class HomeworkController {
      * 教师查看自己发布的作业列表
      */
     @GetMapping("/teacher/all")
-    public ResponseEntity<R<List<Homework>>> getTeacherHomeworks() {
+    public ResponseEntity<R<List<HomeworkDetail>>> getTeacherHomeworks() {
         Long teacherId = AuthenticationUserUtil.getCurrentUserId();
-        List<Homework> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
+        List<HomeworkDetail> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
         return ResponseEntity.ok(R.success(homeworks));
+    }
+
+    /**
+     * 查看某一个作业
+     */
+    @GetMapping("/{homeworkId}")
+    public ResponseEntity<R<HomeworkDetail>> getHomework(@PathVariable Long homeworkId) {
+        HomeworkDetail homework = homeworkService.getHomeworkById(homeworkId);
+        return ResponseEntity.ok(R.success(homework));
     }
 
     /**
@@ -69,8 +79,8 @@ public class HomeworkController {
      * 学生查看所有作业列表
      */
     @GetMapping("/all")
-    public ResponseEntity<R<List<Homework>>> getAllHomeworks() {
-        List<Homework> homeworks = homeworkService.getAllHomeworksForStudent();
+    public ResponseEntity<R<List<HomeworkDetail>>> getAllHomeworks() {
+        List<HomeworkDetail> homeworks = homeworkService.getAllHomeworksForStudent();
         return ResponseEntity.ok(R.success(homeworks));
     }
 }

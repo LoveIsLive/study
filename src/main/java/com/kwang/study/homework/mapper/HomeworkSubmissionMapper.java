@@ -2,6 +2,7 @@ package com.kwang.study.homework.mapper;
 
 
 import com.kwang.study.homework.pojo.HomeworkSubmission;
+import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -11,13 +12,13 @@ public interface HomeworkSubmissionMapper {
 
     int insert(HomeworkSubmission submission);
 
-    HomeworkSubmission findById(@Param("id") Long id);
+    HomeworkSubmissionDetail findById(@Param("id") Long id);
 
-    List<HomeworkSubmission> findAllByStudentId(@Param("studentId") Long studentId);
+    List<HomeworkSubmissionDetail> findAllByStudentId(@Param("studentId") Long studentId);
 
-    List<HomeworkSubmission> findAllByHomeworkId(@Param("homeworkId") Long homeworkId);
+    List<HomeworkSubmissionDetail> findAllByHomeworkId(@Param("homeworkId") Long homeworkId);
 
-    HomeworkSubmission findByHomeworkIdAndStudentId(@Param("homeworkId") Long homeworkId, @Param("studentId") Long studentId);
+    HomeworkSubmissionDetail findByHomeworkIdAndStudentId(@Param("homeworkId") Long homeworkId, @Param("studentId") Long studentId);
 
     List<Long> findIdsByHomeworkId(@Param("homeworkId") Long homeworkId);
 

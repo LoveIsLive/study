@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- 视图管理 (View Manager) ---
-    const showView = (viewName, stateData = {}) => {
+    const showView = (viewName, stateData = {}, replace = false) => {
         Object.values(dom.views).forEach(view => view.style.display = 'none');
         dom.views[viewName].style.display = 'block';
         state.currentView = viewName;
@@ -96,7 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新URL，支持浏览器前进后退
         const url = new URL(window.location);
         url.hash = `${viewName}${stateData.id ? `/${stateData.id}` : ''}`;
-        history.pushState({ view: viewName, data: stateData }, '', url);
+        if (replace) {
+            history.replaceState({ view: viewName, data: stateData }, '', url);
+        } else {
+            history.pushState({ view: viewName, data: stateData }, '', url);
+        }
     };
 
     window.onpopstate = (event) => {
@@ -146,13 +150,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="item-card" data-homework-id="${homework.id}">
                 <div class="card-header">
                     <div>
-                        <h3 class="card-title">${homework.title}</h3>
+                        ${isTeacher ? `<h3 class="card-noclick-title">${homework.title}</h3>` :
+                         `<h3 class="card-title">${homework.title}</h3>`}
                     </div>
                     <div class="card-meta">
-                        发布于: ${formatDate(homework.createTime)}
+                        发布于: ${formatDate(homework.createTime)} <br>
+                        发布者: ${homework.teacherName}
                     </div>
                 </div>
-                <div class="card-content">${homework.content || '教师没有填写具体内容。'}</div>
+                <div class="card-content">${homework.content || `<i>无提交内容</i>`}</div>
                 <div class="card-attachments">
                     ${renderAttachmentList(homework.attachments)}
                 </div>
@@ -166,19 +172,39 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     };
 
-    // 渲染单个提交记录卡片
-    const renderSubmissionCard = (submission) => {
-        // 在学生“我的提交”列表中，会包含完整的作业信息
+    // 教师渲染单个提交记录卡片
+    const teacherRenderSubmissionCard = (submission) => {
+        const submissionName = `<strong>作业: ${submission.studentId}</strong><br>`;
+        return `
+            <div class="item-card" data-submission-id="${submission.id}">
+                 <div class="card-header">
+                     <h3 class="card-noclick-title">${submissionName}</h3>
+                     <div class="card-meta">
+                         提交于: ${formatDate(submission.createTime)} <br>
+                         提交者: ${submission.studentName}
+                     </div>
+                 </div>
+                 <div class="card-content">${submission.content || `<i>无提交内容</i>`}</div>
+                 <div class="card-attachments">
+                     ${renderAttachmentList(submission.attachments)}
+                 </div>
+            </div>
+        `;
+    };
+
+    // 学生渲染单个提交记录卡片
+    const studentRenderSubmissionCard = (submission) => {
         const homeworkTitle = submission.homework ? `<strong>作业: ${submission.homework.title}</strong><br>` : '';
         return `
             <div class="item-card" data-submission-id="${submission.id}">
                  <div class="card-header">
-                     <h3 class="card-title">${homeworkTitle}学生ID: ${submission.studentId}</h3>
+                     <h3 class="card-noclick-title">${homeworkTitle}</h3>
                      <div class="card-meta">
-                         提交于: ${formatDate(submission.createTime)}
+                         提交于: ${formatDate(submission.createTime)} <br>
+                         提交者: ${submission.studentName}
                      </div>
                  </div>
-                 <div class="card-content">${submission.content || '该学生没有填写内容。'}</div>
+                 <div class="card-content">${submission.content || `<i>无提交内容</i>`}</div>
                  <div class="card-attachments">
                      ${renderAttachmentList(submission.attachments)}
                  </div>
@@ -192,14 +218,13 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(true);
         try {
             // 首先获取作业详情来显示标题
-            const homeworks = await homeworkAPI.get('/teacher/all').then(res => res.data);
-            const homework = homeworks.data.find(h => h.id === homeworkId);
+            const homework = await homeworkAPI.get(`${homeworkId}`).then(res => res.data.data);
             dom.submissionListTitle.textContent = `"${homework.title}" 的提交列表`;
 
             const response = await submissionAPI.get(`/${homeworkId}/submissions`);
             const submissions = response.data.data;
             if (submissions && submissions.length > 0) {
-                dom.submissionListContainer.innerHTML = submissions.map(renderSubmissionCard).join('');
+                dom.submissionListContainer.innerHTML = submissions.map(teacherRenderSubmissionCard).join('');
             } else {
                 dom.submissionListContainer.innerHTML = '<p class="placeholder-text">暂无学生提交</p>';
             }
@@ -212,12 +237,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 渲染学生的作业详情/提交视图
-    const renderStudentSubmissionDetailView = async (homeworkId) => {
-        showView('studentSubmissionDetail', { id: homeworkId });
+    const renderStudentSubmissionDetailView = async (homeworkId, replace = false) => {
+        showView('studentSubmissionDetail', { id: homeworkId }, replace);
         showLoading(true);
         try {
-            const allHomeworksRes = await homeworkAPI.get('/all');
-            const homework = allHomeworksRes.data.data.find(h => h.id == homeworkId);
+            const homework = await homeworkAPI.get(`${homeworkId}`).then(res => res.data.data);
             dom.studentSubmissionHomeworkTitle.textContent = homework.title;
 
             const submissionRes = await submissionAPI.get(`/student/${homeworkId}/submission`);
@@ -229,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="submission-detail-card">
                          <h3>我的提交</h3>
                          <p><strong>提交内容:</strong></p>
-                         <p>${submission.content || '无'}</p>
+                         <p>${submission.content || `<i>无提交内容</i>`}</p>
                          <br>
                          ${renderAttachmentList(submission.attachments)}
                     </div>`;
@@ -340,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await submissionAPI.get('/student/all');
                 const submissions = response.data.data;
                 if (submissions && submissions.length > 0) {
-                    dom.mySubmissionListContainer.innerHTML = submissions.map(renderSubmissionCard).join('');
+                    dom.mySubmissionListContainer.innerHTML = submissions.map(studentRenderSubmissionCard).join('');
                 } else {
                     dom.mySubmissionListContainer.innerHTML = '<p class="placeholder-text">你还没有提交过任何作业</p>';
                 }
@@ -408,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (largeFiles.length > 0) {
             // 1. 批量初始化大文件上传
-            const initDTO = { files: largeFiles.map(f => ({ fileName: f.name, fileSize: f.size })) };
+            const initDTO = { files: largeFiles.map(f => ({ fileName: f.name, fileSize: f.size, mimeTypeName: f.type })) };
             const initResponse = await uploadAPI.post('/batch-init', initDTO);
             const uploadResults = initResponse.data.data;
 
@@ -421,6 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return Promise.resolve();
             });
+            // TODO: 这会很慢，待改为异步通知
             await Promise.all(uploadPromises);
         }
 
@@ -597,7 +622,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardTitle = target.closest('.card-title');
         if (isStudent && cardTitle) {
             const homeworkId = target.closest('.item-card').dataset.homeworkId;
-            renderStudentSubmissionDetailView(homeworkId);
+            if (homeworkId) {
+                renderStudentSubmissionDetailView(homeworkId);
+            }
         }
 
         // 学生切换Tab
@@ -634,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await submissionAPI.post('/submit', formData);
                 toast('success', '作业提交成功!');
                 // 提交成功后，刷新当前页面显示已提交内容
-                renderStudentSubmissionDetailView(homeworkId);
+                renderStudentSubmissionDetailView(homeworkId, true);
 
             } catch (error) {
                 toast('error', '提交失败');

@@ -15,27 +15,38 @@
                     column="{ownerId=id, ownerType=owner_type}"/>
     </resultMap>
 
+    <resultMap id="HomeworkDetailResultMap" type="com.kwang.study.homework.pojo.HomeworkDetail" extends="HomeworkResultMap">
+        <result property="teacherName" column="teacher_name"/>
+    </resultMap>
+
+    <sql id="Join_Base_Column_List">
+        h.id, h.teacher_id, h.title, h.content, h.create_time, h.update_time, 'homework' AS owner_type
+    </sql>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO homework (teacher_id, title, content)
         VALUES (#{teacherId}, #{title}, #{content})
     </insert>
 
-    <select id="findById" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
-        FROM homework
-        WHERE id = #{id}
+    <select id="findById" resultMap="HomeworkDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        FROM homework h
+        LEFT JOIN users u ON h.teacher_id = u.id
+        WHERE h.id = #{id}
     </select>
 
-    <select id="findAll" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
-        FROM homework
+    <select id="findAll" resultMap="HomeworkDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        FROM homework h
+        LEFT JOIN users u ON h.teacher_id = u.id
         ORDER BY create_time DESC
     </select>
 
-    <select id="findAllByTeacherId" resultMap="HomeworkResultMap">
-        SELECT id, teacher_id, title, content, create_time, update_time, 'homework' AS owner_type
-        FROM homework
-        WHERE teacher_id = #{teacherId}
+    <select id="findAllByTeacherId" resultMap="HomeworkDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        FROM homework h
+        LEFT JOIN users u ON h.teacher_id = u.id
+        WHERE h.teacher_id = #{teacherId}
         ORDER BY create_time DESC
     </select>
 
