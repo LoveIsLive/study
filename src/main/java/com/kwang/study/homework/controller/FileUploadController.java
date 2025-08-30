@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -73,10 +74,11 @@ public class FileUploadController {
                                             @RequestParam("chunkIndex") Integer chunkIndex,
                                             @RequestParam("totalChunks") Integer totalChunks,
                                             @RequestPart("chunk") MultipartFile chunk) throws IOException {
-        UploadChunkResult result = fileStorageService.uploadChunkAndAutoMerge(uploadId, chunkIndex, totalChunks, chunk.getInputStream());
-        return ResponseEntity.ok(R.success(result));
+        try (InputStream input = chunk.getInputStream()) {
+            UploadChunkResult result = fileStorageService.
+                    uploadChunkAndAutoMerge(uploadId, chunkIndex, totalChunks, input);
+            return ResponseEntity.ok(R.success(result));
+        }
     }
-
-
 
 }

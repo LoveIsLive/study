@@ -134,9 +134,16 @@ document.addEventListener('DOMContentLoaded', () => {
             <h4><i class="fas fa-paperclip"></i> 附件</h4>
             <ul class="attachment-list">
                 ${attachments.map(att => `
-                    <li class="attachment-item" data-path="${att.filePath}" title="点击下载">
-                        <i class="${getFileIconClass(att.fileName)}"></i>
-                        <span>${att.fileName} (${formatFileSize(att.fileSize)})</span>
+                    <li class="attachment-item" data-path="${att.filePath}">
+                        <div class="attachment-info">
+                            <i class="${getFileIconClass(att.fileName)}"></i>
+                            <span>${att.fileName} (${formatFileSize(att.fileSize)})</span>
+                        </div>
+                        <div class="attachment-actions">
+                            ${isPreviewable(att.mimeTypeName) ?
+            `<i class="fas fa-eye action-icon" data-action="preview" title="预览"></i>` : ''}
+                            <i class="fas fa-download action-icon" data-action="download" title="下载"></i>
+                        </div>
                     </li>
                 `).join('')}
             </ul>
@@ -150,15 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="item-card" data-homework-id="${homework.id}">
                 <div class="card-header">
                     <div>
-                        ${isTeacher ? `<h3 class="card-noclick-title">${homework.title}</h3>` :
-                         `<h3 class="card-title">${homework.title}</h3>`}
+                        ${isTeacher ? `<h3 class="card-noclick-title">${sanitizeHTML(homework.title)}</h3>` :
+                         `<h3 class="card-title">${sanitizeHTML(homework.title)}</h3>`}
                     </div>
                     <div class="card-meta">
                         发布于: ${formatDate(homework.createTime)} <br>
                         发布者: ${homework.teacherName}
                     </div>
                 </div>
-                <div class="card-content">${homework.content || `<i>无提交内容</i>`}</div>
+                <div class="card-content">${sanitizeHTML(homework.content) || `<i>无提交内容</i>`}</div>
                 <div class="card-attachments">
                     ${renderAttachmentList(homework.attachments)}
                 </div>
@@ -184,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          提交者: ${submission.studentName}
                      </div>
                  </div>
-                 <div class="card-content">${submission.content || `<i>无提交内容</i>`}</div>
+                 <div class="card-content">${sanitizeHTML(submission.content) || `<i>无提交内容</i>`}</div>
                  <div class="card-attachments">
                      ${renderAttachmentList(submission.attachments)}
                  </div>
@@ -194,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 学生渲染单个提交记录卡片
     const studentRenderSubmissionCard = (submission) => {
-        const homeworkTitle = submission.homework ? `<strong>作业: ${submission.homework.title}</strong><br>` : '';
+        const homeworkTitle = submission.homework ? `<strong>作业: ${sanitizeHTML(submission.homework.title)}</strong><br>` : '';
         return `
             <div class="item-card" data-submission-id="${submission.id}">
                  <div class="card-header">
@@ -204,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          提交者: ${submission.studentName}
                      </div>
                  </div>
-                 <div class="card-content">${submission.content || `<i>无提交内容</i>`}</div>
+                 <div class="card-content">${sanitizeHTML(submission.content) || `<i>无提交内容</i>`}</div>
                  <div class="card-attachments">
                      ${renderAttachmentList(submission.attachments)}
                  </div>
@@ -219,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // 首先获取作业详情来显示标题
             const homework = await homeworkAPI.get(`${homeworkId}`).then(res => res.data.data);
-            dom.submissionListTitle.textContent = `"${homework.title}" 的提交列表`;
+            dom.submissionListTitle.textContent = `"${sanitizeHTML(homework.title)}" 的提交列表`;
 
             const response = await submissionAPI.get(`/${homeworkId}/submissions`);
             const submissions = response.data.data;
@@ -242,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(true);
         try {
             const homework = await homeworkAPI.get(`${homeworkId}`).then(res => res.data.data);
-            dom.studentSubmissionHomeworkTitle.textContent = homework.title;
+            dom.studentSubmissionHomeworkTitle.textContent = sanitizeHTML(homework.title);
 
             const submissionRes = await submissionAPI.get(`/student/${homeworkId}/submission`);
             const submission = submissionRes.data.data;
@@ -253,13 +260,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="submission-detail-card">
                          <h3>我的提交</h3>
                          <p><strong>提交内容:</strong></p>
-                         <p>${submission.content || `<i>无提交内容</i>`}</p>
+                         <p>${sanitizeHTML(submission.content) || `<i>无提交内容</i>`}</p>
                          <br>
                          ${renderAttachmentList(submission.attachments)}
                     </div>`;
             } else {
                 // 未提交，显示提交表单
                 dom.submissionDetailContainer.innerHTML = `
+                    <div class="homework-detail-card">
+                        <div class="detail-card-header">
+                            <h3><i class="fas fa-book-open"></i> 作业详情</h3>
+                            <div class="card-meta">
+                                发布者: ${homework.teacherName || '未知教师'} <br>
+                                发布于: ${formatDate(homework.createTime)}
+                            </div>
+                        </div>
+                        <div class="card-content">${sanitizeHTML(homework.content) || '<i>教师没有填写具体内容。</i>'}</div>
+                        <div class="card-attachments">
+                            ${renderAttachmentList(homework.attachments)}
+                        </div>
+                    </div>
+                    
                     <div class="submission-form-card">
                         <h3>提交作业</h3>
                         <form id="submit-homework-form" data-homework-id="${homeworkId}">
@@ -570,16 +591,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- 通用事件 ---
         // 下载附件
-        const attachmentItem = target.closest('.attachment-item');
-        if (attachmentItem) {
+        const actionIcon = target.closest('.action-icon');
+        if (actionIcon && actionIcon.closest('.attachment-item')) {
+            const attachmentItem = actionIcon.closest('.attachment-item');
             const path = attachmentItem.dataset.path;
+            const action = actionIcon.dataset.action;
+
             try {
+                // 统一获取下载/预览所需的token
                 const res = await downloadAPI.get('/get/downloadId', { params: { path } });
                 const token = res.data.data;
-                const downloadUrl = `${downloadAPI.defaults.baseURL}/download?path=${path}&token=${token}`;
-                window.open(downloadUrl, '_blank');
+
+                if (action === 'preview') {
+                    const previewUrl = `${downloadAPI.defaults.baseURL}/download?mode=inline&path=${path}&token=${token}`;
+                    window.open(previewUrl, '_blank');
+                } else if (action === 'download') {
+                    const downloadUrl = `${downloadAPI.defaults.baseURL}/download?path=${path}&token=${token}`;
+                    // 创建一个隐藏的 <a> 标签并模拟点击来触发下载
+                    const tempLink = document.createElement('a');
+                    tempLink.style.display = 'none';
+                    tempLink.href = downloadUrl;
+                    // download 属性不是必须的，因为后端会设置 Content-Disposition
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    document.body.removeChild(tempLink);
+                }
             } catch (error) {
-                toast('error', '获取下载链接失败');
+                toast('error', '获取文件链接失败');
+                console.error('File action failed:', error);
             }
         }
 

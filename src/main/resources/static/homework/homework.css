@@ -134,19 +134,52 @@ body {
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.8rem; /* 增加列表项之间的间距 */
 }
+/* 附件样式 */
 .attachment-item {
+    display: flex; /* 启用Flexbox布局 */
+    align-items: center; /* 垂直居中 */
+    justify-content: space-between; /* 两端对齐 */
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    /* 移除旧的cursor:pointer，因为现在是图标可点 */
+}
+.attachment-item:hover {
+    background-color: #f8f9fa; /* 添加悬停背景色 */
+}
+.attachment-info {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #007bff;
-    cursor: pointer;
+    color: #333; /* 文件名使用深色 */
     font-size: 0.95rem;
 }
-.attachment-item:hover {
-    text-decoration: underline;
+
+/* 【新增】附件操作图标容器 */
+.attachment-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem; /* 拉开图标间距 */
 }
+
+/* 【新增】操作图标的统一个样式 */
+.attachment-actions .action-icon {
+    color: #007bff;
+    cursor: pointer;
+    font-size: 1.1rem; /* 图标稍大一些 */
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.attachment-actions .action-icon:hover {
+    opacity: 1;
+    transform: scale(1.15); /* 悬停时放大，提供反馈 */
+    color: #0056b3;
+}
+
+
 .card-footer {
     margin-top: 1.5rem;
     padding-top: 1.5rem;
@@ -341,6 +374,55 @@ body {
 }
 
 /* --- 学生提交详情页卡片 --- */
+/* 用于学生提交页面，展示作业详情的卡片样式 */
+.homework-detail-card {
+    background-color: #f8f9fa; /* 使用淡灰色背景，与白色提交区形成微妙对比 */
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem; /* 与下方的提交区拉开足够的距离 */
+}
+.detail-card-header {
+    display: flex;              /* 启用Flexbox */
+    justify-content: space-between; /* 两端对齐：项目一个在头，一个在尾 */
+    align-items: center;        /* 垂直居中对齐 */
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+/* 专门为新Header内的元数据块设置样式 */
+.detail-card-header .card-meta {
+    font-size: 0.9em;
+    color: #666;
+    text-align: right; /* 确保文本在自己的小容器内是右对齐的 */
+}
+/* 为 Header 内部的 h3 设置干净的样式 */
+.detail-card-header h3 {
+    font-size: 1.3rem;
+    color: #2c3e50;
+    margin: 0; /* 移除外边距 */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.submission-form-card h3 {
+    font-size: 1.3rem;
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.submission-detail-card h3 {
+    font-size: 1.3rem;
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
 .submission-detail-card, .submission-form-card {
     background: #fff;
     padding: 2rem;

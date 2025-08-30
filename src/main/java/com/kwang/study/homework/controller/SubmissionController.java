@@ -10,6 +10,7 @@ import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,6 +51,7 @@ public class SubmissionController {
      * @return 该作业的所有提交列表
      */
     @GetMapping("/{homeworkId}/submissions")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<List<HomeworkSubmissionDetail>>> getHomeworkSubmissions(@PathVariable Long homeworkId) {
         List<HomeworkSubmissionDetail> submissions = homeworkService.getHomeworkSubmissions(homeworkId);
         return ResponseEntity.ok(R.success(submissions));

@@ -1,3 +1,15 @@
+
+
+/**
+ * 净化用户内容，对后端允许的前端值，进行前端净化显示
+ */
+const sanitizeHTML = (str) => {
+    if (!str) return '';
+    const temp = document.createElement('div');
+    temp.textContent = str; // 利用浏览器的内置机制进行转义
+    return temp.innerHTML;
+};
+
 /**
 返回登陆用户的所有角色
  */
@@ -37,6 +49,26 @@ function buildNewPath(currentPath, name) {
     const basePath = currentPath.endsWith('/') ? currentPath : currentPath + '/';
     return basePath + name;
 }
+
+const isPreviewable = (mimeTypeName) => {
+    if (!mimeTypeName) return false;
+
+    // 直接通过 startsWith 匹配大类
+    if (mimeTypeName.startsWith('image/') ||
+        mimeTypeName.startsWith('text/') ||
+        mimeTypeName.startsWith('audio/') ||
+        mimeTypeName.startsWith('video/')) {
+        return true;
+    }
+
+    // 单独匹配其他可预览的具体类型
+    return [
+        'application/pdf',
+        'application/json',    // 强烈建议：用于预览JSON数据
+        'application/xml',     // 建议：用于预览XML数据
+        'image/svg+xml'        // 强烈建议：用于预览SVG矢量图
+    ].includes(mimeTypeName);
+};
 
 const mimeIconMap = {
     // Documents

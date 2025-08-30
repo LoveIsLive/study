@@ -8,6 +8,7 @@ import com.kwang.study.homework.pojo.HomeworkDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,6 +36,7 @@ public class HomeworkController {
      * 文件字段：files
      */
     @PostMapping("/publish")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<HomeworkDetail>> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
                                                              @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
         // 获取认证身份
@@ -47,6 +49,7 @@ public class HomeworkController {
      * 教师查看自己发布的作业列表
      */
     @GetMapping("/teacher/all")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<List<HomeworkDetail>>> getTeacherHomeworks() {
         Long teacherId = AuthenticationUserUtil.getCurrentUserId();
         List<HomeworkDetail> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
@@ -68,6 +71,7 @@ public class HomeworkController {
      * @return 操作结果
      */
     @DeleteMapping("/{homeworkId}")
+    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<Void>> deleteHomework(@PathVariable Long homeworkId) {
         homeworkService.deleteHomework(homeworkId);
         return ResponseEntity.ok(R.success(null));

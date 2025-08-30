@@ -421,7 +421,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (!isOrdinaryPath(path))
             throw new InvalidPathException(path);
 
-        Node node = nodeMapper.selectNodeByPath(path);
+        Node node = nodeMapper.selectNodeDetailByPath(path);
         if (node == null) {
             throw new PathNotFoundException(path);
         }
@@ -429,7 +429,6 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new NotAFileException(path);
         }
         FileObjectResult result = new FileObjectResult();
-        result.setSuccess(Boolean.TRUE);
         BeanUtils.copyProperties(node, result);
         if (node.getHashId() != null) {
             HashRefNum hashRefNum = hashRefNumMapper.selectById(node.getHashId());
@@ -437,6 +436,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                 result.setContent(fileStorage.getFile(hashRefNum.getRefPath()));
             }
         }
+        result.setSuccess(Boolean.TRUE);
         return result;
     }
 
