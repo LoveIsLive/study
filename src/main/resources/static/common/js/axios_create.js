@@ -8,7 +8,7 @@ const axiosCreate = (base_url) => {
     // 添加请求拦截器
     apiClient.interceptors.request.use(config => {
         // 从 localStorage 获取 token
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem(tokenName);
 
         // 如果 token 存在，则添加到请求头
         if (token) {
@@ -26,7 +26,7 @@ const axiosCreate = (base_url) => {
     }, error => {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             // Token 无效或过期，清除 token 并跳转到登录页
-            localStorage.removeItem('authToken');
+            localStorage.removeItem(tokenName);
             Swal.fire({
                 icon: 'warning',
                 title: '认证失效',

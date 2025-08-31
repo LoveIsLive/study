@@ -11,9 +11,54 @@
     <link rel="stylesheet" href="/static/lib/css/font-awesome-all.min.css">
 
     <!-- 自定义样式 -->
+    <link rel="stylesheet" href="/static/common/css/common_header.css">
     <link rel="stylesheet" href="/static/homework/homework.css">
 </head>
 <body>
+
+<!-- ================= 公共导航栏 开始 ================= -->
+<header class="main-header">
+    <div class="header-container">
+        <!-- 左侧：Logo 和 导航 -->
+        <div class="header-left">
+            <div class="header-logo">
+                <a href="/">教学系统</a>
+            </div>
+            <nav class="header-nav">
+                <ul>
+                    <li><a href="/ware/home">课程仓库</a></li>
+                    <li><a href="/homework">作业区</a></li>
+                    <!-- 未来可以添加更多页面 -->
+                    <!-- <li><a href="/grades.html">成绩查询</a></li> -->
+                </ul>
+            </nav>
+        </div>
+
+        <!-- 右侧：用户信息 -->
+        <div class="header-right">
+            <div class="user-profile-container">
+                <div class="user-profile" id="user-profile-trigger">
+                    <img src="https://placehold.co/40x40" alt="User Avatar" id="user-avatar">
+                    <span id="user-name">未登录</span>
+                </div>
+                <!-- 用户信息下拉菜单 -->
+                <div class="user-dropdown" id="user-dropdown-menu">
+                    <div class="dropdown-header">
+                        <img src="https://placehold.co/60x60" alt="User Avatar" id="dropdown-user-avatar">
+                        <div class="user-info">
+                            <p class="user-name-large" id="dropdown-user-name">未登录</p>
+                            <p class="user-role" id="dropdown-user-role">--</p>
+                        </div>
+                    </div>
+                    <div class="dropdown-footer">
+                        <button id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+<!-- ================= 公共导航栏 结束 ================= -->
 
 <div id="homework-app" class="app-container">
     <!-- 页面主标题 -->
@@ -114,6 +159,7 @@
 <script src="/static/common/js/axios_create.js"></script>
 
 <!-- 模块JS -->
+<script src="/static/common/js/common-header.js"></script>
 <script src="/static/homework/homework.js"></script>
 
 </body>

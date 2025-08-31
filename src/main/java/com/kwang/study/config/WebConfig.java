@@ -26,6 +26,6 @@ public class WebConfig implements WebMvcConfigurer {
 
         // 主页
         registry.addViewController("/")
-                .setViewName("redirect:/ware/home");
+                .setViewName("forward:/static/index/index.html");
     }
 }

@@ -11,6 +11,7 @@ import java.util.Collection;
 
 @Builder
 public class CustomUserDetails implements UserDetails {
+    private static final long serialVersionUID = -4701803906134899675L;
     private Long id;
     private String username;
     private String password;
