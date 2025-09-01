@@ -17,7 +17,7 @@
 
     <properties>
         <java.version>11</java.version>
-        <nacos.version>2.4.2</nacos.version>
+        <nacos.version>2.5.1</nacos.version>
     </properties>
 
     <dependencies>
@@ -72,19 +72,6 @@
         <dependency>
             <groupId>com.alibaba.nacos</groupId>
             <artifactId>nacos-client</artifactId>
-            <version>${nacos.version}</version>
-            <!-- 指定纯净版SDK -->
-            <classifier>pure</classifier>
-        </dependency>
-        <!-- 使用纯净版时必须要引入同版本nacos-api和nacos-common，否则可能出现运行时找不到类的问题 -->
-        <dependency>
-            <groupId>com.alibaba.nacos</groupId>
-            <artifactId>nacos-common</artifactId>
-            <version>${nacos.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.alibaba.nacos</groupId>
-            <artifactId>nacos-api</artifactId>
             <version>${nacos.version}</version>
         </dependency>
 
