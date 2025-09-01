@@ -5,11 +5,6 @@ logging:
 spring:
   application:
     name: study
-  datasource:
-    username: root
-    password: de38a104af7de301
-    url: jdbc:mysql://47.121.116.149:3306/study?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     date-format: "yyyy-MM-dd HH:mm:ss"
     time-zone: GMT+8
@@ -17,32 +12,18 @@ spring:
       fail-on-unknown-properties: false
     serialization:
       write-dates-as-timestamps: false
-  redis:
-    host: 47.121.116.149
-    port: 6379
-    password: kwang0redis123
   servlet:
     multipart:
       max-request-size: 15MB
       max-file-size: 10MB
   mvc:
     static-path-pattern: static/**
-  web:
-    resources:
-      cache:
-        cachecontrol:
-          no-store: true
-      chain:
-        strategy:
-          content:
-            enabled: false
-
 
 mybatis:
   mapper-locations: "classpath:mybatis/mapper/**/*.xml"
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl  # console 输出，部署时要改为log4j2
+    log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl
     log-prefix: study.mybatis.
 
 kwang:

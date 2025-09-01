@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    username: root
+    password: de38a104af7de301
+    url: jdbc:mysql://127.0.0.1:3306/study?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: kwang0redis123

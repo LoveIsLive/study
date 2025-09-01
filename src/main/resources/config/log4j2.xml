@@ -22,9 +22,9 @@
         </RollingFile>
 
         <Routing name="Routing">
-            <Routes pattern="$${sys:env}">
-                <Route key="pro" ref="RollingFile1" />
-                <!-- env为null, 即defaultRoute -->
+            <Routes pattern="$${sys:spring.profiles.active}">
+                <Route key="prod" ref="RollingFile1" />
+                <!-- key为null, 即defaultRoute -->
                 <Route ref="Console1" />
             </Routes>
         </Routing>

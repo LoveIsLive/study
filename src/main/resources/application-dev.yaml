@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    username: root
+    password: de38a104af7de301
+    url: jdbc:mysql://47.121.116.149:3306/study?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: 47.121.116.149
+    port: 6379
+    password: kwang0redis123
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true
+      chain:
+        strategy:
+          content:
+            enabled: false
+
+nacos:
+  config:
+    server-addr: 47.121.116.149:8848
+    username: nacos
+    password: kwangnacos123
+    data-id: study
+    group: DEFAULT_GROUP
+    auto-refreshed: true
