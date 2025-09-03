@@ -24,6 +24,7 @@
         <Routing name="Routing">
             <Routes pattern="$${sys:spring.profiles.active}">
                 <Route key="prod" ref="RollingFile1" />
+                <Route key="dev" ref="Console1" />
                 <!-- key为null, 即defaultRoute -->
                 <Route ref="Console1" />
             </Routes>

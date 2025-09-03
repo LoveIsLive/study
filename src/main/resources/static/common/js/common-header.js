@@ -69,10 +69,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (result.isConfirmed) {
                     // 1. 调用后端的登出接口
                     // 2. 清除本地存储的token或session
-                    localStorage.removeItem(tokenName);
+                    localStorage.removeItem(common_config.tokenName);
 
                     // 3. 跳转到登录页面
-                    window.location.href = AUTH_PREFIX;
+                    window.location.href = common_config.front_AUTH_PREFIX;
                 }
             });
         });

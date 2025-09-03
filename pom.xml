@@ -17,7 +17,6 @@
 
     <properties>
         <java.version>11</java.version>
-        <nacos.version>2.5.1</nacos.version>
     </properties>
 
     <dependencies>
@@ -70,9 +69,9 @@
 
 <!--        nacos配置中心 -->
         <dependency>
-            <groupId>com.alibaba.nacos</groupId>
-            <artifactId>nacos-client</artifactId>
-            <version>${nacos.version}</version>
+            <groupId>com.alibaba.boot</groupId>
+            <artifactId>nacos-config-spring-boot-starter</artifactId>
+            <version>0.2.12</version>
         </dependency>
 
 <!--        数据库  -->
@@ -161,7 +160,6 @@
                         <exclude>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.30</version>
                         </exclude>
                     </excludes>
                 </configuration>

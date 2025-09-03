@@ -6,11 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const isTeacher = roles.includes("ROLE_TEACHER");
 
     // --- CONFIG ---
-    const API_BASE_URL = 'http://localhost:8080/api/v1';
     const WARE_PREFIX = "/ware/home";
     const WARE_SOCKET_ENDPOINT = "/app/ware/search";
-    const WARE_BASE_URL = API_BASE_URL + WARE_PREFIX;
-    const CHUNK_SIZE = 10 * 1024 * 1024; // 分块上传的阈值
+    const CHUNK_SIZE = common_config.LARGE_FILE_THRESHOLD; // 分块上传的阈值
 
     // --- DOM ELEMENTS ---
     // 提前动态渲染一些元素
@@ -50,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- API HELPERS ---
-    const wareAPI = axiosCreate(WARE_BASE_URL);
+    const wareAPI = axiosCreate(WARE_PREFIX);
 
     const showLoading = (show) => {
         loadingSpinner.style.display = show ? 'flex' : 'none';
@@ -329,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const uploadSmallFile = async (file) => {
         const formData = new FormData();
-        let destPath = buildNewPath(currentPath, file.name);
+        let destPath = buildNewPath(currentPath, fileNameInput.value.trim());
         formData.append('path', destPath);
         formData.append('file', file);
         formData.append('mimeTypeName', mimeTypeSelect.value);
@@ -510,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }).then(response => {
                 const token = response.data.data;
-                window.open(`${WARE_BASE_URL}/download?mode=inline&path=${destPath}&token=${token}`, '_blank');
+                window.open(`${wareAPI.defaults.baseURL}/download?mode=inline&path=${destPath}&token=${token}`, '_blank');
             }).catch(error => {
                 console.log(error)
                 toast('error', '预览失败');
@@ -527,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 创建一个隐藏的 <a> 标签并模拟点击来触发下载
                 const tempLink = document.createElement('a');
                 tempLink.style.display = 'none';
-                tempLink.href = `${WARE_BASE_URL}/download?path=${destPath}&token=${token}`;
+                tempLink.href = `${wareAPI.defaults.baseURL}/download?path=${destPath}&token=${token}`;
                 tempLink.setAttribute('download', name);
                 document.body.appendChild(tempLink);
                 tempLink.click();

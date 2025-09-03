@@ -12,13 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- 配置 (Config) ---
-    const API_PREFIX = '/api/v1';
-    const homeworkAPI = axiosCreate(`${API_PREFIX}/homework`);
-    const submissionAPI = axiosCreate(`${API_PREFIX}/submission`);
-    const uploadAPI = axiosCreate(`${API_PREFIX}/attach/upload`);
-    const downloadAPI = axiosCreate(`${API_PREFIX}/attach/download`);
-    const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB
-    const CHUNK_UPLOAD_CONCURRENCY = 4; // 分块上传并发数
+    const homeworkAPI = axiosCreate('/homework');
+    const submissionAPI = axiosCreate('/submission');
+    const uploadAPI = axiosCreate('/attach/upload');
+    const downloadAPI = axiosCreate('/attach/download');
+    const LARGE_FILE_THRESHOLD = common_config.LARGE_FILE_THRESHOLD;
+    const CHUNK_UPLOAD_CONCURRENCY = common_config.CHUNK_UPLOAD_CONCURRENCY;
 
     // --- DOM 元素缓存 ---
     const dom = {
@@ -181,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 教师渲染单个提交记录卡片
     const teacherRenderSubmissionCard = (submission) => {
-        const submissionName = `<strong>作业: ${submission.studentId}</strong><br>`;
+        const submissionName = `<strong>${submission.studentName}</strong><br>`;
         return `
             <div class="item-card" data-submission-id="${submission.id}">
                  <div class="card-header">
@@ -226,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // 首先获取作业详情来显示标题
             const homework = await homeworkAPI.get(`${homeworkId}`).then(res => res.data.data);
-            dom.submissionListTitle.textContent = `"${sanitizeHTML(homework.title)}" 的提交列表`;
+            dom.submissionListTitle.textContent = `${sanitizeHTML(homework.title)} 的提交列表`;
 
             const response = await submissionAPI.get(`/${homeworkId}/submissions`);
             const submissions = response.data.data;
@@ -427,6 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.filesToUpload.push(file);
             }
             renderFilePreview(type);
+            fileInput.value = '';
         };
     };
 
@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('delete-homework-btn')) {
             const card = target.closest('.item-card');
             const homeworkId = card.dataset.homeworkId;
-            const homeworkTitle = card.querySelector('.card-title').textContent;
+            const homeworkTitle = card.querySelector('.card-noclick-title').textContent;
 
             const result = await Swal.fire({
                 title: `确认删除作业 "${homeworkTitle}"?`,

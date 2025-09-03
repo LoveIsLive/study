@@ -1,11 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE_URL = 'http://localhost:8080/api/v1';
-    const AUTH_PREFIX = "/auth";
-    const AUTH_BASE_URL = API_BASE_URL + AUTH_PREFIX;
-    const HOME_PAGE_URL = "/";
-
     const apiClient = axios.create({
-        baseURL: AUTH_BASE_URL
+        baseURL: common_config.back_base_url + common_config.front_AUTH_PREFIX
     });
 
     const passwordInput = document.getElementById('password');
@@ -33,14 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 username: username,
                 password: password
             });
-            console.log(response)
 
             if (response.data && response.data.code === 200 && response.data.data) {
                 // 登录成功
                 const token = response.data.data;
 
                 // 将JWT存储在localStorage
-                localStorage.setItem('authToken', token);
+                localStorage.setItem(common_config.tokenName, token);
 
                 // 提示成功并跳转到主页
                 Swal.fire({
@@ -49,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showConfirmButton: false,
                     timer: 1500
                 }).then(() => {
-                    window.location.href = HOME_PAGE_URL;
+                    window.location.href = common_config.front_HOME_PAGE_URL;
                 });
 
             } else {

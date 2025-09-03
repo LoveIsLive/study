@@ -1,39 +1,9 @@
-logging:
-  config: "classpath:config/log4j2.xml"
-
-
 spring:
   application:
     name: study
-  jackson:
-    date-format: "yyyy-MM-dd HH:mm:ss"
-    time-zone: GMT+8
-    deserialization:
-      fail-on-unknown-properties: false
-    serialization:
-      write-dates-as-timestamps: false
-  servlet:
-    multipart:
-      max-request-size: 15MB
-      max-file-size: 10MB
-  mvc:
-    static-path-pattern: static/**
 
-mybatis:
-  mapper-locations: "classpath:mybatis/mapper/**/*.xml"
-  configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl
-    log-prefix: study.mybatis.
-
-kwang:
-  fs:
-    file-path: filedata
-    chunk-path: filedata/chunk
-    chunk-size: 10485760 # 以字节为单位
-  jwt:
-    security: 571595a57dd149a29e7881fa9d20316bf5df686ba7387344cbd87607961dfe2c
-    expiration: 86400000
+logging:
+  config: "classpath:config/log4j2.xml"
 
 
 
