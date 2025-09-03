@@ -1,11 +1,11 @@
 nacos:
   config:
-    server-addr: 127.0.0.1:8848
+    server-addr: 47.121.116.149:8848
     username: nacos
     password: kwangnacos123
-    data-id: study-prod
+    data-ids: study,index
     type: yaml
-    group: DEFAULT_GROUP
+    group: prod
     auto-refreshed: true
     bootstrap:
       enable: true

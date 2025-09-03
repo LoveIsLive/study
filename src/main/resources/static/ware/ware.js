@@ -279,8 +279,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 fileNameInput.value = fileToUpload.name.split('.').slice(0, -1).join('.');
             }
             if (!mimeTypeSelect.value) {
-                const mimeType = getMimeType(fileToUpload.name);
-                console.log('mimeType', mimeType)
+                // 先根据扩展名，如果识别不到，在根据file.type(如果在mimeTypesValues中的话)
+                let mimeType = getMimeType(fileToUpload.name);
+                if (!mimeType && fileToUpload.type && mimeTypesValues.includes(fileToUpload.type)) {
+                    mimeType = fileToUpload.type;
+                }
                 if (mimeType) {
                     mimeTypeSelect.value = mimeType;
                 } else {

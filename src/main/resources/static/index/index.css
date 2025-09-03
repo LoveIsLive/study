@@ -59,7 +59,7 @@ html {
 
 .timeline-item {
     position: relative;
-    margin-bottom: 250px;
+    margin-bottom: 20px;
     /* 增加项之间的垂直距离 */
     opacity: 0;
     transform: translateY(100px);

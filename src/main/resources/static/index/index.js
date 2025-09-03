@@ -1,47 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    const indexAPI = axiosCreate(common_config.back_INDEX_PREFIX);
 
-    // 1. Mock数据
-    const timelineData = [{
-        title: '课时一：初识宇宙 - HTML基础',
-        time: '2025-09-01',
-        description: '探索Web的起源，学习HTML基本结构和常用标签，构建你自己的第一个静态页面，就像发射第一艘探索飞船。'
-    },
-        {
-            title: '课时二：星系之光 - CSS样式',
-            time: '2025-09-08',
-            description: '为你的宇宙飞船添加色彩和样式。掌握CSS选择器、盒模型、浮动和定位，让页面焕发光彩。'
-        },
-        {
-            title: '课时三：行星轨道 - Flexbox与Grid布局',
-            time: '2025-09-15',
-            description: '学习现代CSS布局技术，像规划行星轨道一样精确地控制页面元素的位置和对齐。'
-        },
-        {
-            title: '课时四：时空跳跃 - JavaScript入门',
-            time: '2025-09-22',
-            description: '进入动态世界！学习JavaScript基础语法、变量、数据类型和函数，为你的页面注入生命力。'
-        },
-        {
-            title: '课时五：操控飞船 - DOM操作',
-            time: '2025-09-29',
-            description: '学习如何使用JavaScript与HTML文档进行交互。动态地创建、修改和删除页面元素，实现用户交互功能。'
-        },
-        {
-            title: '课时六：星际通讯 - API与异步编程',
-            time: '2025-10-13',
-            description: '掌握与服务器进行数据交换的能力。学习Ajax、Fetch API以及Promise和Async/Await，实现真正的动态应用。'
-        },
-        {
-            title: '课时七：建造空间站 - 前端框架初探',
-            time: '2025-10-20',
-            description: '了解现代前端框架（如Vue或React）的基本概念和优势，为构建大型复杂应用打下基础。'
-        },
-        {
-            title: '课时八：驶向未来 - 项目实战与部署',
-            time: '2025-10-27',
-            description: '综合运用所学知识，完成一个完整的项目，并学习如何将其部署到线上，让全世界看到你的作品。'
-        }
-    ];
+    // 1. 数据
+    const timelineData = await indexAPI.get('/timeline').then(res => res.data.data);
 
     // 2. 动态生成时间线内容
     const timelineContent = document.querySelector('.timeline-content');

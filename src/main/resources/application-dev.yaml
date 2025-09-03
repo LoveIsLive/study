@@ -1,48 +1,11 @@
-spring:
-  jackson:
-    date-format: "yyyy-MM-dd HH:mm:ss"
-    time-zone: GMT+8
-    deserialization:
-      fail-on-unknown-properties: false
-    serialization:
-      write-dates-as-timestamps: false
-  servlet:
-    multipart:
-      max-request-size: 15MB
-      max-file-size: 10MB
-  mvc:
-    static-path-pattern: static/**
-  datasource:
-    username: root
-    password: de38a104af7de301
-    url: jdbc:mysql://47.121.116.149:3306/study?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  redis:
-    host: 47.121.116.149
-    port: 6379
-    password: kwang0redis123
-  web:
-    resources:
-      cache:
-        cachecontrol:
-          no-store: true
-      chain:
-        strategy:
-          content:
-            enabled: false
-
-mybatis:
-  mapper-locations: "classpath:mybatis/mapper/**/*.xml"
-  configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.log4j2.Log4j2Impl
-    log-prefix: study.mybatis.
-
-kwang:
-  fs:
-    file-path: filedata
-    chunk-path: filedata/chunk
-    chunk-size: 10485760 # 以字节为单位
-  jwt:
-    security: 571595a57dd149a29e7881fa9d20316bf5df686ba7387344cbd87607961dfe2c
-    expiration: 86400000
+nacos:
+  config:
+    server-addr: 47.121.116.149:8848
+    username: nacos
+    password: kwangnacos123
+    data-ids: study,index
+    type: yaml
+    group: dev
+    auto-refreshed: true
+    bootstrap:
+      enable: true
