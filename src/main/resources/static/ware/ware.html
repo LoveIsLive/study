@@ -119,25 +119,19 @@
         </form>
         <!-- Upload File Form -->
         <form id="upload-file-form" style="display: none;">
-            <h3>上传文件</h3>
-            <div class="form-group icon-input-container">
-                <label for="file-input-name">名称</label>
-                <input type="text" id="file-input-name" name="name" class="form-control icon-input" required placeholder="请输入文件名称">
-            </div>
-            <div id="drag-drop-area" class="">
-                <p>将文件拖拽到此处，或点击选择文件</p>
-                <input type="file" id="file-input" hidden>
-                <p id="file-name-display"></p>
-            </div>
-            <select id="mime-type-select" required>
-                <option value="" disabled selected>请选择文件类型</option>
-            </select>
-            <button type="submit" class="btn btn-primary">上传</button>
-            <div id="upload-progress-container" style="display: none;">
-                <p id="upload-status"></p>
-                <div class="progress-bar">
-                    <div id="progress-bar-inner" style="width: 0%;"></div>
+            <div class="form-group">
+                <div id="ware-drag-drop-area" class="drag-drop-area">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>将文件拖拽到此处，或点击选择文件</p>
+                    <input type="file" id="ware-file-input" multiple hidden>
                 </div>
+                <div id="ware-file-list" class="file-list-preview"></div>
+            </div>
+            <div id="ware-upload-progress-container" class="upload-progress-container" style="display: none;">
+                <!-- 进度条将动态添加 -->
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> 立即上传</button>
             </div>
         </form>
     </div>

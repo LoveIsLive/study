@@ -214,46 +214,15 @@ tr:hover .actions-container {
     margin-bottom: 1.5rem;
 }
 
-#new-dir-form, #upload-file-form {
+#new-dir-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
-#new-dir-form input, #upload-file-form select {
+#new-dir-form input {
     padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 5px;
-}
-
-#drag-drop-area {
-    border: 2px dashed var(--border-color);
-    border-radius: 5px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background-color 0.2s;
-}
-#drag-drop-area.dragover {
-    border-color: var(--primary-color);
-    background-color: #f0f8ff;
-}
-
-/* Progress Bar */
-#upload-progress-container { margin-top: 1rem; }
-.progress-bar {
-    width: 100%;
-    background-color: #e9ecef;
-    border-radius: 5px;
-    overflow: hidden;
-}
-#progress-bar-inner {
-    height: 20px;
-    width: 0%;
-    background-color: var(--primary-color);
-    text-align: center;
-    color: white;
-    line-height: 20px;
-    transition: width 0.4s ease;
 }
 
 /* Spinner */
@@ -296,4 +265,88 @@ tr:hover .actions-container {
     font-size: 0.8rem;
     color: #6c757d;
     margin-left: 0.5rem;
+}
+
+/* --- 文件上传区域 --- */
+.drag-drop-area {
+    border: 2px dashed #ccc;
+    border-radius: 6px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+.drag-drop-area:hover, .drag-drop-area.dragover {
+    border-color: #007bff;
+    background-color: #f0f8ff;
+}
+.drag-drop-area .fa-cloud-upload-alt {
+    font-size: 3rem;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+.file-list-preview {
+    margin-top: 1rem;
+}
+.file-preview-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+.file-preview-item .file-name {
+    font-size: 0.9rem;
+}
+.file-preview-item .remove-file-btn {
+    color: #dc3545;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+.upload-progress-container .progress-item {
+    margin-bottom: 10px;
+}
+.upload-progress-container .progress-bar {
+    width: 100%;
+    background-color: #e9ecef;
+    border-radius: .25rem;
+    height: 1rem;
+}
+.upload-progress-container .progress-bar-inner {
+    height: 100%;
+    background-color: #28a745;
+    border-radius: .25rem;
+    transition: width .2s;
+    text-align: center;
+    color: white;
+    font-size: 0.8rem;
+    line-height: 1rem;
+}
+
+/* --- 表单样式 --- */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+.form-group input[type="text"], .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Important */
+    font-size: 1rem;
+}
+.form-group textarea {
+    resize: vertical;
+}
+.form-actions {
+    text-align: right;
+    margin-top: 2rem;
 }

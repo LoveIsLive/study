@@ -4,11 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let stompClient = null;
     let roles = getRoles();
     const isTeacher = roles.includes("ROLE_TEACHER");
+    const state = {
+        // 用于文件上传的状态管理
+        filesToUpload: [],
+    };
 
     // --- CONFIG ---
     const WARE_PREFIX = "/ware/home";
     const WARE_SOCKET_ENDPOINT = "/app/ware/search";
-    const CHUNK_SIZE = common_config.LARGE_FILE_THRESHOLD; // 分块上传的阈值
+    const LARGE_FILE_THRESHOLD = common_config.LARGE_FILE_THRESHOLD; // 分块上传的阈值
+    const CHUNK_UPLOAD_CONCURRENCY = common_config.CHUNK_UPLOAD_CONCURRENCY;
 
     // --- DOM ELEMENTS ---
     // 提前动态渲染一些元素
@@ -29,16 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const newDirForm = document.getElementById('new-dir-form');
     const uploadFileForm = document.getElementById('upload-file-form');
     const newDirNameInput = document.getElementById('new-dir-name');
-
-    const dragDropArea = document.getElementById('drag-drop-area');
-    const fileInput = document.getElementById('file-input');
-    const fileNameInput = document.getElementById('file-input-name');
-    const fileNameDisplay = document.getElementById('file-name-display');
-    const mimeTypeSelect = document.getElementById('mime-type-select');
-
-    const uploadProgressContainer = document.getElementById('upload-progress-container');
-    const uploadStatus = document.getElementById('upload-status');
-    const progressBarInner = document.getElementById('progress-bar-inner');
 
     const pathInput = document.getElementById('path-input');
     const searchInput = document.getElementById('search-input');
@@ -88,14 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'fas fa-file';
     };
 
-    const formatSize = (bytes) => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
     const renderNodes = (nodes) => {
         fileListBody.innerHTML = '';
         if (nodes.length === 0) {
@@ -128,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td class="col-icon"><i class="node-icon ${getFileIcon(node.type, node.mimeTypeName)}"></i></td>
                 <td class="col-name"><div class="node-name"><span>${displayName}</span></div></td>
-                <td class="col-size">${node.type === 1 ? formatSize(node.size) : '--'}</td>
+                <td class="col-size">${node.type === 1 ? formatFileSize(node.size) : '--'}</td>
                 <td class="col-modified">${new Date(node.modifyTime).toLocaleString()}</td>
                 <td class="col-actions">${actions}</td>
             `;
@@ -195,22 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const fetchMimeTypes = async () => {
-        try {
-            const response = await wareAPI.get('/get/mime');
-            const mimeTypes = response.data.data.mimeTypeNames;
-            mimeTypeSelect.innerHTML = '<option value="" disabled selected>请选择文件类型</option>';
-            mimeTypes.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                mimeTypeSelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Failed to fetch mime types:', error);
-        }
-    };
-
     // --- EVENT HANDLERS ---
 
     // Modal Handling
@@ -238,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     showUploadFileBtn.onclick = () => {
         document.getElementById('new-item-options').style.display = 'none';
-        uploadFileForm.style.display = 'flex';
+        uploadFileForm.style.display = 'block';
     };
 
     // Form Submissions
@@ -262,78 +233,122 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // File Upload Logic
-    function getMimeType(fileName) {
-        const extension = fileName.split('.').pop().toLowerCase();
-        return mimeTypes[extension] || ''; // 如果找不到匹配项，则返回空字符串
-    }
-    let fileToUpload = null;
-    dragDropArea.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            fileToUpload = e.target.files[0];
-            fileNameDisplay.textContent = `已选择文件: ${fileToUpload.name}`;
-            dragDropArea.classList.add('has-file');
-            if (!fileNameInput.value) {
-                // 如果name输入框为空，将文件名（不含后缀）填入
-                fileNameInput.value = fileToUpload.name.split('.').slice(0, -1).join('.');
-            }
-            if (!mimeTypeSelect.value) {
-                // 先根据扩展名，如果识别不到，在根据file.type(如果在mimeTypesValues中的话)
-                let mimeType = getMimeType(fileToUpload.name);
-                if (!mimeType && fileToUpload.type && mimeTypesValues.includes(fileToUpload.type)) {
-                    mimeType = fileToUpload.type;
-                }
-                if (mimeType) {
-                    mimeTypeSelect.value = mimeType;
-                } else {
-                    toast('warning', '无法识别的文件类型，请手动选择');
-                }
-            }
-        }
-    });
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dragDropArea.addEventListener(eventName, e => {
-            e.preventDefault();
-            e.stopPropagation();
-        }, false);
-    });
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dragDropArea.addEventListener(eventName, () => dragDropArea.classList.add('dragover'), false);
-    });
-    ['dragleave', 'drop'].forEach(eventName => {
-        dragDropArea.addEventListener(eventName, () => dragDropArea.classList.remove('dragover'), false);
-    });
-    dragDropArea.addEventListener('drop', e => {
-        if (e.dataTransfer.files.length > 0) {
-            fileToUpload = e.dataTransfer.files[0];
-            fileNameDisplay.textContent = `已选择文件: ${fileToUpload.name}`;
-            dragDropArea.classList.add('has-file');
-        }
-    });
-
     uploadFileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!fileToUpload || !mimeTypeSelect.value) {
-            toast('warning', '请选择文件和MIME类型');
+
+        await handleFileUploads('ware');
+    });
+
+    // --- 文件上传逻辑 (File Upload Logic) ---
+
+    // 设置文件上传区域的事件监听 (type: 'ware')
+    const setupFileUpload = (type) => {
+        const dragDropArea = document.getElementById(`${type}-drag-drop-area`);
+        const fileInput = document.getElementById(`${type}-file-input`);
+
+        dragDropArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, () => dragDropArea.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, () => dragDropArea.classList.remove('dragover'), false);
+        });
+        dragDropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+
+        const handleFiles = (files) => {
+            for (const file of files) {
+                state.filesToUpload.push(file);
+            }
+            renderFilePreview(type);
+            fileInput.value = '';
+        };
+    };
+
+    // 渲染文件预览列表
+    const renderFilePreview = (type) => {
+        const fileListContainer = document.getElementById(`${type}-file-list`);
+        fileListContainer.innerHTML = state.filesToUpload.map((file, index) => `
+            <div class="file-preview-item" data-index="${index}">
+                <span class="file-name">${file.name} (${formatFileSize(file.size)})</span>
+                <button type="button" class="remove-file-btn">&times;</button>
+            </div>
+        `).join('');
+    };
+
+    // 文件上传总控制器
+    const handleFileUploads = async (type) => {
+        const filesToUpload = state.filesToUpload;
+        if (filesToUpload.length === 0) {
+            toast('info', '请选择要上传的文件');
             return;
         }
 
-        uploadProgressContainer.style.display = 'block';
+        const progressContainer = document.getElementById(`${type}-upload-progress-container`);
+        progressContainer.style.display = 'block';
+        progressContainer.innerHTML = ''; // 清空旧进度条
 
-        if (fileToUpload.size > CHUNK_SIZE) {
-            await uploadFileInChunks(fileToUpload);
-        } else {
-            await uploadSmallFile(fileToUpload);
+        const allUploadTasks = [];
+
+        filesToUpload.forEach((file, index) => {
+            // 1. 为每个文件创建独立的进度条UI
+            const progressItem = document.createElement('div');
+            progressItem.className = 'upload-progress-item';
+            progressItem.innerHTML = `
+            <div class="file-info">
+                <span class="file-name">${file.name}</span>
+                <span class="upload-status" id="upload-status-${index}">准备中...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-inner" id="progress-bar-inner-${index}" style="width: 0;"></div>
+            </div>
+        `;
+            progressContainer.appendChild(progressItem);
+
+            const progressBarInner = document.getElementById(`progress-bar-inner-${index}`);
+            const uploadStatus = document.getElementById(`upload-status-${index}`);
+            const destPath = buildNewPath(currentPath, file.name);
+
+            // 2. 根据文件大小创建不同的上传任务
+            const task = () => {
+                if (file.size <= LARGE_FILE_THRESHOLD) {
+                    return uploadSmallFile(file, destPath, progressBarInner, uploadStatus);
+                } else {
+                    return uploadFileInChunks(file, destPath, progressBarInner, uploadStatus);
+                }
+            };
+            allUploadTasks.push(task);
+        });
+
+        // 3. 并发执行所有上传任务
+        try {
+            await executeConcurrentPromises(allUploadTasks, CHUNK_UPLOAD_CONCURRENCY);
+            toast('success', '所有文件上传完毕！');
+            // 所有任务成功后刷新文件列表
+            fetchAndRenderNodes(currentPath);
+        } catch (error) {
+            toast('error', '部分文件上传失败，请检查。');
+            console.error("One or more uploads failed:", error);
+        } finally {
+            // 可以在这里添加一些清理逻辑，比如几秒后隐藏进度条容器
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 5000);
         }
-    });
+    };
 
-    const uploadSmallFile = async (file) => {
+    const uploadSmallFile = async (file, destPath, progressBarInner, uploadStatus) => {
         const formData = new FormData();
-        let destPath = buildNewPath(currentPath, fileNameInput.value.trim());
         formData.append('path', destPath);
         formData.append('file', file);
-        formData.append('mimeTypeName', mimeTypeSelect.value);
+        formData.append('mimeTypeName', fileMimeTypeName(file));
 
         try {
             uploadStatus.textContent = '正在上传...';
@@ -347,8 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             toast('success', '文件上传成功');
-            resetUploadForm();
-            fetchAndRenderNodes(currentPath);
         } catch (error) {
             console.error('Upload failed:', error);
             toast('error', '上传失败');
@@ -385,18 +398,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return Promise.all(results);
     }
 
-    const uploadFileInChunks = async (file) => {
+    const uploadFileInChunks = async (file, destPath, progressBarInner, uploadStatus) => {
         uploadStatus.textContent = '正在初始化大文件上传...';
         progressBarInner.style.width = '0%';
         const CONCURRENCY_LIMIT = 6; // 设置并发上传数量
 
         // 1. 初始化上传，获取fileId
         let uploadId;
-        let destPath = buildNewPath(currentPath, file.name);
         try {
             const initResponse = await wareAPI.post('/chunk/init', {
                     path: destPath,
-                    mimeTypeName: mimeTypeSelect.value
+                    mimeTypeName: fileMimeTypeName(file)
                 });
             uploadId = initResponse.data.data.uploadId;
         } catch(error) {
@@ -407,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2. 创建所有分块的上传任务
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        const totalChunks = Math.ceil(file.size / LARGE_FILE_THRESHOLD);
         const chunkTasks = [];
         const progressMap = new Array(totalChunks).fill(0); // 用于跟踪每个分块的上传进度
         let totalLoaded = 0;
@@ -422,8 +434,8 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < totalChunks; i++) {
             // 使用函数包装，延迟执行
             const task = () => {
-                const start = i * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const start = i * LARGE_FILE_THRESHOLD;
+                const end = Math.min(start + LARGE_FILE_THRESHOLD, file.size);
                 const chunk = file.slice(start, end);
 
                 const formData = new FormData();
@@ -452,21 +464,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. 并发执行上传任务
         try {
             await executeConcurrentPromises(chunkTasks, CONCURRENCY_LIMIT);
-
-            // 由于后端的合并是自动触发的，前端在这里只需要确认所有分块都已发送
-            // 最终的合并成功与否以后端返回为准。
-            // 为了确保进度条达到100%，即使在请求完成后也手动更新一下。
             progressBarInner.style.width = '100%';
             uploadStatus.textContent = '上传完成，等待后端合并...';
 
             // TODO: 需要改为websocket通知，文件合并需要后端线程执行
-            // 这里可以轮询一个节点状态接口来确认合并成功，或者简单地认为上传已完成
-            // 为简单起见，我们直接刷新列表
-            setTimeout(() => {
-                toast('success', '文件上传成功！');
-                resetUploadForm();
-                fetchAndRenderNodes(currentPath);
-            }, 1000); // 留出一点时间给后端合并
+            // 假设合并成功后需要一个确认步骤，这里用setTimeout模拟
+            // 生产环境中建议使用WebSocket或轮询来确认合并状态
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            uploadStatus.textContent = '上传成功';
+            toast('success', `${file.name} 上传成功！`);
 
         } catch (error) {
             console.error('Upload failed during chunk upload:', error);
@@ -474,15 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadStatus.textContent = '上传失败';
         }
     };
-
-    const resetUploadForm = () => {
-        newItemModal.style.display = 'none';
-        uploadFileForm.reset();
-        fileToUpload = null;
-        fileNameDisplay.textContent = '';
-        uploadProgressContainer.style.display = 'none';
-        progressBarInner.style.width = '0%';
-    }
 
     // Actions on file/dir rows
     fileListBody.addEventListener('click', async (e) => {
@@ -547,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     html: `
                         <div style="text-align: left; margin-left: 2rem;">
                         <p><strong>类型:</strong> ${details.type === 0 ? '目录' : '文件'}</p>
-                        <p><strong>大小:</strong> ${formatSize(details.size)}</p>
+                        <p><strong>大小:</strong> ${formatFileSize(details.size)}</p>
                         <p><strong>MIME类型:</strong> ${details.mimeTypeName || 'N/A'}</p>
                         <p><strong>路径:</strong> ${destPath}</p>
                         <p><strong>创建时间:</strong> ${new Date(details.createTime).toLocaleString()}</p>
@@ -764,8 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location = WARE_PREFIX;
         }
     }
-    fetchMimeTypes();
     connectWebSocket();
+    setupFileUpload('ware');
 
     window.addEventListener('popstate', (event) => {
         console.log("popState", event.state)

@@ -1,5 +1,13 @@
 
 
+const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 /**
  * 净化用户内容，对后端允许的前端值，进行前端净化显示
  */
@@ -197,4 +205,11 @@ const mimeTypes = {
 
 const mimeTypesValues = [...new Set(Object.values(mimeTypes))];
 
-
+function fileMimeTypeName(file) {
+    const useType = mimeTypesValues.includes(file.type) ? file.type : 'application/octet-stream';
+    if (file.name.split('.').length < 2) {
+        return useType;
+    }
+    const ext = file.name.split('.').pop().toLowerCase();
+    return Object.hasOwn(mimeTypes, ext) ? mimeTypes[ext] : useType;
+}
