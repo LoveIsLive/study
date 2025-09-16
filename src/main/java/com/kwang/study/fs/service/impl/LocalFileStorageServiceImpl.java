@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -142,22 +143,26 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         String hash = HashUtil.sha256Hash(content, 0, readSize);
-        HashRefNum hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
-        String fileKey;
-        if (hashRefNum != null) {
-            // 文件已存在，增加引用计数
-            hashRefNumMapper.incrementRefNum(hashRefNum.getId());
-        } else {
-            // 新文件，存入文件存储并创建记录
-            fileKey = UUID.randomUUID().toString();
-            fileStorage.putFile(fileKey, new ByteArrayInputStream(content));
+        boolean insertSuccess = true;
 
-            hashRefNum = new HashRefNum();
-            hashRefNum.setHash(hash);
-            hashRefNum.setRefPath(fileKey);
-            hashRefNum.setRefNum(1);
-            hashRefNum.setSize((long) readSize);
+        String fileKey = UUID.randomUUID().toString();
+
+        HashRefNum hashRefNum = new HashRefNum();
+        hashRefNum.setHash(hash);
+        hashRefNum.setRefPath(fileKey);
+        hashRefNum.setRefNum(1);
+        hashRefNum.setSize((long) readSize);
+        try {
             hashRefNumMapper.insertHash(hashRefNum);
+        } catch (DuplicateKeyException e) {
+            insertSuccess = false;
+            log.info("并发插入失败-重复{}", e.getMessage());
+            // 小心死锁
+            hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
+            hashRefNumMapper.incrementRefNum(hashRefNum.getId());
+        }
+        if (insertSuccess) {
+            fileStorage.putFile(fileKey, new ByteArrayInputStream(content));
         }
 
         Node node = new Node();
@@ -518,7 +523,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
     @Override
     @Transactional
-    public UploadChunkResult uploadChunkAndAutoMerge(String uploadId, Integer chunkIndex,
+    public GenericObjectResult uploadChunk(String uploadId, Integer chunkIndex,
                                                      Integer totalChunks, InputStream chunkStream) throws IOException {
         if (chunkIndex == null || totalChunks == null || chunkIndex < 0 || chunkIndex >= totalChunks)
             throw new IllegalArgumentException("chunkIndex:" + chunkIndex + ", totalChunks:" + totalChunks);
@@ -528,28 +533,34 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (fileId == null)
             throw new IllegalArgumentException("uploadId不存在");
 
-        UploadChunkResult result = new UploadChunkResult();
+        GenericObjectResult result = new GenericObjectResult();
         this.uploadChunk(fileId, chunkIndex, chunkStream);
-        int uploadedCount = this.countUploadedChunks(fileId);
-
-        if (uploadedCount == totalChunks) {
-            Object val = mapLock.putIfAbsent(fileId, new Object());
-            if (val != null) {
-                log.info("并发合并，fileId: {}", fileId);
-            } else {
-                try {
-                    this.mergeChunks(fileId);
-                } finally {
-                    mapLock.remove(fileId);
-                }
-            }
-            result.setMerged(Boolean.TRUE);
-            uploadIdToFileId.remove(uploadId); // Note
-        } else {
-            result.setMerged(Boolean.FALSE);
-        }
         result.setSuccess(Boolean.TRUE);
-        result.setUploadNum(uploadedCount);
+        return result;
+    }
+
+    @Override
+    public GenericObjectResult mergeChunk(String uploadId, Integer totalChunks) throws IOException {
+        if (totalChunks == null || totalChunks < 0)
+            throw new IllegalArgumentException("totalChunks:" + totalChunks);
+        Long fileId = uploadIdToFileId.get(uploadId);
+        if (fileId == null)
+            throw new IllegalArgumentException("uploadId不存在");
+        int currentCount = this.countUploadedChunks(fileId);
+        if (currentCount != totalChunks)
+            throw new IllegalArgumentException("totalChunks:" + totalChunks + ", currentCount = " + currentCount);
+        Object val = mapLock.putIfAbsent(fileId, new Object());
+        if (val != null) {
+            log.info("并发合并，fileId: {}", fileId);
+        } else {
+            try {
+                this.mergeChunks(fileId);
+            } finally {
+                mapLock.remove(fileId);
+            }
+        }
+        uploadIdToFileId.remove(uploadId); // Note
+        GenericObjectResult result = new GenericObjectResult();
         result.setSuccess(Boolean.TRUE);
         return result;
     }

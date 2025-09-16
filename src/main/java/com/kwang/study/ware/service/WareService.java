@@ -120,12 +120,17 @@ public class WareService {
     }
 
     /**
-     * 上传分块，该方法在所有分块上传完毕后，会自动合并。
+     * 上传分块。
      */
     @Transactional
-    public UploadChunkResult uploadChunkAndAutoMerge(String uploadId, Integer chunkIndex, Integer totalChunks,
+    public GenericObjectResult uploadChunk(String uploadId, Integer chunkIndex, Integer totalChunks,
                                               InputStream chunkStream) throws IOException {
-        return fsService.uploadChunkAndAutoMerge(uploadId, chunkIndex, totalChunks, chunkStream);
+        return fsService.uploadChunk(uploadId, chunkIndex, totalChunks, chunkStream);
+    }
+
+    @Transactional
+    public GenericObjectResult mergeChunk(String uploadId, Integer totalChunks) throws IOException {
+        return fsService.mergeChunk(uploadId, totalChunks);
     }
 
     @Transactional

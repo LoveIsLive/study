@@ -93,7 +93,16 @@ public interface FileStorageService {
     InitMultiUploadResult initMultiUpload(String path, String mimeTypeName) throws IOException;
 
     /**
-     * 上传分块，该方法在所有分块上传完毕后，会自动合并。
+     * 上传分块
+     * @param uploadId initMultiUpload方法返回的uploadId，分块上传的凭证
+     * @param totalChunks 总共的块
+     * @return 上传分块结果
+     * @throws IOException 可能的IO异常
+     */
+    GenericObjectResult mergeChunk(String uploadId, Integer totalChunks) throws IOException;
+
+    /**
+     * 合并
      * @param uploadId initMultiUpload方法返回的uploadId，分块上传的凭证
      * @param chunkIndex 上传的第几个块
      * @param totalChunks 总共的块
@@ -101,8 +110,8 @@ public interface FileStorageService {
      * @return 上传分块结果
      * @throws IOException 可能的IO异常
      */
-    UploadChunkResult uploadChunkAndAutoMerge(String uploadId, Integer chunkIndex,
-                            Integer totalChunks, InputStream chunkStream) throws IOException;
+    GenericObjectResult uploadChunk(String uploadId, Integer chunkIndex,
+                                    Integer totalChunks, InputStream chunkStream) throws IOException;
 
 
     /**

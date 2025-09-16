@@ -337,10 +337,11 @@ document.addEventListener('DOMContentLoaded', () => {
             toast('error', '部分文件上传失败，请检查。');
             console.error("One or more uploads failed:", error);
         } finally {
-            // 可以在这里添加一些清理逻辑，比如几秒后隐藏进度条容器
-            setTimeout(() => {
-                progressContainer.style.display = 'none';
-            }, 5000);
+            uploadFileForm.reset();
+            state.filesToUpload = [];
+            progressContainer.style.display = 'none';
+            progressContainer.innerHTML = '';
+            document.getElementById(`${type}-file-list`).innerHTML = '';
         }
     };
 
@@ -466,19 +467,26 @@ document.addEventListener('DOMContentLoaded', () => {
             await executeConcurrentPromises(chunkTasks, CONCURRENCY_LIMIT);
             progressBarInner.style.width = '100%';
             uploadStatus.textContent = '上传完成，等待后端合并...';
-
-            // TODO: 需要改为websocket通知，文件合并需要后端线程执行
-            // 假设合并成功后需要一个确认步骤，这里用setTimeout模拟
-            // 生产环境中建议使用WebSocket或轮询来确认合并状态
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            uploadStatus.textContent = '上传成功';
-            toast('success', `${file.name} 上传成功！`);
-
         } catch (error) {
             console.error('Upload failed during chunk upload:', error);
             toast('error', '上传过程中发生错误，请重试。');
             uploadStatus.textContent = '上传失败';
+            return;
+        }
+
+        // 4. 合并分块
+        // TODO: 需要改为websocket通知，文件合并需要后端线程执行
+        try {
+            const formData = new FormData();
+            formData.append('uploadId', uploadId);
+            formData.append('totalChunks', totalChunks);
+            await wareAPI.post('/chunk/merge', formData);
+
+            uploadStatus.textContent = '合并成功';
+        } catch (e) {
+            console.error('合并失败:', e);
+            toast('error', '合并过程中发生错误，请重试。');
+            uploadStatus.textContent = '合并失败';
         }
     };
 
@@ -752,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- INITIALIZATION ---
-    const initialPath = window.location.pathname;
+    const initialPath = decodeURIComponent(window.location.pathname);
     if (initialPath) {
         if (initialPath === WARE_PREFIX) {
             navigateToPath('/');

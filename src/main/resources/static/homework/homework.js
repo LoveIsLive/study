@@ -528,6 +528,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         await executeConcurrent(chunkPromises, CHUNK_UPLOAD_CONCURRENCY);
+
+        // TODO: 需要改为websocket通知，文件合并需要后端线程执行
+        try {
+            const formData = new FormData();
+            formData.append('uploadId', uploadId);
+            formData.append('totalChunks', totalChunks);
+            await uploadAPI.post('/merge', formData);
+        } catch (e) {
+            console.error('合并失败:', e);
+            toast('error', '附件合并过程中发生错误，请重试。');
+        }
     };
 
 

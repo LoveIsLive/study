@@ -1,8 +1,8 @@
 package com.kwang.study.homework.controller;
 
 import com.kwang.study.common.R;
+import com.kwang.study.fs.dto.result.GenericObjectResult;
 import com.kwang.study.fs.dto.result.InitMultiUploadResult;
-import com.kwang.study.fs.dto.result.UploadChunkResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.request.BatchUploadInitRequestDTO;
 import com.kwang.study.homework.dto.request.FileMetaDTO;
@@ -70,15 +70,25 @@ public class FileUploadController {
      * 上传文件块
      */
     @PostMapping("/chunk")
-    public ResponseEntity<R<UploadChunkResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
+    public ResponseEntity<R<GenericObjectResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
                                             @RequestParam("chunkIndex") Integer chunkIndex,
                                             @RequestParam("totalChunks") Integer totalChunks,
                                             @RequestPart("chunk") MultipartFile chunk) throws IOException {
         try (InputStream input = chunk.getInputStream()) {
-            UploadChunkResult result = fileStorageService.
-                    uploadChunkAndAutoMerge(uploadId, chunkIndex, totalChunks, input);
+            GenericObjectResult result = fileStorageService.
+                    uploadChunk(uploadId, chunkIndex, totalChunks, input);
             return ResponseEntity.ok(R.success(result));
         }
     }
 
+    /**
+     * 合并文件块
+     */
+    @PostMapping("/merge")
+    public ResponseEntity<R<GenericObjectResult>> mergeChunk(@RequestParam("uploadId") String uploadId,
+                                                              @RequestParam("totalChunks") Integer totalChunks) throws IOException {
+        GenericObjectResult result = fileStorageService.
+                mergeChunk(uploadId, totalChunks);
+        return ResponseEntity.ok(R.success(result));
+    }
 }

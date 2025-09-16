@@ -6,22 +6,26 @@ import java.security.NoSuchAlgorithmException;
 
 public class HashUtil {
     private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
-    public static final MessageDigest md;
 
-    static {
+    private static final ThreadLocal<MessageDigest> MD_SHA256 = ThreadLocal.withInitial(() -> {
         try {
-            md = MessageDigest.getInstance("SHA-256");
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
+            throw new RuntimeException(e);
         }
-    }
+    });
 
     public static String sha256Hash(byte[] input, int offset, int len) {
+        MessageDigest md = MD_SHA256.get();
+        md.reset();
+
         md.update(input, offset, len);
         return bytesToHex(md.digest());
     }
 
     public static MessageDigest sha256() {
+        MessageDigest md = MD_SHA256.get();
+        md.reset();
         return md;
     }
 

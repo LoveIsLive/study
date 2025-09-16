@@ -166,22 +166,31 @@ public class WareController {
         requestDTO.check();
 
         try (InputStream input = chunk.getInputStream()) {
-            UploadChunkResult chunkResult = wareService.uploadChunkAndAutoMerge(requestDTO.getUploadId(), requestDTO.getChunkIndex(),
+            GenericObjectResult chunkResult = wareService.uploadChunk(requestDTO.getUploadId(), requestDTO.getChunkIndex(),
                     requestDTO.getTotalChunks(), input);
 
-            if (Boolean.TRUE.equals(chunkResult.getMerged())) {
-                return ResponseEntity.ok(R.success("上传完成，分片已完全合并"));
-            } else if (Boolean.FALSE.equals(chunkResult.getMerged())) {
-                String progress = String.format("Chunk %d/%d uploaded.",
-                        chunkResult.getUploadNum() == null ? 0 : chunkResult.getUploadNum(), requestDTO.getTotalChunks());
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success(progress, "分片上传成功"));
-            } else if (Boolean.TRUE.equals(chunkResult.getSuccess())){
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success("正在合并"));
+            if (Boolean.TRUE.equals(chunkResult.getSuccess())){
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success("上传成功"));
             } else {
                 return ResponseEntity
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(R.error(chunkResult.getErrorMessage()));
             }
+        }
+    }
+
+    @PostMapping("/chunk/merge")
+    public ResponseEntity<?> mergeChunk(@Valid MergeChunkRequestDTO requestDTO) throws Exception {
+        requestDTO.check();
+
+        GenericObjectResult chunkResult = wareService.mergeChunk(requestDTO.getUploadId(), requestDTO.getTotalChunks());
+
+        if (Boolean.TRUE.equals(chunkResult.getSuccess())){
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.success("合并成功"));
+        } else {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(R.error(chunkResult.getErrorMessage()));
         }
     }
 
