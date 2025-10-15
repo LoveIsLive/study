@@ -10,5 +10,7 @@ import java.util.List;
 public interface UserMapper {
     User findByUsername(String username);
 
+    User findByUsernameWithClasses(String username);
+
     List<Role> findRolesByUserId(Long userId);
 }

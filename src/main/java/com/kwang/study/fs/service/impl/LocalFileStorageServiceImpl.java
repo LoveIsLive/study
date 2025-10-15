@@ -83,21 +83,24 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new InvalidPathException(path);
         ResolvedPath resolvedPath = parsePath(path);
 
-        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
-        if (parentNode == null) {
-            throw new PathNotFoundException(resolvedPath.getParentPath());
-        }
-        if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
-            throw new NotADirectoryException(resolvedPath.getParentPath());
+        Node parentNode = null;
+        if (!"/".equals(resolvedPath.parentPath)) {
+            parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
+            if (parentNode == null) {
+                throw new PathNotFoundException(resolvedPath.getParentPath());
+            }
+            if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
+                throw new NotADirectoryException(resolvedPath.getParentPath());
+            }
         }
 
-        if (nodeMapper.selectNodeByParentIdAndName(parentNode.getId(), resolvedPath.getName()) != null) {
+        if (nodeMapper.selectNodeByParentIdAndName(parentNode == null ? null : parentNode.getId(), resolvedPath.getName()) != null) {
             throw new PathAlreadyExistsException(path);
         }
 
         // 4. 创建新节点
         Node node = new Node();
-        node.setParentId(parentNode.getId());
+        node.setParentId(parentNode == null ? null : parentNode.getId());
         node.setName(resolvedPath.getName());
         node.setType(ObjectTypeEnum.DIR.getCode());
         node.setSize(0L);
@@ -123,15 +126,18 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         ResolvedPath resolvedPath = parsePath(path);
-        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
-        if (parentNode == null) {
-            throw new PathNotFoundException(resolvedPath.getParentPath());
-        }
-        if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
-            throw new NotADirectoryException(resolvedPath.getParentPath());
+        Node parentNode = null;
+        if (!"/".equals(resolvedPath.parentPath)) {
+            parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
+            if (parentNode == null) {
+                throw new PathNotFoundException(resolvedPath.getParentPath());
+            }
+            if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
+                throw new NotADirectoryException(resolvedPath.getParentPath());
+            }
         }
 
-        if (nodeMapper.selectNodeByParentIdAndName(parentNode.getId(), resolvedPath.getName()) != null) {
+        if (nodeMapper.selectNodeByParentIdAndName(parentNode == null ? null : parentNode.getId(), resolvedPath.getName()) != null) {
             throw new PathAlreadyExistsException(path);
         }
 
@@ -156,7 +162,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             hashRefNumMapper.insertHash(hashRefNum);
         } catch (DuplicateKeyException e) {
             insertSuccess = false;
-            log.info("并发插入失败-重复{}", e.getMessage());
+            log.info("插入失败-重复{}", e.getMessage());
             // 小心死锁
             hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
             hashRefNumMapper.incrementRefNum(hashRefNum.getId());
@@ -166,7 +172,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         Node node = new Node();
-        node.setParentId(parentNode.getId());
+        node.setParentId(parentNode == null ? null : parentNode.getId());
         node.setName(resolvedPath.getName());
         node.setType(ObjectTypeEnum.FILE.getCode());
         node.setSize((long) readSize);
@@ -482,20 +488,23 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         ResolvedPath resolvedPath = parsePath(path);
-        Node parentNode = nodeMapper.selectNodeByPath(resolvedPath.getParentPath());
-        if (parentNode == null) {
-            throw new PathNotFoundException(resolvedPath.getParentPath());
-        }
-        if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
-            throw new NotADirectoryException(resolvedPath.getParentPath());
+        Node parentNode = null;
+        if (!"/".equals(resolvedPath.parentPath)) {
+            parentNode = nodeMapper.selectNodeByPath(resolvedPath.parentPath);
+            if (parentNode == null) {
+                throw new PathNotFoundException(resolvedPath.parentPath);
+            }
+            if (!Objects.equals(parentNode.getType(), ObjectTypeEnum.DIR.getCode())) {
+                throw new NotADirectoryException(resolvedPath.getParentPath());
+            }
         }
 
-        if (nodeMapper.selectNodeByParentIdAndName(parentNode.getId(), resolvedPath.getName()) != null) {
+        if (nodeMapper.selectNodeByParentIdAndName(parentNode == null ? null : parentNode.getId(), resolvedPath.getName()) != null) {
             throw new PathAlreadyExistsException(path);
         }
 
         Node node = new Node();
-        node.setParentId(parentNode.getId());
+        node.setParentId(parentNode == null ? null : parentNode.getId());
         node.setName(resolvedPath.getName());
         // 设置为分块上传中间态
         node.setType(ObjectTypeEnum.CHUNK_INTERM.getCode());

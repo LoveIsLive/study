@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,7 +21,10 @@ public class AsyncSearchService {
     private SimpMessagingTemplate messagingTemplate;
 
     @Async
-    public void searchAndSendResults(String path, String namePattern, String user) {
+    public void searchAndSendResults(String path, String namePattern, String user, SecurityContext securityContext) {
+        // 设置当前认证身份
+        SecurityContextHolder.setContext(securityContext);
+
         String destination = "/queue/search-results";
         log.info("Async search started for user: {}, destination: {}", user, destination);
 

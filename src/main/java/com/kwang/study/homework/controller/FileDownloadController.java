@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.kwang.study.constant.ApiPrefixConstant.ATTACHE_DOWNLOAD_BASE_PREFIX;
 import static com.kwang.study.constant.RedisKeyPrefixConstant.DOWNLOAD_ID_PREFIX;
-import static com.kwang.study.homework.service.HomeworkService.HOMEWORK_FILE_PREFIX;
 
 @RestController
 @RequestMapping(ATTACHE_DOWNLOAD_BASE_PREFIX)

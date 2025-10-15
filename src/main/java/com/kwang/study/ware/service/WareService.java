@@ -1,5 +1,9 @@
 package com.kwang.study.ware.service;
 
+import com.kwang.study.auth.mapper.UserMapper;
+import com.kwang.study.auth.pojo.Role;
+import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.enums.FileStorageModuleNameEnum;
 import com.kwang.study.fs.dto.result.*;
 import com.kwang.study.fs.service.FileStorageService;
@@ -8,6 +12,8 @@ import com.kwang.study.utils.DownloadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -16,6 +22,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -26,6 +33,8 @@ import static javax.servlet.http.HttpServletResponse.SC_PARTIAL_CONTENT;
 public class WareService {
     @Autowired
     private FileStorageService fsService;
+    @Autowired
+    private UserMapper userMapper;
 
     @Transactional
     public VoidResult createDirectory(String path) throws IOException {
@@ -141,7 +150,27 @@ public class WareService {
 
     // 返回用户该模块的根目录，不以/结尾
     private String buildBasePath() {
-        return FileStorageModuleNameEnum.WARE_NAME.getModuleName();
+        StringBuilder basePath = new StringBuilder(FileStorageModuleNameEnum.WARE_NAME.getModuleName());
+        String userName = AuthenticationUserUtil.getCurrentUserName();
+        User user = userMapper.findByUsernameWithClasses(userName);
+        Assert.isTrue(user != null, "没有查找到该用户");
+        List<Role> roles = user.getRoles();
+        if (!CollectionUtils.isEmpty(roles)) {
+            for (Role role : roles) {
+                if ("ROLE_ADMIN".equals(role.getName())) {
+                    // 管理员能看见all
+                    return basePath.toString();
+                }
+            }
+        }
+        // 其余只能看见本班级的内容
+        Assert.isTrue(user.getClassMember() != null &&
+                user.getClassMember().getClasses() != null &&
+                user.getClassMember().getClasses().getName() != null, "用户无班级信息");
+
+        String classesName = user.getClassMember().getClasses().getName();
+        basePath.append('/').append(classesName);
+        return basePath.toString();
     }
 
     private String buildActualPath(String path) {

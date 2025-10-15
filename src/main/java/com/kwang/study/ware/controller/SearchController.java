@@ -4,7 +4,12 @@ import com.kwang.study.ware.dto.request.SearchRequestDTO;
 import com.kwang.study.ware.service.async.AsyncSearchService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.CustomAutowireConfigurer;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +38,7 @@ public class SearchController {
         request.check();
 
         String userName  = principal.getName();
-        asyncSearchService.searchAndSendResults(request.getPath(), request.getNamePattern(), userName);
+        asyncSearchService.searchAndSendResults(request.getPath(), request.getNamePattern(),
+                userName, SecurityContextHolder.getContext());
     }
 }

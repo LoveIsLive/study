@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', function () {
             userDropdownMenu.classList.toggle('show');
         });
 
+        userDropdownMenu.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+
         // 点击页面其他地方，关闭下拉菜单
         window.addEventListener('click', function () {
             if (userDropdownMenu.classList.contains('show')) {

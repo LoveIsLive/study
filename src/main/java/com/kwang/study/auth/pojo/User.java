@@ -11,4 +11,7 @@ public class User {
     private String password;
     private boolean enabled;
     private List<Role> roles;
+
+    // 目前一个用户只能有一个班级
+    private ClassMember classMember;
 }

@@ -9,6 +9,7 @@
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
+        <result property="enabled" column="enabled" />
         <!-- 其他User实体属性映射 -->
         <collection property="roles" ofType="com.kwang.study.auth.pojo.Role"
                     select="findRolesByUserId" column="id"/>
@@ -24,6 +25,62 @@
         SELECT r.* FROM roles r
                             INNER JOIN user_roles ur ON r.id = ur.role_id
         WHERE ur.user_id = #{userId}
+    </select>
+
+
+    <resultMap id="UserWithClassInfoMap" type="com.kwang.study.auth.pojo.User">
+        <!-- 1. 映射User自身的基本属性 -->
+        <id property="id" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="enabled" column="enabled"/>
+
+        <!-- 3. 关联查询用户的班级成员信息 (ClassMember) -->
+        <!-- 如果用户没有班级, LEFT JOIN的结果为NULL, MyBatis会自动将classMember属性赋为null -->
+        <association property="classMember" javaType="com.kwang.study.auth.pojo.ClassMember">
+            <id property="id" column="cm_id"/>
+            <result property="userId" column="user_id"/>
+            <result property="classId" column="class_id"/>
+            <result property="role" column="cm_role"/>
+            <result property="joinTime" column="join_time"/>
+
+            <!-- 4. 在ClassMember内部, 嵌套关联班级信息 (Classes) -->
+            <!-- 这里只映射ID和name, 满足你的需求 -->
+            <association property="classes" javaType="com.kwang.study.auth.pojo.Classes">
+                <id property="id" column="class_id"/>
+                <result property="name" column="class_name"/>
+            </association>
+        </association>
+
+        <collection property="roles" ofType="com.kwang.study.auth.pojo.Role"
+                    select="findRolesByUserId" column="user_id"/>
+
+    </resultMap>
+
+    <!--
+      根据用户名查询用户及其班级信息的方法实现。
+      - 使用LEFT JOIN: 保证即使用户没有分配班级, 也能查出该用户信息。
+      - 使用AS别名: 为字段起别名以避免不同表之间字段名冲突, 便于ResultMap进行映射。
+    -->
+    <select id="findByUsernameWithClasses" parameterType="string" resultMap="UserWithClassInfoMap">
+        SELECT
+            u.id AS user_id,
+            u.username,
+            u.password,
+            u.enabled,
+            cm.id AS cm_id,
+            cm.role AS cm_role,
+            cm.join_time,
+            c.id AS class_id,
+            c.name AS class_name
+        FROM
+            users u
+                LEFT JOIN
+            class_members cm ON u.id = cm.user_id
+                LEFT JOIN
+            classes c ON cm.class_id = c.id
+        WHERE
+            u.username = #{username}
     </select>
 
 </mapper>

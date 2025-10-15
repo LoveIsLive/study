@@ -1,8 +1,13 @@
 package com.kwang.study.ware.controller;
 
+import com.kwang.study.auth.enums.ClassesRoleEnum;
+import com.kwang.study.auth.mapper.UserMapper;
+import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.*;
 import com.kwang.study.utils.PathUtils;
+import com.kwang.study.ware.dto.cache.DownloadTokenDTO;
 import com.kwang.study.ware.dto.request.*;
 import com.kwang.study.ware.service.WareService;
 import lombok.extern.slf4j.Slf4j;
@@ -10,9 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,15 +44,18 @@ public class WareController {
     private WareService wareService;
 
     @Autowired
-    private RedisTemplate<String, String> redisTemplate;
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private UserMapper userMapper;
 
     /**
      * 创建目录
      */
     @PostMapping("/create/directories")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> createDirectory(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         VoidResult voidResult = wareService.createDirectory(path);
         return build(voidResult);
@@ -57,10 +65,10 @@ public class WareController {
      * 上传小文件
      */
     @PostMapping("/create/files")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> uploadFile(@Valid UploadFileRequestDTO requestDTO,
                                                     @RequestParam("file") MultipartFile file) throws IOException {
         requestDTO.check();
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         try (InputStream input = file.getInputStream()) {
             VoidResult voidResult = wareService.createFile(requestDTO.getPath(),
@@ -71,9 +79,9 @@ public class WareController {
 
     // 删除目录节点
     @DeleteMapping("/delete/dir")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> deleteDireNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         VoidResult voidResult = wareService.deleteDirNode(path);
         return build(voidResult);
@@ -81,9 +89,9 @@ public class WareController {
 
     // 删除文件节点
     @DeleteMapping("/delete/file")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> deleteFileNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         VoidResult voidResult = wareService.deleteFileNode(path);
         return build(voidResult);
@@ -91,10 +99,10 @@ public class WareController {
 
     // 更新目录节点
     @PostMapping("/update/dir")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> updateDireNode(@RequestParam("path") String path,
                                                         @RequestParam("newName") String newName) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         VoidResult voidResult = wareService.renameDirNode(path, newName);
         return build(voidResult);
@@ -102,9 +110,9 @@ public class WareController {
 
     // 更新文件节点
     @PostMapping("/update/file")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<VoidResult>> updateFileNode(@Valid @RequestBody UpdateFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         VoidResult voidResult = wareService.renameFileNode(requestDTO.getPath(), requestDTO.getNewName());
         return build(voidResult);
@@ -140,21 +148,29 @@ public class WareController {
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
 
-        String tokenPath = redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
-        if (!Objects.equals(path, tokenPath)) {
+        DownloadTokenDTO downloadTokenDTO = (DownloadTokenDTO) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
+        if (downloadTokenDTO == null) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().print("下载失败");
+            response.setContentType("text/plain; charset=UTF-8");
+            return;
+        }
+        if (!Objects.equals(path, downloadTokenDTO.getPath())) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.getWriter().print("没有权限");
             response.setContentType("text/plain; charset=UTF-8");
             return;
         }
+        SecurityContextHolder.setContext(AuthenticationUserUtil
+                .newSecurityContext(downloadTokenDTO.getUsername()));
 
         wareService.downloadFile(path, mode, request, response);
     }
 
     @PostMapping("/chunk/init")
-    @PreAuthorize("hasRole('ROLE_TEACHER')")
     public ResponseEntity<R<InitMultiUploadResult>> initMultiUpload(@Valid @RequestBody InitUploadBigFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
+        Assert.isTrue(isTeacher(), "不是教师，非法操作");
 
         InitMultiUploadResult uploadResult = wareService.initMultiUpload(requestDTO.getPath(), requestDTO.getMimeTypeName());
         return build(uploadResult);
@@ -204,7 +220,8 @@ public class WareController {
     public ResponseEntity<R<String>> produceDownloadUUID(@RequestParam("path") String path) {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
         String downloadId = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, path, 30, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, new DownloadTokenDTO(path,
+                AuthenticationUserUtil.getCurrentUserName()), 30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
     }
 
@@ -216,5 +233,14 @@ public class WareController {
         } else {
             return ResponseEntity.ok(R.success(baseResult));
         }
+    }
+
+    private boolean isTeacher() {
+        String userName = AuthenticationUserUtil.getCurrentUserName();
+        if (userName == null) return false;
+
+        User user = userMapper.findByUsernameWithClasses(userName);
+        String role = user.getClassMember().getRole();
+        return ClassesRoleEnum.TEACHER.getRole().equals(role);
     }
 }

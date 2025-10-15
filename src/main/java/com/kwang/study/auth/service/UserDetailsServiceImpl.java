@@ -2,6 +2,7 @@ package com.kwang.study.auth.service;
 
 import com.kwang.study.auth.custom.CustomUserDetails;
 import com.kwang.study.auth.mapper.UserMapper;
+import com.kwang.study.auth.pojo.Role;
 import com.kwang.study.auth.pojo.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
@@ -10,9 +11,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -22,14 +24,25 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userMapper.findByUsername(username);
+        User user = userMapper.findByUsernameWithClasses(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found with username: " + username);
         }
 
-        List<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
-                .collect(Collectors.toList());
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        // 目前仅有特殊的admin管理员权限
+        if (!CollectionUtils.isEmpty(user.getRoles())) {
+            for (Role role : user.getRoles()) {
+                if ("ROLE_ADMIN".equals(role.getName())) {
+                    authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                    break;
+                }
+            }
+        }
+        // 在班级内的角色
+        if (user.getClassMember() != null && user.getClassMember().getRole() != null) {
+            authorities.add(new SimpleGrantedAuthority(user.getClassMember().getRole()));
+        }
 
         return new CustomUserDetails(user.getId(), user.getUsername(),
                 user.getPassword(), user.isEnabled(), authorities);

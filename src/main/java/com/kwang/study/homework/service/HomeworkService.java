@@ -21,12 +21,14 @@ import org.springframework.web.multipart.MultipartFile;
 import cn.hutool.core.lang.UUID;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static com.kwang.study.constant.RedisKeyPrefixConstant.UPLOAD_ID_PREFIX;
+import static com.kwang.study.enums.FileStorageModuleNameEnum.HOMEWORK_NAME;
 
 @Service
 @Slf4j
@@ -48,7 +50,6 @@ public class HomeworkService {
 
     public static final String HOMEWORK_ATTACHMENT_OWNER_TYPE = "homework";
     public static final String SUBMISSION_ATTACHMENT_OWNER_TYPE = "submission";
-    public static final String HOMEWORK_FILE_PREFIX = "/homework/";
 
     // --- 教师功能 ---
 
@@ -181,7 +182,7 @@ public class HomeworkService {
                                 "Mime type not found: " + uploadInfo.getMimeTypeName());
                         return Attachment.builder()
                                 .ownerId(submission.getId())
-                                .ownerType(HOMEWORK_ATTACHMENT_OWNER_TYPE)
+                                .ownerType(SUBMISSION_ATTACHMENT_OWNER_TYPE)
                                 .fileName(uploadInfo.getFileName())
                                 .filePath(uploadInfo.getFilePath())
                                 .fileSize(uploadInfo.getFileSize())
@@ -292,28 +293,30 @@ public class HomeworkService {
         for (MultipartFile file : files) {
             if (file.isEmpty()) continue;
 
-            String originalFilename = file.getOriginalFilename();
-            String filePath = HomeworkService.produceAttachPath(originalFilename);
+            try (InputStream inputStream = file.getInputStream()) {
+                String originalFilename = file.getOriginalFilename();
+                String filePath = HomeworkService.produceAttachPath(originalFilename);
 
-            String contentType = file.getContentType();
-            MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(contentType);
-            Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
-                    "Mime type not found: " + contentType);
+                String contentType = file.getContentType();
+                MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(contentType);
+                Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
+                        "Mime type not found: " + contentType);
 
-            // 调用文件存储服务上传文件
-            fileStorageService.createFile(filePath, file.getInputStream(), contentType);
+                // 调用文件存储服务上传文件
+                fileStorageService.createFile(filePath, inputStream, contentType);
 
-            // 构建附件对象
-            Attachment attachment = Attachment.builder()
-                    .ownerId(ownerId)
-                    .ownerType(ownerType)
-                    .fileName(originalFilename)
-                    .filePath(filePath)
-                    .fileSize(file.getSize())
-                    .mimeTypeId(mimeTypeId.getMimeTypeId())
-                    .uploaderId(uploaderId)
-                    .build();
-            attachments.add(attachment);
+                // 构建附件对象
+                Attachment attachment = Attachment.builder()
+                        .ownerId(ownerId)
+                        .ownerType(ownerType)
+                        .fileName(originalFilename)
+                        .filePath(filePath)
+                        .fileSize(file.getSize())
+                        .mimeTypeId(mimeTypeId.getMimeTypeId())
+                        .uploaderId(uploaderId)
+                        .build();
+                attachments.add(attachment);
+            }
         }
         return attachments;
     }
@@ -324,6 +327,6 @@ public class HomeworkService {
             fileExtension = fileName.substring(fileName.lastIndexOf("."));
         }
         String uniqueFileName = UUID.randomUUID().toString(true) + fileExtension;
-        return HOMEWORK_FILE_PREFIX + uniqueFileName;
+        return HOMEWORK_NAME.getModuleName() + "/" + uniqueFileName;
     }
 }

@@ -22,16 +22,10 @@ import java.util.Properties;
 
 public class TestMain {
     public static void main(String[] args) throws Exception {
-        String serverAddr = "47.121.116.149:8848";
-        String dataId = "study";
-        String group = "DEFAULT_GROUP";
-        Properties properties = new Properties();
-        properties.put(PropertyKeyConst.SERVER_ADDR, serverAddr);
-        properties.put(PropertyKeyConst.USERNAME, "nacos");
-        properties.put(PropertyKeyConst.PASSWORD, "kwangnacos123");
-        ConfigService configService = NacosFactory.createConfigService(properties);
-        String content = configService.getConfig(dataId, group, 2000);
-        System.out.println(content);
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        System.out.println(encoder.encode("123456"));
+        System.out.println(encoder.encode("123456"));
+        System.out.println(encoder.encode("kwang123."));
     }
 
     @Test
