@@ -1,8 +1,6 @@
 package com.kwang.study.ware.controller;
 
-import com.kwang.study.auth.enums.ClassesRoleEnum;
-import com.kwang.study.auth.mapper.UserMapper;
-import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.*;
@@ -15,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
@@ -47,7 +44,7 @@ public class WareController {
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
-    private UserMapper userMapper;
+    private UserInfoUtils userInfoUtils;
 
     /**
      * 创建目录
@@ -55,7 +52,8 @@ public class WareController {
     @PostMapping("/create/directories")
     public ResponseEntity<R<VoidResult>> createDirectory(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         VoidResult voidResult = wareService.createDirectory(path);
         return build(voidResult);
@@ -68,7 +66,8 @@ public class WareController {
     public ResponseEntity<R<VoidResult>> uploadFile(@Valid UploadFileRequestDTO requestDTO,
                                                     @RequestParam("file") MultipartFile file) throws IOException {
         requestDTO.check();
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         try (InputStream input = file.getInputStream()) {
             VoidResult voidResult = wareService.createFile(requestDTO.getPath(),
@@ -81,7 +80,8 @@ public class WareController {
     @DeleteMapping("/delete/dir")
     public ResponseEntity<R<VoidResult>> deleteDireNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         VoidResult voidResult = wareService.deleteDirNode(path);
         return build(voidResult);
@@ -91,7 +91,8 @@ public class WareController {
     @DeleteMapping("/delete/file")
     public ResponseEntity<R<VoidResult>> deleteFileNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         VoidResult voidResult = wareService.deleteFileNode(path);
         return build(voidResult);
@@ -102,7 +103,8 @@ public class WareController {
     public ResponseEntity<R<VoidResult>> updateDireNode(@RequestParam("path") String path,
                                                         @RequestParam("newName") String newName) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         VoidResult voidResult = wareService.renameDirNode(path, newName);
         return build(voidResult);
@@ -112,7 +114,8 @@ public class WareController {
     @PostMapping("/update/file")
     public ResponseEntity<R<VoidResult>> updateFileNode(@Valid @RequestBody UpdateFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         VoidResult voidResult = wareService.renameFileNode(requestDTO.getPath(), requestDTO.getNewName());
         return build(voidResult);
@@ -162,7 +165,7 @@ public class WareController {
             return;
         }
         SecurityContextHolder.setContext(AuthenticationUserUtil
-                .newSecurityContext(downloadTokenDTO.getUsername()));
+                .newSecurityContext(downloadTokenDTO.getUsername(), downloadTokenDTO.getAuthorities()));
 
         wareService.downloadFile(path, mode, request, response);
     }
@@ -170,7 +173,8 @@ public class WareController {
     @PostMapping("/chunk/init")
     public ResponseEntity<R<InitMultiUploadResult>> initMultiUpload(@Valid @RequestBody InitUploadBigFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
-        Assert.isTrue(isTeacher(), "不是教师，非法操作");
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
+                "无权限");
 
         InitMultiUploadResult uploadResult = wareService.initMultiUpload(requestDTO.getPath(), requestDTO.getMimeTypeName());
         return build(uploadResult);
@@ -221,7 +225,7 @@ public class WareController {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
         String downloadId = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, new DownloadTokenDTO(path,
-                AuthenticationUserUtil.getCurrentUserName()), 30, TimeUnit.MINUTES);
+                AuthenticationUserUtil.getCurrentUserName(), AuthenticationUserUtil.getCurrentUserAuthorities()), 30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
     }
 
@@ -233,14 +237,5 @@ public class WareController {
         } else {
             return ResponseEntity.ok(R.success(baseResult));
         }
-    }
-
-    private boolean isTeacher() {
-        String userName = AuthenticationUserUtil.getCurrentUserName();
-        if (userName == null) return false;
-
-        User user = userMapper.findByUsernameWithClasses(userName);
-        String role = user.getClassMember().getRole();
-        return ClassesRoleEnum.TEACHER.getRole().equals(role);
     }
 }

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.organization.mapper.ClassMemberMapper">
+
+    <!-- 定义结果集映射，用于连接查询用户信息 -->
+    <resultMap id="ClassMemberWithUserResultMap" type="com.kwang.study.organization.pojo.ClassMember">
+        <id property="id" column="cm_id"/>
+        <result property="classId" column="cm_class_id"/>
+        <result property="userId" column="cm_user_id"/>
+        <result property="role" column="cm_role"/>
+        <result property="joinTime" column="cm_join_time"/>
+        <!-- 关联的用户对象 -->
+        <association property="user" javaType="com.kwang.study.auth.pojo.User">
+            <id property="id" column="u_id"/>
+            <result property="username" column="u_username"/>
+        </association>
+    </resultMap>
+
+    <!-- 批量插入班级成员 -->
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO class_members (class_id, user_id, `role`)
+        VALUES
+        <foreach collection="members" item="member" separator=",">
+            (#{member.classId}, #{member.userId}, #{member.role})
+        </foreach>
+    </insert>
+
+    <!-- 根据班级ID和用户ID列表批量删除成员 -->
+    <delete id="deleteByClassIdAndUserIds">
+        DELETE FROM class_members
+        WHERE class_id = #{classId} AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+    <!-- 根据班级ID删除所有成员 -->
+    <delete id="deleteByClassId">
+        DELETE FROM class_members WHERE class_id = #{classId}
+    </delete>
+
+    <!-- 查询班级所有成员的基础SQL片段 -->
+    <sql id="selectMembers">
+        SELECT
+            cm.id AS cm_id,
+            cm.class_id AS cm_class_id,
+            cm.user_id AS cm_user_id,
+            cm.role AS cm_role,
+            cm.join_time AS cm_join_time,
+            u.id AS u_id,
+            u.username AS u_username
+        FROM
+            class_members cm
+                JOIN
+            users u ON cm.user_id = u.id
+    </sql>
+
+    <!-- 查询指定班级的所有成员 -->
+    <select id="findMembersByClassId" resultMap="ClassMemberWithUserResultMap">
+        <include refid="selectMembers"/>
+        WHERE cm.class_id = #{classId}
+    </select>
+
+    <!-- 查询指定班级的所有学生 -->
+    <select id="findUsersByClassIdAndRole" resultMap="ClassMemberWithUserResultMap">
+        <include refid="selectMembers"/>
+        WHERE cm.class_id = #{classId} AND cm.role = #{role}
+    </select>
+
+    <!-- 查询单个班级成员 -->
+    <select id="findByClassIdAndUserId" resultType="com.kwang.study.organization.pojo.ClassMember">
+        SELECT id, class_id, user_id, `role`, join_time
+        FROM class_members
+        WHERE class_id = #{classId} AND user_id = #{userId}
+    </select>
+
+    <!-- 根据班级ID和用户ID列表查询成员 -->
+    <select id="findByClassIdAndUserIds" resultType="com.kwang.study.organization.pojo.ClassMember">
+        SELECT id, class_id, user_id, `role`, join_time
+        FROM class_members
+        WHERE class_id = #{classId} AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+
+    <select id="countMemberByClassId" resultType="long">
+        SELECT COUNT(*)
+        FROM class_members
+        WHERE class_id = #{classId}
+    </select>
+
+</mapper>

@@ -1,4 +1,4 @@
-package com.kwang.study.auth.enums;
+package com.kwang.study.organization.enums;
 
 import lombok.Getter;
 

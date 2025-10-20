@@ -1,5 +1,6 @@
 package com.kwang.study.auth.pojo;
 
+import com.kwang.study.organization.pojo.ClassMember;
 import lombok.Data;
 
 import java.util.List;

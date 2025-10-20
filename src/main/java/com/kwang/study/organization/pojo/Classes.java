@@ -1,4 +1,4 @@
-package com.kwang.study.auth.pojo;
+package com.kwang.study.organization.pojo;
 
 import lombok.Data;
 

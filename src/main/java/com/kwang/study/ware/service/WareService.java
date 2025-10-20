@@ -1,33 +1,24 @@
 package com.kwang.study.ware.service;
 
+import com.kwang.study.organization.service.ClassesService;
 import com.kwang.study.auth.mapper.UserMapper;
-import com.kwang.study.auth.pojo.Role;
+import com.kwang.study.organization.pojo.Classes;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.enums.FileStorageModuleNameEnum;
 import com.kwang.study.fs.dto.result.*;
 import com.kwang.study.fs.service.FileStorageService;
-import com.kwang.study.fs.util.TextMimeUtil;
 import com.kwang.study.utils.DownloadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
-
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_PARTIAL_CONTENT;
 
 @Service
 public class WareService {
@@ -35,6 +26,8 @@ public class WareService {
     private FileStorageService fsService;
     @Autowired
     private UserMapper userMapper;
+    @Autowired
+    private ClassesService classesService;
 
     @Transactional
     public VoidResult createDirectory(String path) throws IOException {
@@ -95,7 +88,16 @@ public class WareService {
     @Transactional
     public DirObjectResult listDirectoryDetailContents(String path) throws IOException {
         String actualPath = buildActualPath(path);
-        return fsService.getDirectoryObject(actualPath);
+        DirObjectResult result = fsService.getDirectoryObject(actualPath);
+        // 管理员，班级特殊处理规则，根路径
+        if (AuthenticationUserUtil.currentUserIsAdmin() && "/".equals(path)) {
+            for (DirObjectResult.FileObjectDesc desc : result.getFileObjectDescs()) {
+                Long classId = Long.parseLong(desc.getName());
+                Classes classes = classesService.getClassById(classId);
+                desc.setName(classes.getName());
+            }
+        }
+        return result;
     }
 
     /**
@@ -154,22 +156,16 @@ public class WareService {
         String userName = AuthenticationUserUtil.getCurrentUserName();
         User user = userMapper.findByUsernameWithClasses(userName);
         Assert.isTrue(user != null, "没有查找到该用户");
-        List<Role> roles = user.getRoles();
-        if (!CollectionUtils.isEmpty(roles)) {
-            for (Role role : roles) {
-                if ("ROLE_ADMIN".equals(role.getName())) {
-                    // 管理员能看见all
-                    return basePath.toString();
-                }
-            }
+        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            // 管理员能看见all
+            return basePath.toString();
         }
         // 其余只能看见本班级的内容
         Assert.isTrue(user.getClassMember() != null &&
                 user.getClassMember().getClasses() != null &&
                 user.getClassMember().getClasses().getName() != null, "用户无班级信息");
 
-        String classesName = user.getClassMember().getClasses().getName();
-        basePath.append('/').append(classesName);
+        basePath.append('/').append(user.getClassMember().getClasses().getId());
         return basePath.toString();
     }
 
@@ -179,6 +175,17 @@ public class WareService {
             path = "/" + path;
         if (path.endsWith("/"))
             path = path.substring(0, path.length() - 1);
+
+        // 管理员，班级特殊处理规则
+        if (AuthenticationUserUtil.currentUserIsAdmin() && !"/".equals(path)) {
+            String[] parts = path.split("/");
+            String className = parts[1];
+            Classes classes = classesService.getClassByName(className);
+            Assert.isTrue(classes != null, "路径无班级名称");
+
+            path = path.replaceFirst(className, classes.getId().toString());
+        }
+
         return basePath + path;
     }
 }

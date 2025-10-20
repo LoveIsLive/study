@@ -1,5 +1,6 @@
-package com.kwang.study.auth.pojo;
+package com.kwang.study.organization.pojo;
 
+import com.kwang.study.auth.pojo.User;
 import lombok.Data;
 
 import java.time.LocalDateTime;

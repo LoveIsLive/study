@@ -1,5 +1,8 @@
 package com.kwang.study.homework.service;
 
+import com.kwang.study.auth.mapper.UserMapper;
+import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.fs.dto.result.MimeTypeIdResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
@@ -10,6 +13,9 @@ import com.kwang.study.homework.mapper.AttachmentMapper;
 import com.kwang.study.homework.mapper.HomeworkMapper;
 import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
 import com.kwang.study.homework.service.async.AsyncCleanupFileObjService;
+import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.service.ClassMemberService;
+import com.kwang.study.organization.service.ClassesService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -47,6 +53,12 @@ public class HomeworkService {
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private ClassMemberService classMemberService;
+
+    @Autowired
+    private UserMapper userMapper;
 
     public static final String HOMEWORK_ATTACHMENT_OWNER_TYPE = "homework";
     public static final String SUBMISSION_ATTACHMENT_OWNER_TYPE = "submission";
@@ -224,17 +236,17 @@ public class HomeworkService {
     }
 
     /**
-     * 学生查看所有可做的作业列表
-     * TODO: 简易。后续去要将老师和学生对应起来
+     * 学生查看所有作业列表（即学生所在班级的所有作业列表）
      * @return 作业列表
      */
-    public List<HomeworkDetail> getAllHomeworksForStudent() {
-        return homeworkMapper.findAll();
+    @Transactional
+    public List<HomeworkDetail> getAllHomeworksForStudent(String username) {
+        User user = userMapper.findByUsernameWithClasses(username);
+        return this.getAllHomeworksInClass(user.getClassMember().getClassId());
     }
 
     /**
      * 教师删除作业
-     * TODO: 教师只能删除自己的作业，这里需要做一下权限校验
      * @param homeworkId 作业ID
      */
     @Transactional
@@ -276,6 +288,16 @@ public class HomeworkService {
         cleanupFileObjService.cleanup(filePathsToDelete);
     }
 
+    /**
+     * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
+     */
+    @Transactional
+    public List<HomeworkDetail> getAllHomeworksInClass(Long classId) {
+        return classMemberService.getTeachersInClass(classId)
+                .stream()
+                .flatMap(teacher -> this.getHomeworksByTeacher(teacher.getId()).stream())
+                .collect(Collectors.toList());
+    }
 
     // --- 私有辅助方法 ---
 

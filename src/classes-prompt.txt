@@ -1,0 +1,153 @@
+## 角色
+你是一名出色的前后端全栈程序员，你擅长Java 11, MySQL 8, Spring Boot 2, react框架等技术。
+现在在制作一个教学系统的用户组织模块和作业区模块。
+
+## 数据库表
+CREATE TABLE `users` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名',
+  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码（加密存储）',
+  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '账户是否启用',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表'
+
+CREATE TABLE `user_roles` (
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `role_id` int NOT NULL COMMENT '角色ID',
+  PRIMARY KEY (`user_id`,`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表'
+
+CREATE TABLE `roles` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '角色名 (例如 ROLE_TEACHER, ROLE_STUDENT)',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表'
+
+CREATE TABLE `classes` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '班级ID',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '班级名称',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级表'
+
+CREATE TABLE `class_members` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `class_id` bigint NOT NULL COMMENT '班级ID',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `role` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '在班级中的角色',
+  `join_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_class_user` (`class_id`,`user_id`),
+  KEY `fk_cm_user` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级成员及班内角色表'
+
+## 任务
+我需要你完成ClassesController文件(mapper已完成)和ClassMember的mapper(以及对应的xml文件), service, controller层。
+# ClassMember应该具有的功能有：
+1. 在某个班级添加成员（一个和批量）
+2. 删除某个班级的成员（一个和批量）
+3. 查询某个班级的所有学生
+4. 等，你认为可能需要添加的功能
+
+目前ClassesMapper文件内容为:
+package com.kwang.study.organization.mapper;
+@Mapper
+public interface ClassesMapper {
+    /**
+     * 查询所有班级信息
+     *
+     * @return 班级列表
+     */
+    List<Classes> findAll();
+
+    Classes findById(Long id);
+
+    Classes findByName(String name);
+
+    /**
+     * 新增一个班级
+     *
+     * @param classes 待新增的班级对象 (只需要name属性)
+     * @return 影响的行数, 成功应为1
+     */
+    int insert(Classes classes);
+
+    /**
+     * 修改一个班级的信息 (目前仅支持修改名称)
+     *
+     * @param classes 包含ID和新名称的班级对象
+     * @return 影响的行数, 成功应为1
+     */
+    int update(Classes classes);
+
+    /**
+     * 根据ID删除一个班级（目前只删除数据库行，不进行逻辑服务删除）
+     * @param id 要删除的班级ID
+     * @return 影响的行数, 成功应为1
+     */
+    int deleteById(Long id);
+}
+@Data
+public class Classes {
+    private Long id;
+    private String name;
+    private LocalDateTime createTime;
+    private LocalDateTime updateTime;
+    // 一个班级可以有多名成员
+    private List<ClassMember> members;
+}
+@Data
+public class ClassMember {
+    private Long id;
+    private Long classId;
+    private Long userId;
+    private String role;
+    private LocalDateTime joinTime;
+
+    // 关联的User对象
+    private User user;
+    // 关联的Classes对象
+    private Classes classes;
+}
+
+## 输出要求
+- ClassesController和ClassMember在同一个模块下，包名以com.kwang.study.organization开头。
+- 注释、描述等使用中文
+- 通用返回类型
+@Data
+public class R<T> implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private int code;
+    private String message;
+    private T data;
+
+    private R(int code, String message, T data) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
+    }
+
+    public static <T> R<T> success(T data) {
+        return new R<>(200, "Success", data);
+    }
+
+    public static <T> R<T> success(T data, String message) {
+        return new R<>(200, message, data);
+    }
+
+    public static <T> R<T> error(int code, String message) {
+        return new R<>(code, message, null);
+    }
+
+    public static <T> R<T> error(String message) {
+        return new R<>(500, message, null);
+    }
+}
+
+# 附录文件：可供参考的其他模块的Controller和service层，对于代码规范应该保持一致。

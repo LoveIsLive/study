@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.organization.mapper.ClassesMapper">
+
+    <!-- 基础映射：用于映射 `Classes` 实体类 -->
+    <resultMap id="BaseResultMap" type="com.kwang.study.organization.pojo.Classes">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <!-- 详细信息映射：用于映射 `ClassDetailDTO` -->
+    <!-- `extends="BaseResultMap"` 表示它继承了 `Classes` 实体的所有基础映射，只需定义额外的属性即可。 -->
+    <resultMap id="DetailResultMap" type="com.kwang.study.organization.dto.result.ClassDetailDTO"
+               extends="BaseResultMap">
+        <result property="memberCount" column="memberCount"/>
+    </resultMap>
+
+
+    <!-- ===================================================================== -->
+    <!-- ========================= 基本信息查询 =============================== -->
+    <!-- ===================================================================== -->
+
+    <select id="findAll" resultMap="BaseResultMap">
+        SELECT
+            id, name, create_time, update_time
+        FROM
+            classes
+        ORDER BY
+            id ASC
+    </select>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT
+            id, name, create_time, update_time
+        FROM
+            classes
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultMap="BaseResultMap">
+        SELECT
+            id, name, create_time, update_time
+        FROM
+            classes
+        WHERE `name` = #{name}
+    </select>
+
+    <select id="matchByName" resultMap="BaseResultMap">
+        SELECT
+            id, name, create_time, update_time
+        FROM
+            classes
+        WHERE `name` LIKE CONCAT('%', #{key}, '%')
+    </select>
+
+
+    <!-- ===================================================================== -->
+    <!-- ========================= 详细信息查询 =============================== -->
+    <!-- ===================================================================== -->
+    <!--
+        所有详细信息查询都使用 LEFT JOIN 关联 class_members 表，
+        并通过 COUNT(cm.id) 计算成员数量。
+        使用 GROUP BY 对班级进行分组，确保每个班级只返回一行记录。
+    -->
+
+    <select id="findAllDetail" resultMap="DetailResultMap">
+        SELECT
+            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+        FROM
+            classes c
+                LEFT JOIN
+            class_members cm ON c.id = cm.class_id
+        GROUP BY
+            c.id, c.name, c.create_time, c.update_time
+        ORDER BY
+            c.id ASC
+    </select>
+
+    <select id="findClassDetailById" resultMap="DetailResultMap">
+        SELECT
+            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+        FROM
+            classes c
+                LEFT JOIN
+            class_members cm ON c.id = cm.class_id
+        WHERE
+            c.id = #{id}
+        GROUP BY
+            c.id, c.name, c.create_time, c.update_time
+    </select>
+
+    <select id="findClassDetailByName" resultMap="DetailResultMap">
+        SELECT
+            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+        FROM
+            classes c
+                LEFT JOIN
+            class_members cm ON c.id = cm.class_id
+        WHERE
+            c.name = #{name}
+        GROUP BY
+            c.id, c.name, c.create_time, c.update_time
+    </select>
+
+    <select id="matchClassDetailByName" resultMap="DetailResultMap">
+        SELECT
+            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+        FROM
+            classes c
+                LEFT JOIN
+            class_members cm ON c.id = cm.class_id
+        WHERE
+            c.name LIKE CONCAT('%', #{key}, '%')
+        GROUP BY
+            c.id, c.name, c.create_time, c.update_time
+        ORDER BY
+            c.id ASC
+    </select>
+
+
+    <!-- ===================================================================== -->
+    <!-- ============================ 写操作 ================================== -->
+    <!-- ===================================================================== -->
+
+    <!--
+        - useGeneratedKeys="true": 启用主键自动生成。
+        - keyProperty="id": 将数据库生成的主键值回填到传入的Java对象的id属性中。
+    -->
+    <insert id="insert" parameterType="com.kwang.study.organization.pojo.Classes" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO classes (name, create_time, update_time)
+        VALUES (#{name}, NOW(), NOW())
+    </insert>
+
+    <!--
+        根据ID更新班级的名称。
+        `update_time` 字段由数据库的 ON UPDATE CURRENT_TIMESTAMP 自动更新。
+    -->
+    <update id="update" parameterType="com.kwang.study.organization.pojo.Classes">
+        UPDATE
+            classes
+        SET
+            name = #{name}
+        WHERE
+            id = #{id}
+    </update>
+
+    <!-- 根据主键ID删除一条班级记录。 -->
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM
+            classes
+        WHERE
+            id = #{id}
+    </delete>
+
+</mapper>

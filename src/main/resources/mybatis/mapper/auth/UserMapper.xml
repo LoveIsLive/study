@@ -37,7 +37,7 @@
 
         <!-- 3. 关联查询用户的班级成员信息 (ClassMember) -->
         <!-- 如果用户没有班级, LEFT JOIN的结果为NULL, MyBatis会自动将classMember属性赋为null -->
-        <association property="classMember" javaType="com.kwang.study.auth.pojo.ClassMember">
+        <association property="classMember" javaType="com.kwang.study.organization.pojo.ClassMember">
             <id property="id" column="cm_id"/>
             <result property="userId" column="user_id"/>
             <result property="classId" column="class_id"/>
@@ -46,7 +46,7 @@
 
             <!-- 4. 在ClassMember内部, 嵌套关联班级信息 (Classes) -->
             <!-- 这里只映射ID和name, 满足你的需求 -->
-            <association property="classes" javaType="com.kwang.study.auth.pojo.Classes">
+            <association property="classes" javaType="com.kwang.study.organization.pojo.Classes">
                 <id property="id" column="class_id"/>
                 <result property="name" column="class_name"/>
             </association>
