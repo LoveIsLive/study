@@ -170,12 +170,6 @@ public class WareService {
     }
 
     private String buildActualPath(String path) {
-        String basePath = buildBasePath();
-        if (!path.startsWith("/"))
-            path = "/" + path;
-        if (path.endsWith("/"))
-            path = path.substring(0, path.length() - 1);
-
         // 管理员，班级特殊处理规则
         if (AuthenticationUserUtil.currentUserIsAdmin() && !"/".equals(path)) {
             String[] parts = path.split("/");
@@ -185,6 +179,12 @@ public class WareService {
 
             path = path.replaceFirst(className, classes.getId().toString());
         }
+
+        String basePath = buildBasePath();
+        if (!path.startsWith("/"))
+            path = "/" + path;
+        if (path.endsWith("/"))
+            path = path.substring(0, path.length() - 1);
 
         return basePath + path;
     }

@@ -8,6 +8,7 @@ public class ApiPrefixConstant {
     public static final String WARE_BASE_PREFIX = API_BASE_PREFIX + "/ware";
 
     public static final String AUTH_BASE_PREFIX = API_BASE_PREFIX + "/auth";
+    public static final String USER_BASE_PREFIX = API_BASE_PREFIX + "/user";
 
     public static final String HOMEWORK_BASE_PREFIX = API_BASE_PREFIX + "/homework";
 

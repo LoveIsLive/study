@@ -26,7 +26,7 @@ public class WareInitModule implements ApplicationRunner {
         try {
             fileStorageService.createDirectory(FileStorageModuleNameEnum.WARE_NAME.getModuleName());
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.warn(e.getMessage());
         }
 
         // 2. 创建所有班级目录
@@ -37,7 +37,7 @@ public class WareInitModule implements ApplicationRunner {
                 fileStorageService.createDirectory(FileStorageModuleNameEnum.WARE_NAME
                         .getModuleName() + "/" + classes.getId());
             } catch (Exception e) {
-                log.error(e.getMessage());
+                log.warn(e.getMessage());
             }
         }
     }

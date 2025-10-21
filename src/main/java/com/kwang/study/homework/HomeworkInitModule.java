@@ -27,7 +27,7 @@ public class HomeworkInitModule implements ApplicationRunner {
         try {
             fileStorageService.createDirectory(FileStorageModuleNameEnum.HOMEWORK_NAME.getModuleName());
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.warn(e.getMessage());
         }
 
         // 2. 创建所有班级目录
@@ -38,7 +38,7 @@ public class HomeworkInitModule implements ApplicationRunner {
                 fileStorageService.createDirectory(FileStorageModuleNameEnum.HOMEWORK_NAME
                         .getModuleName() + "/" + classes.getId());
             } catch (Exception e) {
-                log.error(e.getMessage());
+                log.warn(e.getMessage());
             }
         }
     }

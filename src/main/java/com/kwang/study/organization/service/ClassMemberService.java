@@ -1,5 +1,8 @@
 package com.kwang.study.organization.service;
 
+import com.kwang.study.auth.constant.AuthConstant;
+import com.kwang.study.auth.mapper.UserMapper;
+import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
@@ -10,11 +13,13 @@ import com.kwang.study.organization.pojo.Classes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +30,8 @@ public class ClassMemberService {
 
     private final ClassMemberMapper classMemberMapper;
     private final ClassesMapper classesMapper;
+    private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 向班级中批量添加成员
@@ -37,28 +44,22 @@ public class ClassMemberService {
         Classes existingClass = classesMapper.findById(classId);
         Assert.notNull(existingClass, "班级不存在，ID: " + classId);
 
-        // 2. 过滤掉已经存在的成员，防止重复添加
-        List<Long> userIdsToAdd = dto.getUserIds();
-        if (CollectionUtils.isEmpty(userIdsToAdd)) {
-            return;
-        }
-        List<ClassMember> existingMembers = classMemberMapper.findByClassIdAndUserIds(classId, userIdsToAdd);
-        if (!CollectionUtils.isEmpty(existingMembers)) {
-            List<Long> existingUserIds = existingMembers.stream().map(ClassMember::getUserId).collect(Collectors.toList());
-            userIdsToAdd.removeAll(existingUserIds);
-        }
+        // 先创建用户
+        ArrayList<User> newUsers = new ArrayList<>(dto.getUserNames().size());
+        dto.getUserNames().forEach(userName -> {
+            User user = new User();
+            user.setUsername(userName);
+            user.setPassword(passwordEncoder.encode(AuthConstant.DEFAULT_PASSWORD));
+            user.setEnabled(true);
+            userMapper.insertUser(user);
+            userMapper.insertUserRoleByName(user.getId(), dto.getRole());
+            newUsers.add(user);
+        });
 
-        // 3. 如果没有需要添加的新成员，直接返回
-        if (CollectionUtils.isEmpty(userIdsToAdd)) {
-            log.warn("没有新的成员需要添加到班级 {}", classId);
-            return;
-        }
-
-        // 4. 构建成员对象并批量插入
-        List<ClassMember> newMembers = userIdsToAdd.stream().map(userId -> {
+        List<ClassMember> newMembers = newUsers.stream().map(user -> {
             ClassMember member = new ClassMember();
             member.setClassId(classId);
-            member.setUserId(userId);
+            member.setUserId(user.getId());
             member.setRole(dto.getRole());
             return member;
         }).collect(Collectors.toList());
@@ -77,6 +78,7 @@ public class ClassMemberService {
         Assert.notEmpty(userIds, "用户ID列表不能为空");
 
         int affectedRows = classMemberMapper.deleteByClassIdAndUserIds(classId, userIds);
+        // TODO: 删除用户，复杂操作。
         log.info("从班级 {} 尝试删除 {} 名成员，实际删除 {} 名", classId, userIds.size(), affectedRows);
     }
 

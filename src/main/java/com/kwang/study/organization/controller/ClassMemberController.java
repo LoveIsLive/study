@@ -1,6 +1,7 @@
 package com.kwang.study.organization.controller;
 
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
+import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.common.R;
 import com.kwang.study.constant.ApiPrefixConstant;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
@@ -19,7 +20,6 @@ import javax.validation.Valid;
 import java.util.List;
 
 
-
 @RestController
 @RequestMapping(ApiPrefixConstant.CLASSMEMBER_BASE_PREFIX + "/{classId}")
 @RequiredArgsConstructor
@@ -27,6 +27,7 @@ import java.util.List;
 public class ClassMemberController {
 
     private final ClassMemberService classMemberService;
+    private final UserInfoUtils userInfoUtils;
 
     /**
      * 向班级中批量添加成员
@@ -36,7 +37,7 @@ public class ClassMemberController {
      */
     @PostMapping("/add")
     public ResponseEntity<R<Void>> addMembers(@PathVariable Long classId, @Valid @RequestBody ClassMemberAddDTO dto) {
-        if (!AuthenticationUserUtil.currentUserIsAdmin())
+        if (!(AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.currentUserInClassIsTeacher()))
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
 
         classMemberService.addMembers(classId, dto);
@@ -51,7 +52,7 @@ public class ClassMemberController {
      */
     @DeleteMapping("/remove")
     public ResponseEntity<R<Void>> removeMembers(@PathVariable Long classId, @Valid @RequestBody ClassMemberDeleteDTO dto) {
-        if (!AuthenticationUserUtil.currentUserIsAdmin())
+        if (!(AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.currentUserInClassIsTeacher()))
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
 
         classMemberService.removeMembers(classId, dto.getUserIds());
@@ -86,7 +87,7 @@ public class ClassMemberController {
      * @return 成员数量
      */
     @GetMapping("/count")
-    public ResponseEntity<R<Long>> countMemberByClassId(Long classId) {
+    public ResponseEntity<R<Long>> countMemberByClassId(@PathVariable Long classId) {
         Long count = classMemberService.countMemberByClassId(classId);
         return ResponseEntity.ok(R.success(count));
     }

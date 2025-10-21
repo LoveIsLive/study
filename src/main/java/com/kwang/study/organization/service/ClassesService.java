@@ -1,5 +1,7 @@
 package com.kwang.study.organization.service;
 
+import com.kwang.study.enums.FileStorageModuleNameEnum;
+import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.organization.dto.request.ClassCreateDTO;
 import com.kwang.study.organization.dto.result.ClassDetailDTO;
 import com.kwang.study.organization.mapper.ClassesMapper;
@@ -10,7 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 班级管理服务层
@@ -21,6 +26,7 @@ import java.util.List;
 public class ClassesService {
 
     private final ClassesMapper classesMapper;
+    private final FileStorageService fileStorageService;
 
     /**
      * 创建一个新班级
@@ -36,6 +42,29 @@ public class ClassesService {
         newClass.setName(dto.getName());
 
         classesMapper.insert(newClass);
+
+        List<String> dirs = Arrays.stream(FileStorageModuleNameEnum.values())
+                .map(m -> m.getModuleName() + "/" + newClass.getId())
+                .collect(Collectors.toList());
+        boolean batchSuccess = true;
+        for (String dir : dirs) {
+            try {
+                fileStorageService.createDirectory(dir);
+            } catch (IOException e) {
+                batchSuccess = false;
+            }
+        }
+        if (!batchSuccess) {
+            for (String dir : dirs) {
+                try {
+                    fileStorageService.deleteDirObject(dir);
+                } catch (IOException e) {
+                    // no-op
+                }
+            }
+            throw new IllegalStateException("创建班级，模块目录创建失败");
+        }
+
         log.info("创建班级成功: id={}, name={}", newClass.getId(), newClass.getName());
         return newClass;
     }

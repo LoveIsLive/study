@@ -45,10 +45,11 @@
             <result property="joinTime" column="join_time"/>
 
             <!-- 4. 在ClassMember内部, 嵌套关联班级信息 (Classes) -->
-            <!-- 这里只映射ID和name, 满足你的需求 -->
             <association property="classes" javaType="com.kwang.study.organization.pojo.Classes">
                 <id property="id" column="class_id"/>
                 <result property="name" column="class_name"/>
+                <result property="createTime" column="class_createTime" />
+                <result property="updateTime" column="class_updateTime" />
             </association>
         </association>
 
@@ -72,7 +73,9 @@
             cm.role AS cm_role,
             cm.join_time,
             c.id AS class_id,
-            c.name AS class_name
+            c.name AS class_name,
+            c.create_time AS class_create_time,
+            c.update_time AS class_update_time
         FROM
             users u
                 LEFT JOIN
@@ -82,5 +85,55 @@
         WHERE
             u.username = #{username}
     </select>
+
+
+
+    <!-- 1. 添加用户 -->
+    <insert id="insertUser" parameterType="com.kwang.study.auth.pojo.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (username, password, enabled)
+        VALUES (#{username}, #{password}, #{enabled})
+    </insert>
+
+    <!-- 2. 修改用户信息 (动态SQL) -->
+    <update id="updateUser" parameterType="com.kwang.study.auth.pojo.User">
+        UPDATE users
+        <set>
+            <if test="password != null and password != ''">
+                password = #{password},
+            </if>
+            <if test="enabled != null">
+                enabled = #{enabled},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 3. 删除用户 -->
+    <delete id="deleteUser" parameterType="long">
+        DELETE
+        FROM users
+        WHERE id = #{userId}
+    </delete>
+
+    <!-- 4. 为用户分配角色 -->
+    <insert id="insertUserRoleByName">
+        INSERT INTO user_roles (user_id, role_id)
+        VALUES (#{userId}, (SELECT id FROM roles WHERE name = #{roleName}))
+    </insert>
+
+    <!-- 5. 删除用户的所有角色 -->
+    <delete id="deleteRolesByUserId" parameterType="long">
+        DELETE
+        FROM user_roles
+        WHERE user_id = #{userId}
+    </delete>
+
+    <!-- 6. 删除用户的指定角色 -->
+    <delete id="deleteUserRoleByName">
+        DELETE
+        FROM user_roles
+        WHERE user_id = #{userId}
+          AND role_id = (SELECT id FROM roles WHERE name = #{roleName})
+    </delete>
 
 </mapper>
