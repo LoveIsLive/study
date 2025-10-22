@@ -10,7 +10,7 @@ public class User {
     private Long id;
     private String username;
     private String password;
-    private boolean enabled;
+    private Boolean enabled;
     private List<Role> roles;
 
     // 目前一个用户只能有一个班级
