@@ -295,7 +295,7 @@ public class HomeworkService {
     public List<HomeworkDetail> getAllHomeworksInClass(Long classId) {
         return classMemberService.getTeachersInClass(classId)
                 .stream()
-                .flatMap(teacher -> this.getHomeworksByTeacher(teacher.getId()).stream())
+                .flatMap(teacher -> this.getHomeworksByTeacher(teacher.getUserId()).stream())
                 .collect(Collectors.toList());
     }
 

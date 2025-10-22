@@ -1,14 +1,10 @@
 package com.kwang.study.auth.controller;
 
-import com.kwang.study.auth.dto.LoginRequestDTO;
-import com.kwang.study.auth.pojo.User;
-import com.kwang.study.auth.utils.AuthenticationUserUtil;
-import com.kwang.study.auth.utils.UserInfoUtils;
+import com.kwang.study.auth.dto.request.LoginRequestDTO;
 import com.kwang.study.common.R;
 import com.kwang.study.auth.component.JwtUtil;
 import com.kwang.study.auth.service.LoginAttemptService;
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

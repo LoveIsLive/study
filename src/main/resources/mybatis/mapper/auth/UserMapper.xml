@@ -15,6 +15,10 @@
                     select="findRolesByUserId" column="id"/>
     </resultMap>
 
+    <select id="findById" parameterType="long" resultMap="UserWithRolesMap">
+        SELECT u.* FROM users u WHERE u.id = #{id}
+    </select>
+
     <!-- 根据用户名查询用户 -->
     <select id="findByUsername" parameterType="string" resultMap="UserWithRolesMap">
         SELECT u.* FROM users u WHERE u.username = #{username}

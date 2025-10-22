@@ -1,4 +1,4 @@
-package com.kwang.study.auth.dto;
+package com.kwang.study.auth.dto.request;
 
 
 import com.kwang.study.dto.BaseRequestDTO;

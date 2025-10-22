@@ -9,6 +9,8 @@ import java.util.List;
 
 @Mapper
 public interface UserMapper {
+    User findById(@Param("id") Long id);
+
     User findByUsername(String username);
 
     User findByUsernameWithClasses(String username);
