@@ -34,3 +34,4 @@ build/
 
 filedata/
 logs/
+src/main/resources/static/

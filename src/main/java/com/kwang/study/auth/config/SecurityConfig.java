@@ -36,21 +36,23 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 允许各个模块的入口访问、登录接口，以及所有的静态资源
                         .antMatchers(AUTH_BASE_PREFIX + "/login",
-                                "/auth/**",
-                                "/ware/**",
-                                "/homework/**",
                                 "/",
-                                STATIC_BASE_PREFIX + "/**",
-                                "/favicon.ico"
+                                "/index.html",
+                                "/favicon.ico",
+                                "/assets/**",
+                                "/webfonts/**"
                                 ).permitAll()
                         // 特殊端点
                         .antMatchers(
                                 WARE_BASE_PREFIX + "/home/download",
                                 ATTACHE_DOWNLOAD_BASE_PREFIX + "/download"
                         ).permitAll()
-                        // 允许websocket握手阶段
+                        // 允许websocket握手请求
                         .antMatchers("/ws/search/**").permitAll()
-                        .anyRequest().authenticated()
+                        // API请求被保护
+                        .antMatchers("/api/**").authenticated()
+                        // 非API请求
+                        .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态session
                 .authenticationProvider(authenticationProvider())

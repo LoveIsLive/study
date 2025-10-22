@@ -321,8 +321,8 @@ public class HomeworkService {
 
                 String contentType = file.getContentType();
                 MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(contentType);
-                Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
-                        "Mime type not found: " + contentType);
+                Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()) &&
+                        mimeTypeId.getMimeTypeId() != null, "Mime type not found: " + contentType);
 
                 // 调用文件存储服务上传文件
                 fileStorageService.createFile(filePath, inputStream, contentType);
