@@ -3,6 +3,7 @@ package com.kwang.study.homework.controller;
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.FileObjectResult;
 import com.kwang.study.fs.service.FileStorageService;
+import com.kwang.study.homework.dto.result.DownloadDTO;
 import com.kwang.study.utils.DownloadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -34,9 +35,11 @@ public class FileDownloadController {
     private RedisTemplate<String, Object> redisTemplate;
 
     @GetMapping("/get/downloadId")
-    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path) {
+    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
+                                                         @NotBlank @RequestParam("fileName") String fileName) {
         String downloadId = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, path, 30, TimeUnit.MINUTES);
+        DownloadDTO dto = new DownloadDTO(path, fileName);
+        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, dto, 30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
     }
 
@@ -46,8 +49,8 @@ public class FileDownloadController {
                              @RequestParam(name = "mode", defaultValue = "attachment") String mode,
                              @NotBlank @RequestParam("token") String token,
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String tokenPath = (String) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
-        if (!Objects.equals(path, tokenPath)) {
+        DownloadDTO dto = (DownloadDTO) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
+        if (dto == null || !Objects.equals(path, dto.getActualPath())) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.getWriter().print("没有权限");
             response.setContentType("text/plain; charset=UTF-8");
@@ -55,7 +58,7 @@ public class FileDownloadController {
         }
 
         FileObjectResult fileObject = fileStorageService.getFileObject(path);
-
+        fileObject.setName(dto.getFileName());
         DownloadUtils.downloadFile(fileObject, mode, request, response);
     }
 }

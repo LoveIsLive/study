@@ -54,4 +54,19 @@
         DELETE FROM homework WHERE id = #{id}
     </delete>
 
+    <update id="updateById" parameterType="com.kwang.study.homework.pojo.Homework">
+        UPDATE
+        homework
+        <set>
+            <if test="title != null">
+                title = #{title},
+            </if>
+            <if test="content != null">
+                content = #{content},
+            </if>
+        </set>
+        WHERE
+        id = #{id}
+    </update>
+
 </mapper>

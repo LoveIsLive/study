@@ -14,11 +14,31 @@
         </foreach>
     </insert>
 
+    <delete id="deleteBatchIds" parameterType="java.util.List">
+        DELETE FROM
+        attachment
+        WHERE
+        id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <select id="findByOwner" resultType="com.kwang.study.homework.pojo.AttachmentDetail">
         SELECT <include refid="JOIN_Base_Column_List" />, mt.name AS mime_type_name
         FROM attachment AS att
         LEFT JOIN mime_types mt ON att.mime_type_id = mt.id
         WHERE owner_id = #{ownerId} AND owner_type = #{ownerType}
+    </select>
+
+    <select id="findByIds" resultType="com.kwang.study.homework.pojo.AttachmentDetail">
+        SELECT <include refid="JOIN_Base_Column_List" />, mt.name AS mime_type_name
+        FROM attachment AS att
+        LEFT JOIN mime_types mt ON att.mime_type_id = mt.id
+        WHERE att.id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </select>
 
     <delete id="deleteByOwner">

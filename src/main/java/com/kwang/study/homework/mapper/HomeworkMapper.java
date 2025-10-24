@@ -19,4 +19,6 @@ public interface HomeworkMapper {
     List<HomeworkDetail> findAll();
 
     int deleteById(@Param("id") Long id);
+
+    int updateById(Homework homework);
 }

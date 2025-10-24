@@ -9,9 +9,13 @@ import java.util.List;
 @Mapper
 public interface AttachmentMapper {
 
-    void batchInsert(@Param("attachments") List<Attachment> attachments);
+    int batchInsert(@Param("attachments") List<Attachment> attachments);
+
+    int deleteBatchIds(@Param("ids") List<Long> ids);
 
     List<AttachmentDetail> findByOwner(@Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
+
+    List<AttachmentDetail> findByIds(@Param("ids") List<Long> ids);
 
     int deleteByOwner(@Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
 

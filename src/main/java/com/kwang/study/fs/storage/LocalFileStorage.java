@@ -18,7 +18,7 @@ public class LocalFileStorage implements FileStorage {
 
     public LocalFileStorage(Path dir) throws IOException {
         if (!Files.exists(dir)) {
-            Files.createDirectory(dir);
+            Files.createDirectories(dir);
         } else if (!Files.isDirectory(dir)) {
             throw new IllegalArgumentException("指定的路径不是目录");
         }

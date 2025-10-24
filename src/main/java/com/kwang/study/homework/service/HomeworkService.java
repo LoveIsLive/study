@@ -6,6 +6,7 @@ import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.fs.dto.result.MimeTypeIdResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
+import com.kwang.study.homework.dto.request.HomeworkUpdateDTO;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
 import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
 import com.kwang.study.homework.pojo.*;
@@ -81,49 +82,41 @@ public class HomeworkService {
         homework.setContent(dto.getContent());
         homeworkMapper.insert(homework);
 
-        List<Attachment> attachmentList = new ArrayList<>();
-        // 2. 处理小附件
-        if (!CollectionUtils.isEmpty(smallFiles)) {
-            List<Attachment> attachments = uploadAndBuildAttachments(
-                    smallFiles,
-                    homework.getId(),
-                    HOMEWORK_ATTACHMENT_OWNER_TYPE,
-                    dto.getTeacherId()
-            );
-            attachmentList.addAll(attachments);
-        }
-
-        // 大附件处理
-        List<String> attachmentIds = dto.getAttachmentUploadIds();
-        if (!CollectionUtils.isEmpty(attachmentIds)) {
-            List<Attachment> attachments = attachmentIds.stream()
-                    .map(uploadId -> {
-                        UploadInfoRedisDTO uploadInfo = (UploadInfoRedisDTO) redisTemplate.opsForValue()
-                                .get(UPLOAD_ID_PREFIX + uploadId);
-                        // Note: 忽略为空的
-                        if (uploadInfo == null) return null;
-                        MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(uploadInfo.getMimeTypeName());
-                        Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
-                                "Mime type not found: " + uploadInfo.getMimeTypeName());
-                        return Attachment.builder()
-                                .ownerId(homework.getId())
-                                .ownerType(HOMEWORK_ATTACHMENT_OWNER_TYPE)
-                                .fileName(uploadInfo.getFileName())
-                                .filePath(uploadInfo.getFilePath())
-                                .fileSize(uploadInfo.getFileSize())
-                                .mimeTypeId(mimeTypeId.getMimeTypeId())
-                                .uploaderId(dto.getTeacherId())
-                                .build();
-                    }).filter(Objects::nonNull).collect(Collectors.toList());
-            attachmentList.addAll(attachments);
-        }
-
-        if (!CollectionUtils.isEmpty(attachmentList)) {
-            attachmentMapper.batchInsert(attachmentList);
-        }
+        handleAttachment(homework.getId(), dto, smallFiles);
 
         // 4. 返回完整的作业信息 (包含附件)
         return homeworkMapper.findById(homework.getId());
+    }
+
+    @Transactional
+    public HomeworkDetail updateHomework(Long homeworkId, HomeworkUpdateDTO dto, List<MultipartFile> smallFiles) throws IOException {
+        // 1. 更新作业主体信息
+        Homework homeworkToUpdate = new Homework();
+        homeworkToUpdate.setId(homeworkId);
+        homeworkToUpdate.setTitle(dto.getTitle());
+        homeworkToUpdate.setContent(dto.getContent());
+        int i = homeworkMapper.updateById(homeworkToUpdate);
+        Assert.isTrue(i > 0, "更新作业失败");
+
+        // 2. 处理要删除的旧附件
+        if (!CollectionUtils.isEmpty(dto.getAttachmentIdsToDelete())) {
+            // 2.1 查找要删除的附件信息，以获取文件路径用于物理删除
+            List<AttachmentDetail> attachmentsToDelete = attachmentMapper.findByIds(dto.getAttachmentIdsToDelete());
+            List<String> filePathsToDelete = attachmentsToDelete.stream()
+                    .map(AttachmentDetail::getFilePath)
+                    .collect(Collectors.toList());
+
+            // 2.2 从数据库中删除附件记录
+            attachmentMapper.deleteBatchIds(dto.getAttachmentIdsToDelete());
+
+            // 2.3 异步删除物理文件
+            cleanupFileObjService.cleanup(filePathsToDelete);
+        }
+
+        handleAttachment(homeworkId, dto, smallFiles);
+
+        // 7. 返回更新后完整的作业信息
+        return homeworkMapper.findById(homeworkId);
     }
 
     /**
@@ -341,6 +334,49 @@ public class HomeworkService {
             }
         }
         return attachments;
+    }
+
+    private void handleAttachment(Long homeworkId, HomeworkCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
+        List<Attachment> attachmentList = new ArrayList<>();
+        // 2. 处理小附件
+        if (!CollectionUtils.isEmpty(smallFiles)) {
+            List<Attachment> attachments = uploadAndBuildAttachments(
+                    smallFiles,
+                    homeworkId,
+                    HOMEWORK_ATTACHMENT_OWNER_TYPE,
+                    dto.getTeacherId()
+            );
+            attachmentList.addAll(attachments);
+        }
+
+        // 大附件处理
+        List<String> attachmentIds = dto.getAttachmentUploadIds();
+        if (!CollectionUtils.isEmpty(attachmentIds)) {
+            List<Attachment> attachments = attachmentIds.stream()
+                    .map(uploadId -> {
+                        UploadInfoRedisDTO uploadInfo = (UploadInfoRedisDTO) redisTemplate.opsForValue()
+                                .get(UPLOAD_ID_PREFIX + uploadId);
+                        // Note: 忽略为空的
+                        if (uploadInfo == null) return null;
+                        MimeTypeIdResult mimeTypeId = fileStorageService.getMimeTypeId(uploadInfo.getMimeTypeName());
+                        Assert.isTrue(mimeTypeId != null && Boolean.TRUE.equals(mimeTypeId.getSuccess()),
+                                "Mime type not found: " + uploadInfo.getMimeTypeName());
+                        return Attachment.builder()
+                                .ownerId(homeworkId)
+                                .ownerType(HOMEWORK_ATTACHMENT_OWNER_TYPE)
+                                .fileName(uploadInfo.getFileName())
+                                .filePath(uploadInfo.getFilePath())
+                                .fileSize(uploadInfo.getFileSize())
+                                .mimeTypeId(mimeTypeId.getMimeTypeId())
+                                .uploaderId(dto.getTeacherId())
+                                .build();
+                    }).filter(Objects::nonNull).collect(Collectors.toList());
+            attachmentList.addAll(attachments);
+        }
+
+        if (!CollectionUtils.isEmpty(attachmentList)) {
+            attachmentMapper.batchInsert(attachmentList);
+        }
     }
 
     public static String produceAttachPath(String fileName) {

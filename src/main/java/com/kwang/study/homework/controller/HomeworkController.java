@@ -4,6 +4,7 @@ import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
+import com.kwang.study.homework.dto.request.HomeworkUpdateDTO;
 import com.kwang.study.homework.pojo.HomeworkDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,21 @@ public class HomeworkController {
         dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
         HomeworkDetail createdHomework = homeworkService.createHomework(dto, smallFiles);
         return ResponseEntity.ok(R.success(createdHomework));
+    }
+
+    @PutMapping("/{homeworkId}")
+    public ResponseEntity<R<HomeworkDetail>> updateHomework(
+            @PathVariable Long homeworkId,
+            @Valid @RequestPart("dto") HomeworkUpdateDTO dto,
+            @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
+        if (!(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin()))
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+
+        // 获取认证身份
+        dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
+
+        HomeworkDetail updatedHomework = homeworkService.updateHomework(homeworkId, dto, smallFiles);
+        return ResponseEntity.ok(R.success(updatedHomework, "作业修改成功"));
     }
 
     /**
