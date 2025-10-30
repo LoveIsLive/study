@@ -39,7 +39,7 @@
         SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
-        ORDER BY create_time DESC
+        ORDER BY update_time DESC
     </select>
 
     <select id="findAllByTeacherId" resultMap="HomeworkDetailResultMap">
@@ -47,7 +47,7 @@
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
         WHERE h.teacher_id = #{teacherId}
-        ORDER BY create_time DESC
+        ORDER BY update_time DESC
     </select>
 
     <delete id="deleteById">

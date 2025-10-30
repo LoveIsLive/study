@@ -4,6 +4,8 @@ package com.kwang.study.homework.controller;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.common.R;
+import com.kwang.study.homework.dto.request.HomeworkSubmissionUpdateDTO;
+import com.kwang.study.homework.dto.request.HomeworkUpdateDTO;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
 import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.pojo.HomeworkDetail;
@@ -50,6 +52,21 @@ public class SubmissionController {
         dto.setStudentId(AuthenticationUserUtil.getCurrentUserId());
         HomeworkSubmissionDetail submission = homeworkService.createSubmission(dto, files);
         return ResponseEntity.ok(R.success(submission));
+    }
+
+    @PutMapping("/{homeworkSubmissionId}")
+    public ResponseEntity<R<HomeworkSubmissionDetail>> updateHomework(
+            @PathVariable Long homeworkSubmissionId,
+            @Valid @RequestPart("dto") HomeworkSubmissionUpdateDTO dto,
+            @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
+        if (!userInfoUtils.currentUserInClassIsStudent())
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+
+        // 获取认证身份
+        dto.setStudentId(AuthenticationUserUtil.getCurrentUserId());
+
+        HomeworkSubmissionDetail updatedHomework = homeworkService.updateHomeworkSubmission(homeworkSubmissionId, dto, smallFiles);
+        return ResponseEntity.ok(R.success(updatedHomework, "作业提交修改成功"));
     }
 
     /**

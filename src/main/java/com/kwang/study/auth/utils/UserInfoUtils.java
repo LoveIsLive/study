@@ -20,6 +20,15 @@ public class UserInfoUtils {
         return ClassesRoleEnum.TEACHER.getRole().equals(role);
     }
 
+    public boolean currentUserInClassIsStudent() {
+        String userName = AuthenticationUserUtil.getCurrentUserName();
+        if (userName == null) return false;
+
+        User user = userMapper.findByUsernameWithClasses(userName);
+        String role = user.getClassMember().getRole();
+        return ClassesRoleEnum.STUDENT.getRole().equals(role);
+    }
+
     public User getCurrentUserInfoWithClasses() {
         String userName = AuthenticationUserUtil.getCurrentUserName();
         if (userName == null) return null;

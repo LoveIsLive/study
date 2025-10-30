@@ -10,6 +10,7 @@ public class HomeworkSubmission {
     private Long homeworkId;
     private Long studentId;
     private String content;
+    private String status; // 提交状态
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 

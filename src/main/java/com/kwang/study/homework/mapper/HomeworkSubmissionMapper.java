@@ -23,4 +23,8 @@ public interface HomeworkSubmissionMapper {
     List<Long> findIdsByHomeworkId(@Param("homeworkId") Long homeworkId);
 
     int deleteByHomeworkId(@Param("homeworkId") Long homeworkId);
+
+    int batchUpdateStatus(@Param("ids") List<Long> ids, @Param("status") String status);
+
+    int updateById(HomeworkSubmission submission);
 }

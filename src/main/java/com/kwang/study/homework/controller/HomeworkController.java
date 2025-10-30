@@ -6,6 +6,7 @@ import com.kwang.study.common.R;
 import com.kwang.study.homework.dto.request.HomeworkCreateDTO;
 import com.kwang.study.homework.dto.request.HomeworkUpdateDTO;
 import com.kwang.study.homework.pojo.HomeworkDetail;
+import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import com.kwang.study.homework.service.HomeworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -131,4 +132,16 @@ public class HomeworkController {
         return ResponseEntity.ok(R.success(result));
     }
 
+    /**
+     * 退回学生作业提交
+     */
+    @PostMapping("/returnSubmission/{subId}")
+    public ResponseEntity<R<HomeworkSubmissionDetail>> returnSubmission(@PathVariable Long subId) {
+        if (!(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin()))
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+
+        Long teacherId = AuthenticationUserUtil.getCurrentUserId();
+        HomeworkSubmissionDetail returnedSubmission = homeworkService.returnSubmission(teacherId, subId);
+        return ResponseEntity.ok(R.success(returnedSubmission));
+    }
 }
