@@ -11,4 +11,5 @@ public class TimeLineItem {
     private String title;
     private String time;
     private String description;
+    private String location;
 }

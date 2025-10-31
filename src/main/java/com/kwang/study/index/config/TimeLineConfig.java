@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author kwang
@@ -23,5 +24,5 @@ import java.util.List;
 @Data
 @Configuration
 public class TimeLineConfig {
-    private List<TimeLineItem> timeline;
+    private Map<String, List<TimeLineItem>> timeline;
 }
