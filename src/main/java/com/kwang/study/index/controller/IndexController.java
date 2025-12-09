@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +48,9 @@ public class IndexController {
 
         Long classId = user.getClassMember().getClasses().getId();
         List<TimeLineItem> itemList = timeLineConfig.getTimeline().get(String.valueOf(classId));
+        if (CollectionUtils.isEmpty(itemList)) {
+            return ResponseEntity.ok(R.success(Collections.emptyList()));
+        }
         return ResponseEntity.ok(R.success(itemList));
     }
 

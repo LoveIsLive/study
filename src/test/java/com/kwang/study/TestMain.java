@@ -7,6 +7,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.exception.NacosException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -21,14 +22,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Properties;
 
 public class TestMain {
     public static void main(String[] args) throws Exception {
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        System.out.println(encoder.encode("123456"));
-        System.out.println(encoder.encode("123456"));
-        System.out.println(encoder.encode("kwang123."));
+        // 1. 定义模版 (Java 11 只能用 + 号拼接换行，虽然丑但在 Java 11 没办法)
+        String template = "你好，${name}\n" +
+                "欢迎来到 ${place}。";
+
+        // 2. 准备参数
+        Map<String, String> values = Map.of(
+                "name", "张三",
+                "place", "Spring Boot 世界"
+        );
+
+        // 3. 执行替换
+        StringSubstitutor sub = new StringSubstitutor(values);
+        String result = sub.replace(template);
+
+        System.out.println(result);
     }
 
     @Test
