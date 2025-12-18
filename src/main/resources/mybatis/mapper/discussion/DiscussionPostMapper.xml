@@ -21,7 +21,7 @@
     </sql>
 
     <sql id="Join_User_Column_List">
-        <include refid="Base_Column_List"/>, u.username
+        <include refid="Base_Column_List"/>, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS username
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" parameterType="com.kwang.study.discussion.pojo.DiscussionPost">

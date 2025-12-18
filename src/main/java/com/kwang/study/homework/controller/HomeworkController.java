@@ -37,53 +37,41 @@ public class HomeworkController {
 
     /**
      * 教师发布作业
-     * 使用 multipart/form-data 格式提交
-     * 表单字段：title, content
-     * 文件字段：files
+     * 权限：目前仅有教师可以发布作业
      */
     @PostMapping("/publish")
     public ResponseEntity<R<HomeworkDetail>> publishHomework(@Valid @RequestPart("dto") HomeworkCreateDTO dto,
                                                              @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
-        // NOTE: 目前只有教师才可以操作，管理员是否有权限待商榷
-        if (!userInfoUtils.currentUserInClassIsTeacher())
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
-        // 获取认证身份
-        dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
         HomeworkDetail createdHomework = homeworkService.createHomework(dto, smallFiles);
         return ResponseEntity.ok(R.success(createdHomework));
     }
 
+    /**
+     * 修改作业
+     * 权限：管理员、校长、教师，与作业发布者保持一致
+     */
     @PutMapping("/{homeworkId}")
     public ResponseEntity<R<HomeworkDetail>> updateHomework(
             @PathVariable Long homeworkId,
             @Valid @RequestPart("dto") HomeworkUpdateDTO dto,
             @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws IOException {
-        if (!(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin()))
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
-        // 获取认证身份
-        dto.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
-
         HomeworkDetail updatedHomework = homeworkService.updateHomework(homeworkId, dto, smallFiles);
         return ResponseEntity.ok(R.success(updatedHomework, "作业修改成功"));
     }
 
     /**
-     * 教师查看自己发布的作业列表
+     * 教师查看自己发布的所有作业
+     * 权限：仅教师本人
      */
     @GetMapping("/teacher/all")
     public ResponseEntity<R<List<HomeworkDetail>>> getTeacherHomeworks() {
-        if (!userInfoUtils.currentUserInClassIsTeacher())
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
-        Long teacherId = AuthenticationUserUtil.getCurrentUserId();
-        List<HomeworkDetail> homeworks = homeworkService.getHomeworksByTeacher(teacherId);
+        List<HomeworkDetail> homeworks = homeworkService.getHomeworksByTeacher();
         return ResponseEntity.ok(R.success(homeworks));
     }
 
     /**
      * 查看某一个作业
+     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
      */
     @GetMapping("/{homeworkId}")
     public ResponseEntity<R<HomeworkDetail>> getHomework(@PathVariable Long homeworkId) {
@@ -92,39 +80,28 @@ public class HomeworkController {
     }
 
     /**
-     * 教师删除作业
-     * @param homeworkId 作业ID
-     * @return 操作结果
+     * 删除作业
+     * 权限：管理员、校长、教师，与作业发布者保持一致
      */
     @DeleteMapping("/{homeworkId}")
     public ResponseEntity<R<Void>> deleteHomework(@PathVariable Long homeworkId) {
-        // NOTE: 教师和管理员可以删除作业
-        if (!(userInfoUtils.currentUserInClassIsTeacher() ||
-                AuthenticationUserUtil.currentUserIsAdmin()))
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
-        HomeworkDetail homework = homeworkService.getHomeworkById(homeworkId);
-        // 只可以删除自己发布的作业
-        if (!Objects.equals(homework.getTeacherId(), AuthenticationUserUtil.getCurrentUserId()))
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
         homeworkService.deleteHomework(homeworkId);
         return ResponseEntity.ok(R.success(null));
     }
 
-    // --- Student Endpoints ---
-
     /**
      * 学生查看所有作业列表（即学生所在班级的所有作业列表）
+     * 权限：仅学生本人
      */
     @GetMapping("/student/all")
     public ResponseEntity<R<List<HomeworkDetail>>> getAllHomeworks() {
-        List<HomeworkDetail> homeworks = homeworkService.getAllHomeworksForStudent(AuthenticationUserUtil.getCurrentUserName());
+        List<HomeworkDetail> homeworks = homeworkService.getAllHomeworksForStudent();
         return ResponseEntity.ok(R.success(homeworks));
     }
 
     /**
-     * 查看某个班级的所有作业
+     * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
+     * 权限：管理员、校长、教师
      */
     @GetMapping("/class/{classId}")
     public ResponseEntity<R<List<HomeworkDetail>>> getHomeworksByClassId(@PathVariable Long classId) {
@@ -133,15 +110,12 @@ public class HomeworkController {
     }
 
     /**
-     * 退回学生作业提交
+     * 打回作业提交
+     * 权限：管理员、校长、教师，与作业提交对应的作业发布者保持一致
      */
     @PostMapping("/returnSubmission/{subId}")
     public ResponseEntity<R<HomeworkSubmissionDetail>> returnSubmission(@PathVariable Long subId) {
-        if (!(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin()))
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-
-        Long teacherId = AuthenticationUserUtil.getCurrentUserId();
-        HomeworkSubmissionDetail returnedSubmission = homeworkService.returnSubmission(teacherId, subId);
+        HomeworkSubmissionDetail returnedSubmission = homeworkService.returnSubmission(subId);
         return ResponseEntity.ok(R.success(returnedSubmission));
     }
 }

@@ -11,11 +11,6 @@ public class SubmissionCreateDTO {
     @NotNull(message = "Homework ID cannot be null")
     private Long homeworkId;
 
-    /**
-     * 学生ID，从当前登陆用户获取，非前端传入
-     */
-    private Long studentId;
-
     private String content;
 
     private List<String> attachmentUploadIds; // 大附件的uploadId, 小附件不使用此

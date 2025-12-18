@@ -7,13 +7,14 @@
     <!-- 基础映射：用于映射 `Classes` 实体类 -->
     <resultMap id="BaseResultMap" type="com.kwang.study.organization.pojo.Classes">
         <id property="id" column="id"/>
+        <result property="schoolId" column="school_id"/>
         <result property="name" column="name"/>
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
     </resultMap>
 
     <!-- 详细信息映射：用于映射 `ClassDetailDTO` -->
-    <!-- `extends="BaseResultMap"` 表示它继承了 `Classes` 实体的所有基础映射，只需定义额外的属性即可。 -->
+    <!-- `extends="BaseResultMap"` 表示它继承了 `Classes` 实体的所有基础映射 -->
     <resultMap id="DetailResultMap" type="com.kwang.study.organization.dto.result.ClassDetailDTO"
                extends="BaseResultMap">
         <result property="memberCount" column="memberCount"/>
@@ -24,37 +25,59 @@
     <!-- ========================= 基本信息查询 =============================== -->
     <!-- ===================================================================== -->
 
-    <select id="findAll" resultMap="BaseResultMap">
+    <select id="findAllBySchoolId" resultMap="BaseResultMap">
         SELECT
-            id, name, create_time, update_time
+            id, school_id, name, create_time, update_time
         FROM
             classes
+        WHERE
+            school_id = #{schoolId}
         ORDER BY
             id ASC
     </select>
 
     <select id="findById" resultMap="BaseResultMap">
         SELECT
-            id, name, create_time, update_time
+            id, school_id, name, create_time, update_time
         FROM
             classes
         WHERE id = #{id}
     </select>
 
-    <select id="findByName" resultMap="BaseResultMap">
+    <!-- 批量查询 -->
+    <select id="selectBatchIds" resultMap="BaseResultMap">
         SELECT
-            id, name, create_time, update_time
+        id, school_id, name, create_time, update_time
         FROM
-            classes
-        WHERE `name` = #{name}
+        classes
+        WHERE
+        id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        <if test="schoolId != null">
+            AND school_id = #{schoolId}
+        </if>
+        ORDER BY id ASC
     </select>
 
-    <select id="matchByName" resultMap="BaseResultMap">
+    <select id="findByNameAndSchoolId" resultMap="BaseResultMap">
         SELECT
-            id, name, create_time, update_time
+            id, school_id, name, create_time, update_time
         FROM
             classes
-        WHERE `name` LIKE CONCAT('%', #{key}, '%')
+        WHERE
+            `name` = #{name} AND school_id = #{schoolId}
+    </select>
+
+    <select id="matchByNameAndSchoolId" resultMap="BaseResultMap">
+        SELECT
+            id, school_id, name, create_time, update_time
+        FROM
+            classes
+        WHERE
+            school_id = #{schoolId}
+          AND `name` LIKE CONCAT('%', #{key}, '%')
     </select>
 
 
@@ -64,25 +87,27 @@
     <!--
         所有详细信息查询都使用 LEFT JOIN 关联 class_members 表，
         并通过 COUNT(cm.id) 计算成员数量。
-        使用 GROUP BY 对班级进行分组，确保每个班级只返回一行记录。
+        必须限定 school_id。
     -->
 
-    <select id="findAllDetail" resultMap="DetailResultMap">
+    <select id="findAllDetailBySchoolId" resultMap="DetailResultMap">
         SELECT
-            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+            c.id, c.school_id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
         FROM
             classes c
                 LEFT JOIN
             class_members cm ON c.id = cm.class_id
+        WHERE
+            c.school_id = #{schoolId}
         GROUP BY
-            c.id, c.name, c.create_time, c.update_time
+            c.id, c.school_id, c.name, c.create_time, c.update_time
         ORDER BY
             c.id ASC
     </select>
 
     <select id="findClassDetailById" resultMap="DetailResultMap">
         SELECT
-            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+            c.id, c.school_id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
         FROM
             classes c
                 LEFT JOIN
@@ -90,33 +115,34 @@
         WHERE
             c.id = #{id}
         GROUP BY
-            c.id, c.name, c.create_time, c.update_time
+            c.id, c.school_id, c.name, c.create_time, c.update_time
     </select>
 
-    <select id="findClassDetailByName" resultMap="DetailResultMap">
+    <select id="findClassDetailByNameAndSchoolId" resultMap="DetailResultMap">
         SELECT
-            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+            c.id, c.school_id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
         FROM
             classes c
                 LEFT JOIN
             class_members cm ON c.id = cm.class_id
         WHERE
-            c.name = #{name}
+            c.name = #{name} AND c.school_id = #{schoolId}
         GROUP BY
-            c.id, c.name, c.create_time, c.update_time
+            c.id, c.school_id, c.name, c.create_time, c.update_time
     </select>
 
-    <select id="matchClassDetailByName" resultMap="DetailResultMap">
+    <select id="matchClassDetailByNameAndSchoolId" resultMap="DetailResultMap">
         SELECT
-            c.id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
+            c.id, c.school_id, c.name, c.create_time, c.update_time, COUNT(cm.id) AS memberCount
         FROM
             classes c
                 LEFT JOIN
             class_members cm ON c.id = cm.class_id
         WHERE
-            c.name LIKE CONCAT('%', #{key}, '%')
+            c.school_id = #{schoolId}
+          AND c.name LIKE CONCAT('%', #{key}, '%')
         GROUP BY
-            c.id, c.name, c.create_time, c.update_time
+            c.id, c.school_id, c.name, c.create_time, c.update_time
         ORDER BY
             c.id ASC
     </select>
@@ -127,17 +153,15 @@
     <!-- ===================================================================== -->
 
     <!--
-        - useGeneratedKeys="true": 启用主键自动生成。
-        - keyProperty="id": 将数据库生成的主键值回填到传入的Java对象的id属性中。
+        新增 school_id 字段
     -->
     <insert id="insert" parameterType="com.kwang.study.organization.pojo.Classes" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO classes (name, create_time, update_time)
-        VALUES (#{name}, NOW(), NOW())
+        INSERT INTO classes (school_id, name, create_time, update_time)
+        VALUES (#{schoolId}, #{name}, NOW(), NOW())
     </insert>
 
     <!--
-        根据ID更新班级的名称。
-        `update_time` 字段由数据库的 ON UPDATE CURRENT_TIMESTAMP 自动更新。
+        更新班级名称
     -->
     <update id="update" parameterType="com.kwang.study.organization.pojo.Classes">
         UPDATE
@@ -148,7 +172,7 @@
             id = #{id}
     </update>
 
-    <!-- 根据主键ID删除一条班级记录。 -->
+    <!-- 根据主键ID删除 -->
     <delete id="deleteById" parameterType="long">
         DELETE FROM
             classes

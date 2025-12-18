@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.organization.mapper.SchoolMemberMapper">
+
+    <resultMap id="SchoolMemberWithUserMap" type="com.kwang.study.organization.pojo.SchoolMember">
+        <id property="id" column="sm_id"/>
+        <result property="schoolId" column="sm_school_id"/>
+        <result property="userId" column="sm_user_id"/>
+        <result property="role" column="sm_role"/>
+        <result property="joinTime" column="sm_join_time"/>
+
+        <association property="user" javaType="com.kwang.study.auth.pojo.User">
+            <id property="id" column="u_id"/>
+            <result property="username" column="u_username"/>
+            <result property="enabled" column="u_enabled"/>
+        </association>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO school_members (school_id, user_id, role)
+        VALUES (#{schoolId}, #{userId}, #{role})
+    </insert>
+
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO school_members (school_id, user_id, role)
+        VALUES
+        <foreach collection="members" item="m" separator=",">
+            (#{m.schoolId}, #{m.userId}, #{m.role})
+        </foreach>
+    </insert>
+
+    <select id="findByUserId" resultType="com.kwang.study.organization.pojo.SchoolMember">
+        SELECT * FROM school_members WHERE user_id = #{userId}
+    </select>
+
+    <select id="findMembersBySchoolId" resultMap="SchoolMemberWithUserMap">
+        SELECT
+            sm.id AS sm_id,
+            sm.school_id AS sm_school_id,
+            sm.user_id AS sm_user_id,
+            sm.role AS sm_role,
+            sm.join_time AS sm_join_time,
+            u.id AS u_id,
+            SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS u_username,
+            u.enabled AS u_enabled
+        FROM school_members sm
+                 JOIN users u ON sm.user_id = u.id
+        WHERE sm.school_id = #{schoolId}
+    </select>
+
+    <delete id="deleteByUserId">
+        DELETE FROM school_members WHERE user_id = #{userId}
+    </delete>
+
+    <delete id="deleteBySchoolIdAndUserIds">
+        DELETE FROM school_members
+        WHERE school_id = #{schoolId}
+        AND user_id IN
+        <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+            #{uid}
+        </foreach>
+    </delete>
+
+</mapper>

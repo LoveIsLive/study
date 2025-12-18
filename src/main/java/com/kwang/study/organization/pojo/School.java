@@ -1,17 +1,15 @@
 package com.kwang.study.organization.pojo;
 
 import lombok.Data;
-
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
-public class Classes {
+public class School {
     private Long id;
     private String name;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
-    private Long schoolId;
-    // 一个班级可以有多名成员
-    private List<ClassMember> members;
+
+    // 非数据库字段
+    private Integer classCount;
 }

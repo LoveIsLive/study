@@ -13,6 +13,9 @@ import javax.validation.constraints.NotBlank;
 public class LoginRequestDTO extends BaseRequestDTO {
     private static final long serialVersionUID = 1369154046899685120L;
 
+    // 非必填，如果是Admin登录则不传
+    private Long schoolId;
+
     @NotBlank(message = "账号不能为空")
     private String username;
 

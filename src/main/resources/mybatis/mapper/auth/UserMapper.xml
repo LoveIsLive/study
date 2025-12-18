@@ -32,7 +32,7 @@
     </select>
 
 
-    <resultMap id="UserWithClassInfoMap" type="com.kwang.study.auth.pojo.User">
+    <resultMap id="UserWithOrgInfoMap" type="com.kwang.study.auth.pojo.User">
         <!-- 1. 映射User自身的基本属性 -->
         <id property="id" column="user_id"/>
         <result property="username" column="username"/>
@@ -46,14 +46,31 @@
             <result property="userId" column="user_id"/>
             <result property="classId" column="class_id"/>
             <result property="role" column="cm_role"/>
-            <result property="joinTime" column="join_time"/>
+            <result property="joinTime" column="cm_join_time"/>
 
             <!-- 4. 在ClassMember内部, 嵌套关联班级信息 (Classes) -->
             <association property="classes" javaType="com.kwang.study.organization.pojo.Classes">
                 <id property="id" column="class_id"/>
                 <result property="name" column="class_name"/>
-                <result property="createTime" column="class_createTime" />
-                <result property="updateTime" column="class_updateTime" />
+                <result property="createTime" column="class_create_time" />
+                <result property="updateTime" column="class_update_time" />
+                <result property="schoolId" column="c_school_id" />
+            </association>
+        </association>
+        <!-- 关联查询用户的学校成员信息 (SchoolMember) -->
+        <association property="schoolMember" javaType="com.kwang.study.organization.pojo.SchoolMember">
+            <id property="id" column="sm_id"/>
+            <result property="userId" column="user_id"/>
+            <result property="schoolId" column="s_school_id"/>
+            <result property="role" column="sm_role"/>
+            <result property="joinTime" column="sm_join_time"/>
+
+            <!-- 在SchoolMember内部, 嵌套关联学校信息 (School) -->
+            <association property="school" javaType="com.kwang.study.organization.pojo.School">
+                <id property="id" column="s_school_id"/>
+                <result property="name" column="school_name"/>
+                <result property="createTime" column="school_create_time" />
+                <result property="updateTime" column="school_update_time" />
             </association>
         </association>
 
@@ -62,12 +79,7 @@
 
     </resultMap>
 
-    <!--
-      根据用户名查询用户及其班级信息的方法实现。
-      - 使用LEFT JOIN: 保证即使用户没有分配班级, 也能查出该用户信息。
-      - 使用AS别名: 为字段起别名以避免不同表之间字段名冲突, 便于ResultMap进行映射。
-    -->
-    <select id="findByUsernameWithClasses" parameterType="string" resultMap="UserWithClassInfoMap">
+    <select id="findByIdWithOrgInfo" parameterType="long" resultMap="UserWithOrgInfoMap">
         SELECT
             u.id AS user_id,
             u.username,
@@ -75,17 +87,69 @@
             u.enabled,
             cm.id AS cm_id,
             cm.role AS cm_role,
-            cm.join_time,
+            cm.join_time AS cm_join_time,
             c.id AS class_id,
             c.name AS class_name,
             c.create_time AS class_create_time,
-            c.update_time AS class_update_time
+            c.update_time AS class_update_time,
+            c.school_id AS c_school_id,
+            sm.id AS sm_id,
+            sm.role AS sm_role,
+            sm.join_time AS sm_join_time,
+            s.id AS s_school_id,
+            s.name AS school_name,
+            s.create_time AS school_create_time,
+            s.update_time AS school_update_time
         FROM
             users u
                 LEFT JOIN
             class_members cm ON u.id = cm.user_id
                 LEFT JOIN
             classes c ON cm.class_id = c.id
+                LEFT JOIN
+            school_members sm ON u.id = sm.user_id
+                LEFT JOIN
+            schools s ON sm.school_id = s.id
+        WHERE
+            u.id = #{id}
+    </select>
+
+    <!--
+      根据用户名查询用户及其班级信息的方法实现。
+      - 使用LEFT JOIN: 保证即使用户没有分配班级, 也能查出该用户信息。
+      - 使用AS别名: 为字段起别名以避免不同表之间字段名冲突, 便于ResultMap进行映射。
+    -->
+    <select id="findByUsernameWithOrgInfo" parameterType="string" resultMap="UserWithOrgInfoMap">
+        SELECT
+            u.id AS user_id,
+            u.username,
+            u.password,
+            u.enabled,
+            cm.id AS cm_id,
+            cm.role AS cm_role,
+            cm.join_time AS cm_join_time,
+            c.id AS class_id,
+            c.name AS class_name,
+            c.create_time AS class_create_time,
+            c.update_time AS class_update_time,
+            c.school_id AS c_school_id,
+            sm.id AS sm_id,
+            sm.role AS sm_role,
+            sm.join_time AS sm_join_time,
+            s.id AS s_school_id,
+            s.name AS school_name,
+            s.create_time AS school_create_time,
+            s.update_time AS school_update_time
+        FROM
+            users u
+                LEFT JOIN
+            class_members cm ON u.id = cm.user_id
+                LEFT JOIN
+            classes c ON cm.class_id = c.id
+                LEFT JOIN
+            school_members sm ON u.id = sm.user_id
+                LEFT JOIN
+            schools s ON sm.school_id = s.id
         WHERE
             u.username = #{username}
     </select>

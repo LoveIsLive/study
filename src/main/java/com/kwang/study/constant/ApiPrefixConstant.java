@@ -22,6 +22,10 @@ public class ApiPrefixConstant {
 
     public static final String CLASSMEMBER_BASE_PREFIX = API_BASE_PREFIX + "/classmember";
 
+    public static final String SCHOOL_BASE_PREFIX = API_BASE_PREFIX + "/school";
+
+    public static final String SCHOOL_MEMBER_BASE_PREFIX = API_BASE_PREFIX + "/school-member";
+
     public static final String DISCUSSION_BASE_PREFIX =  API_BASE_PREFIX + "/discussion";
 
     public static final String STATIC_BASE_PREFIX = "/static";

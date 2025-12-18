@@ -15,7 +15,6 @@ import java.util.Objects;
 public class Tools {
     @Data
     public static abstract class Tool {
-        @JsonIgnore
         private String toolCallId;
         @JsonIgnore
         public abstract boolean isTerminal();

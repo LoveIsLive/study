@@ -24,7 +24,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userMapper.findByUsernameWithClasses(username);
+        User user = userMapper.findByUsernameWithOrgInfo(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found with username: " + username);
         }
@@ -39,9 +39,14 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 }
             }
         }
+        // 在学校-班级内的角色，前端使用
         // 在班级内的角色
         if (user.getClassMember() != null && user.getClassMember().getRole() != null) {
             authorities.add(new SimpleGrantedAuthority(user.getClassMember().getRole()));
+        }
+        // 在学校层的角色
+        if (user.getSchoolMember() != null && user.getSchoolMember().getRole() != null) {
+            authorities.add(new SimpleGrantedAuthority(user.getSchoolMember().getRole()));
         }
 
         return new CustomUserDetails(user.getId(), user.getUsername(),

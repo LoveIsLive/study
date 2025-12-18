@@ -43,17 +43,12 @@ public class WareController {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
-    @Autowired
-    private UserInfoUtils userInfoUtils;
-
     /**
      * 创建目录
      */
     @PostMapping("/create/directories")
     public ResponseEntity<R<VoidResult>> createDirectory(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         VoidResult voidResult = wareService.createDirectory(path);
         return build(voidResult);
@@ -66,8 +61,6 @@ public class WareController {
     public ResponseEntity<R<VoidResult>> uploadFile(@Valid UploadFileRequestDTO requestDTO,
                                                     @RequestParam("file") MultipartFile file) throws IOException {
         requestDTO.check();
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         try (InputStream input = file.getInputStream()) {
             VoidResult voidResult = wareService.createFile(requestDTO.getPath(),
@@ -80,8 +73,6 @@ public class WareController {
     @DeleteMapping("/delete/dir")
     public ResponseEntity<R<VoidResult>> deleteDireNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         VoidResult voidResult = wareService.deleteDirNode(path);
         return build(voidResult);
@@ -91,8 +82,6 @@ public class WareController {
     @DeleteMapping("/delete/file")
     public ResponseEntity<R<VoidResult>> deleteFileNode(@RequestParam("path") String path) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         VoidResult voidResult = wareService.deleteFileNode(path);
         return build(voidResult);
@@ -103,8 +92,6 @@ public class WareController {
     public ResponseEntity<R<VoidResult>> updateDireNode(@RequestParam("path") String path,
                                                         @RequestParam("newName") String newName) throws IOException {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         VoidResult voidResult = wareService.renameDirNode(path, newName);
         return build(voidResult);
@@ -114,8 +101,6 @@ public class WareController {
     @PostMapping("/update/file")
     public ResponseEntity<R<VoidResult>> updateFileNode(@Valid @RequestBody UpdateFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         VoidResult voidResult = wareService.renameFileNode(requestDTO.getPath(), requestDTO.getNewName());
         return build(voidResult);
@@ -173,8 +158,6 @@ public class WareController {
     @PostMapping("/chunk/init")
     public ResponseEntity<R<InitMultiUploadResult>> initMultiUpload(@Valid @RequestBody InitUploadBigFileRequestDTO requestDTO) throws IOException {
         requestDTO.check();
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher() || AuthenticationUserUtil.currentUserIsAdmin(),
-                "无权限");
 
         InitMultiUploadResult uploadResult = wareService.initMultiUpload(requestDTO.getPath(), requestDTO.getMimeTypeName());
         return build(uploadResult);

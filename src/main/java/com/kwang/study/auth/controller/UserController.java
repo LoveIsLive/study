@@ -2,7 +2,6 @@ package com.kwang.study.auth.controller;
 
 import com.kwang.study.auth.dto.request.PasswordUpdateDTO;
 import com.kwang.study.auth.dto.result.PasswordUpdateResultDTO;
-import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.service.UserService;
 import com.kwang.study.auth.utils.UserInfoUtils;
@@ -10,7 +9,6 @@ import com.kwang.study.common.R;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +28,7 @@ public class UserController {
 
     @GetMapping("/detailInfo")
     public ResponseEntity<R<User>> currentUserDetailInfo() {
-        return ResponseEntity.ok(R.success(userInfoUtils.getCurrentUserInfoWithClasses()));
+        return ResponseEntity.ok(R.success(userInfoUtils.getCurrentUserInfoWithOrgInfo()));
     }
 
     /**

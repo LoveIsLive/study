@@ -28,18 +28,6 @@ public class WareInitModule implements ApplicationRunner {
         } catch (Exception e) {
             log.warn(e.getMessage());
         }
-
-        // 2. 创建所有班级目录
-        List<Classes> allClasses = classesService.getAllClasses();
-        for (Classes classes : allClasses) {
-            try {
-                // 以id为路径，班级名可变
-                fileStorageService.createDirectory(FileStorageModuleNameEnum.WARE_NAME
-                        .getModuleName() + "/" + classes.getId());
-            } catch (Exception e) {
-                log.warn(e.getMessage());
-            }
-        }
     }
 
 }

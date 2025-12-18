@@ -61,7 +61,7 @@ public class LLM {
      * @param prompt 包含本次对话的历史记录和新消息
      * @return Tool 列表
      */
-    public List<Tools.Tool> invoke(Prompt prompt) {
+    public List<Tools.Tool> invoke(Prompt prompt, LLMContext context) {
         ChatCompletionCreateParams.Builder paramsBuilder = params.toBuilder();
 
         if (params.tools().isEmpty()) {
@@ -89,7 +89,7 @@ public class LLM {
     /**
      * 流式文本生成
      */
-    public Stream<String> stream(Prompt prompt) {
+    public Stream<String> stream(Prompt prompt, LLMContext context) {
         ChatCompletionCreateParams.Builder paramsBuilder = params.toBuilder();
         // 1. 追加消息
         prompt.getMessages().forEach(paramsBuilder::addMessage);

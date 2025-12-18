@@ -146,7 +146,7 @@ public class LLMService {
 
                 StringBuilder fullResponse = new StringBuilder();
 
-                try (Stream<String> stream = llm.stream(prompt)) {
+                try (Stream<String> stream = llm.stream(prompt, context)) {
                     stream.forEach(token -> {
                         try {
                             if (token != null) {

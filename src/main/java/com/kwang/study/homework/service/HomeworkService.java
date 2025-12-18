@@ -13,9 +13,10 @@ import com.kwang.study.homework.mapper.AttachmentMapper;
 import com.kwang.study.homework.mapper.HomeworkMapper;
 import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
 import com.kwang.study.homework.service.async.AsyncCleanupFileObjService;
-import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.enums.ClassesRoleEnum;
+import com.kwang.study.organization.enums.SchoolRoleEnum;
+import com.kwang.study.organization.mapper.ClassMemberMapper;
 import com.kwang.study.organization.service.ClassMemberService;
-import com.kwang.study.organization.service.ClassesService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -55,10 +56,13 @@ public class HomeworkService {
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
-    private ClassMemberService classMemberService;
+    private UserMapper userMapper;
 
     @Autowired
-    private UserMapper userMapper;
+    private UserInfoUtils userInfoUtils;
+
+    @Autowired
+    private ClassMemberMapper classMemberMapper;
 
     public static final String HOMEWORK_ATTACHMENT_OWNER_TYPE = "homework";
     public static final String SUBMISSION_ATTACHMENT_OWNER_TYPE = "submission";
@@ -67,30 +71,35 @@ public class HomeworkService {
 
     /**
      * 教师发布作业
-     * @param dto 作业创建数据传输对象
-     * @param smallFiles 小附件列表
-     * @return 创建的作业对象
-     * @throws IOException 文件IO异常
+     * 权限：目前仅有教师可以发布作业
      */
     @Transactional
     public HomeworkDetail createHomework(HomeworkCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
-        // 1. 创建并插入作业主体
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher(), "当前登录用户不是教师");
+        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
+
         Homework homework = new Homework();
-        homework.setTeacherId(dto.getTeacherId()); // 实际应从用户登录信息中获取
+        homework.setTeacherId(currentUserId);
         homework.setTitle(dto.getTitle());
         homework.setContent(dto.getContent());
         homeworkMapper.insert(homework);
 
         handleAttachment(homework.getId(), HOMEWORK_ATTACHMENT_OWNER_TYPE,
-                dto.getTeacherId(), dto.getAttachmentUploadIds(), smallFiles);
+                currentUserId, dto.getAttachmentUploadIds(), smallFiles);
 
         // 4. 返回完整的作业信息 (包含附件)
         return homeworkMapper.findById(homework.getId());
     }
 
+    /**
+     * 修改作业
+     * 权限：管理员、校长、教师，与作业发布者保持一致
+     */
     @Transactional
     public HomeworkDetail updateHomework(Long homeworkId, HomeworkUpdateDTO dto, List<MultipartFile> smallFiles) throws IOException {
-        // 1. 更新作业主体信息
+        HomeworkDetail originalHomework = homeworkMapper.findById(homeworkId);
+        validateTeacherPermission(originalHomework.getTeacherId());
+
         Homework homeworkToUpdate = new Homework();
         homeworkToUpdate.setId(homeworkId);
         homeworkToUpdate.setTitle(dto.getTitle());
@@ -98,41 +107,41 @@ public class HomeworkService {
         int i = homeworkMapper.updateById(homeworkToUpdate);
         Assert.isTrue(i > 0, "更新作业失败");
 
-        // 2. 处理要删除的旧附件
         if (!CollectionUtils.isEmpty(dto.getAttachmentIdsToDelete())) {
-            // 2.1 查找要删除的附件信息，以获取文件路径用于物理删除
             List<AttachmentDetail> attachmentsToDelete = attachmentMapper.findByIds(dto.getAttachmentIdsToDelete());
             List<String> filePathsToDelete = attachmentsToDelete.stream()
                     .map(AttachmentDetail::getFilePath)
                     .collect(Collectors.toList());
 
-            // 2.2 从数据库中删除附件记录
             attachmentMapper.deleteBatchIds(dto.getAttachmentIdsToDelete());
 
-            // 2.3 异步删除物理文件
             cleanupFileObjService.cleanup(filePathsToDelete);
         }
 
         handleAttachment(homeworkId, HOMEWORK_ATTACHMENT_OWNER_TYPE,
-                dto.getTeacherId(), dto.getAttachmentUploadIds(), smallFiles);
+                originalHomework.getTeacherId(), dto.getAttachmentUploadIds(), smallFiles);
 
-        // 修改已经提交过的作业提交的状态
-        List<HomeworkSubmissionDetail> submissions = submissionMapper.findAllByHomeworkId(homeworkId);
-        submissionMapper.batchUpdateStatus(submissions.stream()
-                        .map(HomeworkSubmission::getId)
-                        .collect(Collectors.toList()),
-                HomeworkSubmissionStatusEnum.HAVE_UPDATED.getValue());
-
-        // 7. 返回更新后完整的作业信息
+        List<Long> collect = submissionMapper.findAllByHomeworkId(homeworkId).stream()
+                .map(HomeworkSubmission::getId)
+                .collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(collect)) {
+            submissionMapper.batchUpdateStatus(collect,
+                    HomeworkSubmissionStatusEnum.HAVE_UPDATED.getValue());
+        }
         return homeworkMapper.findById(homeworkId);
     }
 
+    /**
+     * 修改作业提交
+     * 权限：仅学生本人
+     */
     @Transactional
     public HomeworkSubmissionDetail updateHomeworkSubmission(Long homeworkSubmissionId, HomeworkSubmissionUpdateDTO dto,
                                                              List<MultipartFile> smallFiles) throws IOException {
         HomeworkSubmissionDetail origin = submissionMapper.findById(homeworkSubmissionId);
         Assert.isTrue(HomeworkSubmissionStatusEnum.RETURNED.getValue().equals(origin.getStatus()) ||
                 HomeworkSubmissionStatusEnum.HAVE_UPDATED.getValue().equals(origin.getStatus()), "作业提交状态错误");
+        Assert.isTrue(Objects.equals(origin.getStudentId(), AuthenticationUserUtil.getCurrentUserId()), "你无权限操作他人作业");
 
         // 1. 更新作业提交主体信息
         HomeworkSubmission homeworkSubmission = new HomeworkSubmission();
@@ -158,7 +167,7 @@ public class HomeworkService {
         }
 
         handleAttachment(homeworkSubmissionId, SUBMISSION_ATTACHMENT_OWNER_TYPE,
-                dto.getStudentId(), dto.getAttachmentUploadIds(), smallFiles);
+                origin.getStudentId(), dto.getAttachmentUploadIds(), smallFiles);
 
         // 7. 返回更新后完整的作业信息
         return submissionMapper.findById(homeworkSubmissionId);
@@ -166,36 +175,33 @@ public class HomeworkService {
 
     /**
      * 教师查看自己发布的所有作业
-     * @param teacherId 教师ID
-     * @return 作业列表
+     * 权限：仅教师本人
      */
-    public List<HomeworkDetail> getHomeworksByTeacher(Long teacherId) {
-        return homeworkMapper.findAllByTeacherId(teacherId);
+    public List<HomeworkDetail> getHomeworksByTeacher() {
+        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher(), "当前登录用户不是教师");
+
+        return homeworkMapper.findAllByTeacherId(AuthenticationUserUtil.getCurrentUserId());
     }
 
     /**
      * 查看某一个作业
-     * @param homeworkId 作业ID
-     * @return 作业对象
+     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
      */
     public HomeworkDetail getHomeworkById(Long homeworkId) {
-        return homeworkMapper.findById(homeworkId);
+        HomeworkDetail result = homeworkMapper.findById(homeworkId);
+        validateStudentPermission(result.getTeacherId());
+
+        return result;
     }
 
     /**
-     * 打回作业
-     * @param teacherId 教师id
-     * @param submissionId 作业提交id
-     * @return 修改后的作业提交详情
+     * 打回作业提交
+     * 权限：管理员、校长、教师，与作业提交对应的作业发布者保持一致
      */
-    public HomeworkSubmissionDetail returnSubmission(Long teacherId, Long submissionId) {
+    public HomeworkSubmissionDetail returnSubmission(Long submissionId) {
         HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(submissionId);
-        // 检验非管理员权限
-        if (!AuthenticationUserUtil.currentUserIsAdmin()) {
-            Long homeworkId = submissionDetail.getHomeworkId();
-            HomeworkDetail homeworkDetail = homeworkMapper.findById(homeworkId);
-            Assert.isTrue(Objects.equals(teacherId, homeworkDetail.getTeacherId()), "无权限");
-        }
+        Long teacherId = submissionDetail.getHomework().getTeacherId();
+        validateTeacherPermission(teacherId);
 
         submissionMapper.batchUpdateStatus(List.of(submissionDetail.getId()),
                 HomeworkSubmissionStatusEnum.RETURNED.getValue());
@@ -207,15 +213,17 @@ public class HomeworkService {
 
     /**
      * 学生提交作业
-     * @param dto 提交创建数据传输对象
-     * @param smallFiles 小附件列表
-     * @return 创建的提交记录
-     * @throws IOException 文件IO异常
+     * 权限：学生，与作业发布者保持一致
      */
     @Transactional
     public HomeworkSubmissionDetail createSubmission(SubmissionCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
+        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
+        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
+        HomeworkDetail homeworkDetail = homeworkMapper.findById(dto.getHomeworkId());
+        validateStudentPermission(homeworkDetail.getTeacherId());
+
         // 校验是否重复提交
-        HomeworkSubmissionDetail existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), dto.getStudentId());
+        HomeworkSubmissionDetail existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), currentUserId);
         if (existing != null) {
             throw new IllegalStateException("You have already submitted this homework.");
         }
@@ -223,13 +231,13 @@ public class HomeworkService {
         // 1. 创建并插入提交主体
         HomeworkSubmission submission = new HomeworkSubmission();
         submission.setHomeworkId(dto.getHomeworkId());
-        submission.setStudentId(dto.getStudentId());
+        submission.setStudentId(currentUserId);
         submission.setContent(dto.getContent());
         submission.setStatus(HomeworkSubmissionStatusEnum.SUBMITTED.getValue());
         submissionMapper.insert(submission);
 
         handleAttachment(submission.getId(), SUBMISSION_ATTACHMENT_OWNER_TYPE,
-                dto.getStudentId(), dto.getAttachmentUploadIds(), smallFiles);
+                currentUserId, dto.getAttachmentUploadIds(), smallFiles);
 
         // 4. 返回完整的提交信息 (包含附件和作业信息)
         return submissionMapper.findById(submission.getId());
@@ -237,47 +245,64 @@ public class HomeworkService {
 
     /**
      * 学生查看自己所有的提交记录
-     * @param studentId 学生ID
-     * @return 提交记录列表
+     * 权限：仅学生本人
      */
-    public List<HomeworkSubmissionDetail> getSubmissionsByStudent(Long studentId) {
-        return submissionMapper.findAllByStudentId(studentId);
-    }
+    public List<HomeworkSubmissionDetail> getSubmissionsByStudent() {
+        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
 
-    public HomeworkSubmissionDetail getSubmissionByStudent(Long studentId, Long homeworkId) {
-        return submissionMapper.findByHomeworkIdAndStudentId(homeworkId, studentId);
+        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
+        return submissionMapper.findAllByStudentId(currentUserId);
     }
 
     /**
-     * 教师查看作业的所有提交记录
-     * @param homeworkId 作业ID
-     * @return 提交记录列表
+     * 学生查看自己某个作业的提交
+     * 权限：仅学生本人
+     */
+    public HomeworkSubmissionDetail getSubmissionByStudent(Long homeworkId) {
+        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
+
+        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
+
+        return submissionMapper.findByHomeworkIdAndStudentId(homeworkId, currentUserId);
+    }
+
+    /**
+     * 查看作业的所有提交记录
+     * 权限：管理员、校长、教师，与作业发布者保持一致
      */
     public List<HomeworkSubmissionDetail> getHomeworkSubmissions(Long homeworkId) {
+        HomeworkDetail homeworkDetail = homeworkMapper.findById(homeworkId);
+        validateTeacherPermission(homeworkDetail.getTeacherId());
+
         return submissionMapper.findAllByHomeworkId(homeworkId);
     }
 
     /**
      * 学生查看所有作业列表（即学生所在班级的所有作业列表）
-     * @return 作业列表
+     * 权限：仅学生本人
      */
     @Transactional
-    public List<HomeworkDetail> getAllHomeworksForStudent(String username) {
-        User user = userMapper.findByUsernameWithClasses(username);
+    public List<HomeworkDetail> getAllHomeworksForStudent() {
+        User user = userMapper.findByUsernameWithOrgInfo(AuthenticationUserUtil.getCurrentUserName());
+        if (user == null || user.getClassMember() == null || !ClassesRoleEnum.STUDENT.getRole().equals(user.getClassMember().getRole())) {
+            throw new IllegalStateException("当前登录用户不是学生");
+        }
+
         return this.getAllHomeworksInClass(user.getClassMember().getClassId());
     }
 
     /**
-     * 教师删除作业
-     * @param homeworkId 作业ID
+     * 删除作业
+     * 权限：管理员、校长、教师，与作业发布者保持一致
      */
     @Transactional
     public void deleteHomework(Long homeworkId) {
         // 1. 权限校验
-        Homework homework = homeworkMapper.findById(homeworkId);
+        HomeworkDetail homework = homeworkMapper.findById(homeworkId);
         if (homework == null) {
             throw new IllegalArgumentException("Homework not found with id: " + homeworkId);
         }
+        validateTeacherPermission(homework.getTeacherId());
 
         // 2. 查找所有关联的附件路径，以便后续删除物理文件
         List<String> filePathsToDelete = new ArrayList<>();
@@ -312,25 +337,34 @@ public class HomeworkService {
 
     /**
      * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
+     * 权限：管理员、校长、教师
      */
     @Transactional
     public List<HomeworkDetail> getAllHomeworksInClass(Long classId) {
-        return classMemberService.getTeachersInClass(classId)
+        return classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.TEACHER.getRole())
                 .stream()
-                .flatMap(teacher -> this.getHomeworksByTeacher(teacher.getUserId()).stream())
+                .flatMap(teacher -> this.innerGetHomeworksByTeacher(teacher.getUserId()).stream())
                 .collect(Collectors.toList());
     }
 
     // --- 私有辅助方法 ---
+    /**
+     * 查看某一个教师发布的所有作业
+     */
+    private List<HomeworkDetail> innerGetHomeworksByTeacher(Long teacherId) {
+        return homeworkMapper.findAllByTeacherId(teacherId);
+    }
+
+    private List<HomeworkDetail> innerGetAllHomeworksInClass(Long classId) {
+        return classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.TEACHER.getRole())
+                .stream()
+                .flatMap(teacher -> this.innerGetHomeworksByTeacher(teacher.getUserId()).stream())
+                .collect(Collectors.toList());
+    }
+
 
     /**
      * 上传文件并构建附件对象列表
-     * @param files MultipartFile 列表
-     * @param ownerId 所属对象ID
-     * @param ownerType 所属对象类型
-     * @param uploaderId 上传者ID
-     * @return Attachment 列表
-     * @throws IOException IO异常
      */
     private List<Attachment> uploadAndBuildAttachments(List<MultipartFile> files, Long ownerId, String ownerType, Long uploaderId) throws IOException {
         List<Attachment> attachments = new ArrayList<>();
@@ -415,5 +449,61 @@ public class HomeworkService {
         }
         String uniqueFileName = UUID.randomUUID().toString(true) + fileExtension;
         return HOMEWORK_NAME.getModuleName() + "/" + uniqueFileName;
+    }
+
+    // 验证当前登录用户与targetId(教师/学生)是否是管理员、校长、同一班级的教师
+    private void validateTeacherPermission(Long targetId) {
+        // 管理员
+        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            return;
+        }
+        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+        if (user == null)
+            throw new IllegalStateException("当前无登录账户");
+        User target = userMapper.findByIdWithOrgInfo(targetId);
+        if (target == null || target.getClassMember() == null)
+            throw new IllegalStateException("目标教师不存在");
+
+        // 校长
+        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
+            if (Objects.equals(user.getSchoolMember().getSchoolId(),
+                    target.getClassMember().getClasses().getSchoolId()))
+                return;
+        }
+        // 同班级的教师
+        if (user.getClassMember() != null && ClassesRoleEnum.TEACHER.getRole().equals(user.getClassMember().getRole())) {
+            if (Objects.equals(user.getClassMember().getClassId(),
+                    target.getClassMember().getClassId()))
+                return;
+        }
+        throw new IllegalStateException("你无权限操作");
+    }
+
+    // 验证当前登录用户与targetId(教师/学生)是否是管理员、校长、同一班级的教师/学生
+    private void validateStudentPermission(Long targetId) {
+        // 管理员
+        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            return;
+        }
+        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+        if (user == null)
+            throw new IllegalStateException("当前无登录账户");
+        User target = userMapper.findByIdWithOrgInfo(targetId);
+        if (target == null || target.getClassMember() == null)
+            throw new IllegalStateException("目标教师不存在");
+
+        // 校长
+        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
+            if (Objects.equals(user.getSchoolMember().getSchoolId(),
+                    target.getClassMember().getClasses().getSchoolId()))
+                return;
+        }
+        // 同班级
+        if (user.getClassMember() != null) {
+            if (Objects.equals(user.getClassMember().getClassId(),
+                    target.getClassMember().getClassId()))
+                return;
+        }
+        throw new IllegalStateException("你无权限操作");
     }
 }

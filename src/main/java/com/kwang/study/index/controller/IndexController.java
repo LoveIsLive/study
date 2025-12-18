@@ -42,12 +42,14 @@ public class IndexController {
         if (AuthenticationUserUtil.currentUserIsAdmin()) {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }
-        User user = userInfoUtils.getCurrentUserInfoWithClasses();
-        Assert.isTrue(user != null && user.getClassMember() != null
-        && user.getClassMember().getClasses() != null, "用户班级信息为空");
+        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+        if (user == null || user.getClassMember() == null) {
+            return ResponseEntity.ok(R.success(Collections.emptyList()));
+        }
 
+        Long schoolId = user.getClassMember().getClasses().getSchoolId();
         Long classId = user.getClassMember().getClasses().getId();
-        List<TimeLineItem> itemList = timeLineConfig.getTimeline().get(String.valueOf(classId));
+        List<TimeLineItem> itemList = timeLineConfig.getTimeline().get(schoolId + "-" + classId);
         if (CollectionUtils.isEmpty(itemList)) {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }

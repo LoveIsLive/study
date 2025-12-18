@@ -11,9 +11,11 @@ import java.util.List;
 public interface UserMapper {
     User findById(@Param("id") Long id);
 
+    User findByIdWithOrgInfo(Long id);
+
     User findByUsername(String username);
 
-    User findByUsernameWithClasses(String username);
+    User findByUsernameWithOrgInfo(String username);
 
     List<Role> findRolesByUserId(Long userId);
 

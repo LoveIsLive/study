@@ -1,7 +1,10 @@
 package com.kwang.study.llm.core;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kwang.study.llm.mapper.ChatMemoryMapper;
 import com.kwang.study.llm.pojo.ChatMemory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -18,9 +21,12 @@ public class Agent {
     @Resource
     private ChatMemoryMapper memory;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     // 编排执行llm.
     // 主要，context的systemPromp十分重要，需要在调用方按照业务逻辑拼装
-    public List<Tools.Tool> invoke(LLMContext context) {
+    public List<Tools.Tool> invoke(LLMContext context) throws JsonProcessingException {
         LLM llm = LLM.create(context);
 
         Prompt prompt = Prompt.create();
@@ -30,7 +36,7 @@ public class Agent {
         // 执行次数，可以在context中动态配置
         int count = 0;
         do {
-            List<Tools.Tool> tools = llm.invoke(prompt);
+            List<Tools.Tool> tools = llm.invoke(prompt, context);
             // 逻辑上来说，不可能同时存在终端操作和非终端操作
             boolean hasTerminal = false, hasNonTerminal = false;
             for (Tools.Tool tool : tools) {
@@ -56,6 +62,8 @@ public class Agent {
                         .map(CompletableFuture::join)
                         .collect(Collectors.toList())).join();
 
+                String assistant = objectMapper.writeValueAsString(tools);
+                prompt.addAssistant(assistant);
                 for (int i = 0; i < tools.size(); i++) {
                     prompt.addToolMessage(tools.get(i).getToolCallId(), results.get(i));
                 }

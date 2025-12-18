@@ -39,7 +39,7 @@ public interface ClassMemberMapper {
 
     /**
      * 查询指定班级的所有成员（包含教师和学生）
-     *
+     * 已对结果（用户名）进行处理
      * @param classId 班级ID
      * @return 成员列表，包含用户信息
      */
@@ -47,7 +47,7 @@ public interface ClassMemberMapper {
 
     /**
      * 查询指定班级某个角色的所有用户
-     *
+     * 已对结果（用户名）进行处理
      * @param classId 班级ID
      * @param role 用户角色
      * @return 学生列表，包含用户信息

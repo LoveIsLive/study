@@ -29,21 +29,21 @@
     </insert>
 
     <select id="findById" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS teacher_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
         WHERE h.id = #{id}
     </select>
 
     <select id="findAll" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS teacher_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
         ORDER BY update_time DESC
     </select>
 
     <select id="findAllByTeacherId" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS teacher_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
         WHERE h.teacher_id = #{teacherId}
