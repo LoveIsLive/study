@@ -72,6 +72,8 @@ public class LLMService {
         LLMGlobalConfig.SceneConfig sceneConfig = llmGlobalConfig.getScenes().getOrDefault(request.getScene(),
                 llmGlobalConfig.getScenes().get("default"));
 
+        log.info("sceneConfig:{}", sceneConfig);
+        log.info("request.getContentPartMessage:{}", request.getContentPartMessage());
         // 存在附件时强制使用qwen3-vl-plus模型
         if (request.getContentPartMessage() != null) {
             sceneConfig.setModelName("qwen3-vl-plus");
@@ -143,6 +145,7 @@ public class LLMService {
         } else {
             log.warn("删除会话不存在");
         }
+        // 没有删除会话中的图片等其他存储信息
     }
 
     /**

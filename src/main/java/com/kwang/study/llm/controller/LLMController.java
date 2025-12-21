@@ -16,6 +16,7 @@ import com.kwang.study.llm.service.LLMService;
 import com.kwang.study.utils.DownloadUtils;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import static com.kwang.study.constant.ApiPrefixConstant.LLM_BASE_PREFIX;
 import static com.kwang.study.constant.RedisKeyPrefixConstant.DOWNLOAD_ID_PREFIX;
 
+@Slf4j
 @RestController
 @RequestMapping(LLM_BASE_PREFIX) // /api/v1/llm
 @RequiredArgsConstructor
@@ -156,6 +158,7 @@ public class LLMController {
                         .stream(fileObject.getContent())
                         .build());
             }
+            log.info("上传图片, {}", fileItems);
             request.setContentPartMessage(ContentPartMessage.builder()
                     .text(request.getMessage())
                     .files(fileItems)
