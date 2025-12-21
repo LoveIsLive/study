@@ -16,6 +16,7 @@ import com.kwang.study.llm.pojo.ChatMemory;
 import com.kwang.study.llm.pojo.ChatSession;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -76,9 +77,13 @@ public class LLMService {
         log.info("request.getContentPartMessage:{}", request.getContentPartMessage());
         // 存在附件时强制使用qwen3-vl-plus模型
         if (request.getContentPartMessage() != null) {
-            sceneConfig.setModelName("qwen3-vl-plus");
-            sceneConfig.setApiKey("sk-d0d552efe91d4512b74c9cfdb671c544");
-            sceneConfig.setBaseUrl("https://dashscope.aliyuncs.com/compatible-mode/v1");
+            LLMGlobalConfig.SceneConfig finalSceneConfig = new LLMGlobalConfig.SceneConfig();
+            BeanUtils.copyProperties(sceneConfig, finalSceneConfig);
+
+            finalSceneConfig.setModelName("qwen3-vl-plus");
+            finalSceneConfig.setApiKey("sk-d0d552efe91d4512b74c9cfdb671c544");
+            finalSceneConfig.setBaseUrl("https://dashscope.aliyuncs.com/compatible-mode/v1");
+            sceneConfig = finalSceneConfig;
         }
 
         // TODO: 处理RAG
