@@ -46,7 +46,8 @@ public class SecurityConfig {
                         // 特殊端点
                         .antMatchers(
                                 WARE_BASE_PREFIX + "/home/download",
-                                ATTACHE_DOWNLOAD_BASE_PREFIX + "/download"
+                                ATTACHE_DOWNLOAD_BASE_PREFIX + "/download",
+                                LLM_BASE_PREFIX + "/download"
                         ).permitAll()
                         // 允许websocket握手请求
                         .antMatchers("/ws/search/**").permitAll()

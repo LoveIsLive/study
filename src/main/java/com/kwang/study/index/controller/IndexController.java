@@ -43,7 +43,7 @@ public class IndexController {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user == null || user.getClassMember() == null) {
+        if (user == null || user.getSchoolMember() == null || user.getClassMember() == null) {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }
 

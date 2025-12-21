@@ -7,8 +7,8 @@ import java.util.List;
 
 @Mapper
 public interface ChatMemoryMapper {
-    @Insert("INSERT INTO chat_memory(session_id, user_id, role, content, created_at) " +
-            "VALUES(#{sessionId}, #{userId}, #{role}, #{content}, NOW())")
+    @Insert("INSERT INTO chat_memory(session_id, user_id, role, type, content, created_at) " +
+            "VALUES(#{sessionId}, #{userId}, #{role}, #{type}, #{content}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(ChatMemory memory);
 

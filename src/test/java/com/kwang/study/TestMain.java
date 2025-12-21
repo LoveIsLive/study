@@ -11,6 +11,7 @@ import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.util.MimeType;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
@@ -46,7 +47,7 @@ public class TestMain {
 
     @Test
     public void f() throws Exception {
-        Path path = Paths.get("a/b");
-        Files.createDirectories(path);
+        MimeType mimeType = new MimeType("text", "plain");
+        System.out.println(mimeType);
     }
 }

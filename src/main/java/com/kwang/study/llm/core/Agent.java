@@ -2,8 +2,10 @@ package com.kwang.study.llm.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.llm.mapper.ChatMemoryMapper;
 import com.kwang.study.llm.pojo.ChatMemory;
+import com.openai.models.chat.completions.ChatCompletionMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -24,19 +26,24 @@ public class Agent {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     // 编排执行llm.
     // 主要，context的systemPromp十分重要，需要在调用方按照业务逻辑拼装
-    public List<Tools.Tool> invoke(LLMContext context) throws JsonProcessingException {
+    public ChatCompletionMessage invoke(LLMContext context) {
         LLM llm = LLM.create(context);
 
         Prompt prompt = Prompt.create();
         List<ChatMemory> memoryList = memory.findBySessionId(context.getSessionId());
-        prompt.addHistory(memoryList);
+        prompt.addHistory(memoryList, fileStorageService, objectMapper);
 
         // 执行次数，可以在context中动态配置
         int count = 0;
         do {
-            List<Tools.Tool> tools = llm.invoke(prompt, context);
+            ChatCompletionMessage message = llm.invoke(prompt, context, Tools.SUPPORTED_TOOLS);
+            List<Tools.Tool> tools = Tools.convert(message, Tools.SUPPORTED_TOOLS);
+
             // 逻辑上来说，不可能同时存在终端操作和非终端操作
             boolean hasTerminal = false, hasNonTerminal = false;
             for (Tools.Tool tool : tools) {
@@ -62,14 +69,12 @@ public class Agent {
                         .map(CompletableFuture::join)
                         .collect(Collectors.toList())).join();
 
-                String assistant = objectMapper.writeValueAsString(tools);
-                prompt.addAssistant(assistant);
+                prompt.addAssistant(message);
                 for (int i = 0; i < tools.size(); i++) {
                     prompt.addToolMessage(tools.get(i).getToolCallId(), results.get(i));
                 }
             } else {
-                // 设计上，这个应该只有一个
-                return tools;
+                return message;
             }
             count++;
         } while (count < 3);

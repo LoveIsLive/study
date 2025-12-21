@@ -28,5 +28,7 @@ public class ApiPrefixConstant {
 
     public static final String DISCUSSION_BASE_PREFIX =  API_BASE_PREFIX + "/discussion";
 
+    public static final String LLM_BASE_PREFIX =  API_BASE_PREFIX + "/llm";
+
     public static final String STATIC_BASE_PREFIX = "/static";
 }

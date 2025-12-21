@@ -5,6 +5,7 @@ import com.kwang.study.llm.util.OpenAIClientManager;
 import com.openai.client.OpenAIClient;
 import com.openai.core.http.StreamResponse;
 import com.openai.models.chat.completions.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
 
 import javax.xml.crypto.Data;
@@ -12,10 +13,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // LLM是无状态的，不可变的。
+@Slf4j
 public class LLM {
 
     private final OpenAIClient client;
@@ -58,10 +61,8 @@ public class LLM {
 
     /**
      * 执行对话或任务
-     * @param prompt 包含本次对话的历史记录和新消息
-     * @return Tool 列表
      */
-    public List<Tools.Tool> invoke(Prompt prompt, LLMContext context) {
+    public ChatCompletionMessage invoke(Prompt prompt, LLMContext context, List<Class<?>> tools) {
         ChatCompletionCreateParams.Builder paramsBuilder = params.toBuilder();
 
         if (params.tools().isEmpty()) {
@@ -69,7 +70,6 @@ public class LLM {
         }
 
         // 工具集的选择应该也是可以按场景配置的，需要LLMContext
-        List<Class<?>> tools = Tools.SUPPORTED_TOOLS;
         tools.forEach(paramsBuilder::addTool);
         // 必须调用tool
         paramsBuilder.toolChoice(ChatCompletionToolChoiceOption.Auto.REQUIRED);
@@ -79,15 +79,16 @@ public class LLM {
         ChatCompletion completion = client.chat().completions().create(paramsBuilder.build());
         ChatCompletionMessage message = completion.choices().get(0).message();
 
-        Assert.isTrue(message.toolCalls().isPresent(), "模型没有调用tool");
+        // 没有调用工具
+        if (message.toolCalls().isEmpty()) {
+            log.warn("没有调用工具, {}", context.getRequest().getRequestId());
+        }
 
-        return message.toolCalls().get().stream()
-                .map(toolCall -> Tools.convert(toolCall.asFunction(), tools))
-                .collect(Collectors.toList());
+        return message;
     }
 
     /**
-     * 流式文本生成
+     * 流式文本生成，不支持工具
      */
     public Stream<String> stream(Prompt prompt, LLMContext context) {
         ChatCompletionCreateParams.Builder paramsBuilder = params.toBuilder();
@@ -103,5 +104,17 @@ public class LLM {
                 .flatMap(chunk -> chunk.choices().stream())
                 .flatMap(choice -> choice.delta().content().stream())
                 .onClose(streamResponse::close);
+    }
+
+    /**
+     * 不使用工具，直接调用模型
+     */
+    public String noStream(Prompt prompt, LLMContext context) {
+        ChatCompletionCreateParams.Builder paramsBuilder = params.toBuilder();
+        prompt.getMessages().forEach(paramsBuilder::addMessage);
+
+        return client.chat().completions().create(paramsBuilder.build()).choices().stream()
+                .flatMap(choice -> choice.message().content().stream())
+                .collect(Collectors.joining());
     }
 }
