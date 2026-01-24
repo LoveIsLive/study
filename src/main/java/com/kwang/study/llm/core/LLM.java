@@ -38,8 +38,8 @@ public class LLM {
                 .temperature(config.getTemperature() != null ? config.getTemperature() : 0.7);
 
         // 3. 填充 System Prompt
-        if (config.getSystemPrompt() != null && !config.getSystemPrompt().isEmpty()) {
-            paramsBuilder.addSystemMessage(config.getSystemPrompt());
+        if (context.getSystemPrompt() != null && !context.getSystemPrompt().isEmpty()) {
+            paramsBuilder.addSystemMessage(context.getSystemPrompt());
         } else {
             paramsBuilder.addSystemMessage("当前时间为：" +
                     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now()));

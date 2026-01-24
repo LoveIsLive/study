@@ -24,6 +24,6 @@ public class LLMGlobalConfig {
         private String baseUrl;
         private String modelName;
         private Double temperature;
-        private String systemPrompt;
+        private String systemPromptTemplate;
     }
 }

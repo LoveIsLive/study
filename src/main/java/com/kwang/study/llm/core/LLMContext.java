@@ -23,6 +23,8 @@ public class LLMContext {
 
     // 包含当前场景的大模型配置
     private LLMGlobalConfig.SceneConfig llmConfig;
+    // 填充后的systemPrompt
+    private String systemPrompt;
 
     private ChatRequestDTO request;
 }

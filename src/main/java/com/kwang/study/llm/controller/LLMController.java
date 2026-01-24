@@ -67,7 +67,7 @@ public class LLMController {
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@Valid @RequestPart ChatRequestDTO request,
                                  @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws Exception {
-
+        request.setType("stream");
         processFile(smallFiles, request);
         return llmService.streamChat(request);
     }
@@ -79,6 +79,7 @@ public class LLMController {
     @PostMapping("/chat/agent")
     public ResponseEntity<R<ChatCompletionMessage>> agentChat(@Valid @RequestPart ChatRequestDTO request,
                                                               @RequestPart(value = "files", required = false) List<MultipartFile> smallFiles) throws Exception {
+        request.setType("agent");
         processFile(smallFiles, request);
 
         ChatCompletionMessage result = llmService.agentChat(request);

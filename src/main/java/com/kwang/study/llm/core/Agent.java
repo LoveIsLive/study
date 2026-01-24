@@ -77,7 +77,7 @@ public class Agent {
                 return message;
             }
             count++;
-        } while (count < 3);
+        } while (count < 5);
 
         throw new IllegalStateException("调用次数多于" + (count - 1) + "次");
     }

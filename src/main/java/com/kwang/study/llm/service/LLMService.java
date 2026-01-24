@@ -46,6 +46,8 @@ public class LLMService {
     private ObjectMapper objectMapper;
     @Autowired
     private FileStorageService fileStorageService;
+    @Autowired
+    private RAG rag;
 
     /**
      * 生成新的会话ID
@@ -73,20 +75,36 @@ public class LLMService {
         LLMGlobalConfig.SceneConfig sceneConfig = llmGlobalConfig.getScenes().getOrDefault(request.getScene(),
                 llmGlobalConfig.getScenes().get("default"));
 
-        log.info("sceneConfig:{}", sceneConfig);
-        log.info("request.getContentPartMessage:{}", request.getContentPartMessage());
         // 存在附件时强制使用qwen3-vl-plus模型
-        if (request.getContentPartMessage() != null) {
+        boolean existContentPart = request.getContentPartMessage() != null;
+        if (!existContentPart) {
+            List<ChatMemory> memories = chatMemoryMapper.findBySessionId(request.getSessionId());
+            for (ChatMemory memory : memories) {
+                if ("file".equals(memory.getType())) {
+                    existContentPart = true;
+                    break;
+                }
+            }
+        }
+        if (existContentPart) {
             LLMGlobalConfig.SceneConfig finalSceneConfig = new LLMGlobalConfig.SceneConfig();
             BeanUtils.copyProperties(sceneConfig, finalSceneConfig);
 
-            finalSceneConfig.setModelName("qwen3-vl-plus");
-            finalSceneConfig.setApiKey("sk-d0d552efe91d4512b74c9cfdb671c544");
-            finalSceneConfig.setBaseUrl("https://dashscope.aliyuncs.com/compatible-mode/v1");
+            LLMGlobalConfig.SceneConfig imageConfig = llmGlobalConfig.getScenes().getOrDefault("image",
+                    llmGlobalConfig.getScenes().get("default"));
+            finalSceneConfig.setModelName(imageConfig.getModelName());
+            finalSceneConfig.setApiKey(imageConfig.getApiKey());
+            finalSceneConfig.setBaseUrl(imageConfig.getBaseUrl());
             sceneConfig = finalSceneConfig;
         }
 
-        // TODO: 处理RAG
+        String systemPrompt = "";
+        try {
+            systemPrompt = rag.build(request, sceneConfig.getSystemPromptTemplate());
+        } catch (JsonProcessingException e) {
+            log.error(e.getMessage(), e);
+            throw new RuntimeException(e);
+        }
 
         return LLMContext.builder()
                 .userId(userId)
@@ -95,6 +113,7 @@ public class LLMService {
                 .sceneParams(request.getSceneParams())
                 .llmConfig(sceneConfig)
                 .request(request)
+                .systemPrompt(systemPrompt)
                 .build();
     }
 
