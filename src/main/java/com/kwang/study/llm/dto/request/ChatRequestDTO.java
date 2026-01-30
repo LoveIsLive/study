@@ -14,9 +14,6 @@ public class ChatRequestDTO {
     @NotBlank(message = "Message cannot be empty")
     private String message;
 
-    // 请求类型，stream / agent
-    private String type;
-
     // 上下文感知参数
     private String scene;
     private Map<String, Object> sceneParams;
@@ -27,4 +24,7 @@ public class ChatRequestDTO {
     private ContentPartMessage contentPartMessage;
 
     private String requestId;
+
+    // 请求类型，stream / agent,由接口设置
+    private String type;
 }

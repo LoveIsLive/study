@@ -12,6 +12,7 @@ public enum HomeworkSubmissionStatusEnum {
     RETURNED("被退回"),
     HAVE_UPDATED("作业有更新"),
     RE_SUBMITTED("重新提交"),
+    GRADED("已批改"),
 
     ;
 

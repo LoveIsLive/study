@@ -52,13 +52,14 @@ public class LLMService {
     /**
      * 生成新的会话ID
      */
-    public String createSessionId() {
+    public String createSessionId(String purpose) {
+        // 暂时不去做策略
         return UUID.randomUUID().toString();
     }
 
-    public List<ChatSession> getUserSessions() {
+    public List<ChatSession> getUserSessions(String purpose) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
-        return chatSessionMapper.findByUserId(userId);
+        return chatSessionMapper.findByUserIdAndPurpose(userId, purpose);
     }
 
     /**
@@ -122,7 +123,7 @@ public class LLMService {
      * request和response有且仅能有一个不为null
      */
     @Transactional
-    public Pair<ChatSession, ChatMemory> saveMemory(ChatMemory chatMemory) {
+    public Pair<ChatSession, ChatMemory> saveMemory(ChatMemory chatMemory, LLMContext context) {
         ChatSession session = chatSessionMapper.findBySessionId(chatMemory.getSessionId());
         if (session == null) {
             // 只有当这是第一条消息（通常是User发的）才创建，或者系统恢复时
@@ -146,10 +147,17 @@ public class LLMService {
                 title = "新会话"; // 防止第一条是 AI 发的（极少情况）
             }
 
+            String purpose = "chat_window";
+            // 应当配合new_session的策略，根据session_id来判断是哪个purpose。这里只适配少数场景
+            if ("homework-gen".equals(context.getScene())) {
+                purpose = "homework-gen";
+            }
+
             ChatSession newSession = ChatSession.builder()
                     .sessionId(chatMemory.getSessionId())
                     .userId(chatMemory.getUserId())
                     .title(title)
+                    .purpose(purpose)
                     .build();
             chatSessionMapper.insert(newSession);
             session = newSession;
@@ -192,7 +200,7 @@ public class LLMService {
                 .role("user")
                 .type(pair.getKey())
                 .content(pair.getValue())
-                .build());
+                .build(), context);
         List<ChatMemory> history = new ArrayList<>(oldHistory);
         history.add(memory.getValue());
 
@@ -225,7 +233,7 @@ public class LLMService {
                             .role("assistant")
                             .content(fullResponse.toString())
                             .type("text")
-                            .build());
+                            .build(), context);
                     emitter.complete();
                 }
             } catch (Exception e) {
@@ -258,7 +266,7 @@ public class LLMService {
                 .role("user")
                 .type(pair.getKey())
                 .content(pair.getValue())
-                .build());
+                .build(), context);
 
         try {
             // 2. 调用 Agent 执行 (Agent 内部会自行查询数据库获取历史记录)
@@ -272,7 +280,7 @@ public class LLMService {
                     .role("assistant")
                     .content(value)
                     .type("tool")
-                    .build());
+                    .build(), context);
             return message;
         } catch (Exception e) {
             log.error("Agent Chat Error", e);

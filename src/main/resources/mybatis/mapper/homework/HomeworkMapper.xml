@@ -7,6 +7,8 @@
         <result property="teacherId" column="teacher_id"/>
         <result property="title" column="title"/>
         <result property="content" column="content"/>
+        <result property="type" column="type" />
+        <result property="metaData" column="meta_data" />
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
         <!-- 一对多关联查询附件 -->
@@ -20,12 +22,12 @@
     </resultMap>
 
     <sql id="Join_Base_Column_List">
-        h.id, h.teacher_id, h.title, h.content, h.create_time, h.update_time, 'homework' AS owner_type
+        h.id, h.teacher_id, h.title, h.content, h.create_time, h.update_time, h.type, h.meta_data, 'homework' AS owner_type
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO homework (teacher_id, title, content)
-        VALUES (#{teacherId}, #{title}, #{content})
+        INSERT INTO homework (teacher_id, title, content, type, meta_data)
+        VALUES (#{teacherId}, #{title}, #{content}, #{type}, #{metaData})
     </insert>
 
     <select id="findById" resultMap="HomeworkDetailResultMap">
@@ -63,6 +65,12 @@
             </if>
             <if test="content != null">
                 content = #{content},
+            </if>
+            <if test="type != null">
+                type = #{type},
+            </if>
+            <if test="metaData != null">
+                meta_data = #{metaData},
             </if>
         </set>
         WHERE

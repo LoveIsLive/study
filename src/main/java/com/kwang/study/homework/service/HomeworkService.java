@@ -1,11 +1,18 @@
 package com.kwang.study.homework.service;
 
+import cn.hutool.core.util.ObjectUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.fs.dto.result.MimeTypeIdResult;
 import com.kwang.study.fs.service.FileStorageService;
+import com.kwang.study.homework.dto.json.HomeworkMetaDTO;
+import com.kwang.study.homework.dto.json.SubmissionGradingDTO;
 import com.kwang.study.homework.dto.request.*;
 import com.kwang.study.homework.enums.HomeworkSubmissionStatusEnum;
 import com.kwang.study.homework.pojo.*;
@@ -16,7 +23,7 @@ import com.kwang.study.homework.service.async.AsyncCleanupFileObjService;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.ClassMemberMapper;
-import com.kwang.study.organization.service.ClassMemberService;
+import com.kwang.study.utils.CloneUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -64,6 +71,12 @@ public class HomeworkService {
     @Autowired
     private ClassMemberMapper classMemberMapper;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private HomeworkValidator homeworkValidator;
+
     public static final String HOMEWORK_ATTACHMENT_OWNER_TYPE = "homework";
     public static final String SUBMISSION_ATTACHMENT_OWNER_TYPE = "submission";
 
@@ -82,6 +95,16 @@ public class HomeworkService {
         homework.setTeacherId(currentUserId);
         homework.setTitle(dto.getTitle());
         homework.setContent(dto.getContent());
+
+        homework.setType(dto.getType());
+        if ("STRUCTURED".equals(dto.getType()) && dto.getMetaData() != null) {
+            // 1. Map -> POJO
+            HomeworkMetaDTO meta = objectMapper.convertValue(dto.getMetaData(), HomeworkMetaDTO.class);
+            // 2. 校验
+            homeworkValidator.validateHomeworkMeta(meta);
+            // 3. 序列化存储
+            homework.setMetaData(objectMapper.writeValueAsString(meta));
+        }
         homeworkMapper.insert(homework);
 
         handleAttachment(homework.getId(), HOMEWORK_ATTACHMENT_OWNER_TYPE,
@@ -104,6 +127,12 @@ public class HomeworkService {
         homeworkToUpdate.setId(homeworkId);
         homeworkToUpdate.setTitle(dto.getTitle());
         homeworkToUpdate.setContent(dto.getContent());
+
+        homeworkToUpdate.setType(dto.getType());
+        if ("STRUCTURED".equals(dto.getType()) && dto.getMetaData() != null) {
+            homeworkToUpdate.setMetaData(objectMapper.writeValueAsString(dto.getMetaData()));
+        }
+
         int i = homeworkMapper.updateById(homeworkToUpdate);
         Assert.isTrue(i > 0, "更新作业失败");
 
@@ -191,7 +220,7 @@ public class HomeworkService {
         HomeworkDetail result = homeworkMapper.findById(homeworkId);
         validateStudentPermission(result.getTeacherId());
 
-        return result;
+        return (HomeworkDetail) desensitization(result);
     }
 
     /**
@@ -234,6 +263,13 @@ public class HomeworkService {
         submission.setStudentId(currentUserId);
         submission.setContent(dto.getContent());
         submission.setStatus(HomeworkSubmissionStatusEnum.SUBMITTED.getValue());
+
+        if ("STRUCTURED".equals(homeworkDetail.getType()) && dto.getAnswerData() != null) {
+            // 校验提交数据
+            homeworkValidator.validateSubmission(homeworkDetail.getMetaData(), dto.getAnswerData());
+            submission.setAnswerData(objectMapper.writeValueAsString(dto.getAnswerData()));
+        }
+
         submissionMapper.insert(submission);
 
         handleAttachment(submission.getId(), SUBMISSION_ATTACHMENT_OWNER_TYPE,
@@ -347,7 +383,89 @@ public class HomeworkService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 教师批改作业
+     * 权限：管理员、校长、教师（与作业发布者一致）
+     */
+    @Transactional
+    public HomeworkSubmissionDetail gradeSubmission(SubmissionGradingDTO dto) {
+        HomeworkSubmissionDetail submission = submissionMapper.findById(dto.getSubmissionId());
+        Assert.notNull(submission, "提交记录不存在");
+
+        HomeworkDetail homework = homeworkMapper.findById(submission.getHomeworkId());
+        validateTeacherPermission(homework.getTeacherId());
+
+        // 3. 计算总分并构建 JSON
+        Integer totalScore = dto.getManualTotalScore();
+        String gradingDataJson = "{}";
+
+        if ("STRUCTURED".equals(homework.getType()) && dto.getDetails() != null) {
+            // 结构化作业：累加每一题的分数
+            for (SubmissionGradingDTO.QuestionGradingItem item : dto.getDetails().values()) {
+                if (item.getScore() != null) {
+                    totalScore += item.getScore();
+                }
+            }
+            try {
+                gradingDataJson = objectMapper.writeValueAsString(dto);
+            } catch (Exception e) {
+                log.error("JSON serialization failed", e);
+            }
+        }
+
+        // 4. 更新对象
+        HomeworkSubmission updateEntity = new HomeworkSubmission();
+        updateEntity.setId(submission.getId());
+        updateEntity.setScore(totalScore);
+        updateEntity.setGradingData(gradingDataJson);
+        updateEntity.setStatus(HomeworkSubmissionStatusEnum.GRADED.getValue());
+
+        submissionMapper.updateById(updateEntity);
+
+        return submissionMapper.findById(submission.getId());
+    }
+    /**
+     * 查看某个作业提交
+     * 权限：学生本人、相应教师、校长管理员
+     */
+    public HomeworkSubmissionDetail getSubmissionById(Long submissionId) {
+        HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(submissionId);
+        validateStudentPermission(submissionDetail.getStudentId());
+        if (userInfoUtils.currentUserInClassIsStudent()) {
+            Assert.isTrue(Objects.equals(AuthenticationUserUtil.getCurrentUserId(), submissionDetail.getStudentId()),
+                    "学生查看非本人作业提交");
+        }
+
+        HomeworkSubmissionDetail result = CloneUtil.clone(submissionDetail, HomeworkSubmissionDetail.class); // 深拷贝
+        result.setHomework(desensitization(result.getHomework()));
+        return result;
+    }
+
     // --- 私有辅助方法 ---
+    // 返回一个新的HomeworkDetail
+    private Homework desensitization(Homework homeworkDetail) {
+        // 如果是学生，且是结构化作业，进行脱敏
+        Homework result = CloneUtil.clone(homeworkDetail, Homework.class); // 深拷贝
+        if (userInfoUtils.currentUserInClassIsStudent() && "STRUCTURED".equals(result.getType()) && result.getMetaData() != null) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(result.getMetaData());
+                if (root.has("questions")) {
+                    for (com.fasterxml.jackson.databind.JsonNode node : root.get("questions")) {
+                        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode) {
+                            ((com.fasterxml.jackson.databind.node.ObjectNode) node).remove(java.util.Arrays.asList("correctAnswer", "analysis", "aiGradingCriteria"));
+                        }
+                    }
+                }
+                result.setMetaData(root.toString());
+            } catch (Exception e) {
+                log.error("脱敏失败", e);
+                result.setMetaData("{}"); // 安全起见
+            }
+        }
+        return result;
+    }
+
+
     /**
      * 查看某一个教师发布的所有作业
      */
@@ -505,5 +623,27 @@ public class HomeworkService {
                 return;
         }
         throw new IllegalStateException("你无权限操作");
+    }
+
+    /**
+     * 辅助方法：从 JSON 中移除答案字段
+     */
+    private String removeSensitiveData(String jsonString) throws IOException {
+        JsonNode root = objectMapper.readTree(jsonString);
+
+        // 假设 metaData 结构为 { "questions": [ ... ] }
+        if (root.has("questions") && root.get("questions").isArray()) {
+            ArrayNode questions = (ArrayNode) root.get("questions");
+            for (JsonNode node : questions) {
+                if (node instanceof ObjectNode) {
+                    ObjectNode q = (ObjectNode) node;
+                    // 移除标准答案、AI评分标准、解析
+                    q.remove("correctAnswer");
+                    q.remove("aiGradingCriteria");
+                    q.remove("analysis");
+                }
+            }
+        }
+        return root.toString();
     }
 }

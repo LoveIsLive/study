@@ -1,10 +1,12 @@
 package com.kwang.study;
 
 import cn.hutool.core.util.HexUtil;
+import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.nacos.api.NacosFactory;
 import com.alibaba.nacos.api.PropertyKeyConst;
 import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.exception.NacosException;
+import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.apache.commons.text.StringSubstitutor;
@@ -47,7 +49,9 @@ public class TestMain {
 
     @Test
     public void f() throws Exception {
-        MimeType mimeType = new MimeType("text", "plain");
-        System.out.println(mimeType);
+        HomeworkSubmissionDetail detail = new HomeworkSubmissionDetail();
+        detail.setId(1L);
+        HomeworkSubmissionDetail cloned = ObjectUtil.cloneByStream(detail);
+        System.out.println(cloned);
     }
 }

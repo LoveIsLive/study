@@ -56,8 +56,8 @@ public class LLMController {
      * 1. 获取新的 Session ID
      */
     @GetMapping("/session/new")
-    public ResponseEntity<R<String>> createSession() {
-        return ResponseEntity.ok(R.success(llmService.createSessionId()));
+    public ResponseEntity<R<String>> createSession(@RequestParam(name = "purpose", defaultValue = "chat_window") String purpose) {
+        return ResponseEntity.ok(R.success(llmService.createSessionId(purpose)));
     }
 
     /**
@@ -95,8 +95,9 @@ public class LLMController {
     }
 
     @GetMapping("/sessions")
-    public ResponseEntity<R<List<ChatSession>>> getSessions() {
-        return ResponseEntity.ok(R.success(llmService.getUserSessions()));
+    public ResponseEntity<R<List<ChatSession>>> getSessions(@RequestParam(name = "purpose",
+            defaultValue = "chat_window") String purpose) {
+        return ResponseEntity.ok(R.success(llmService.getUserSessions(purpose)));
     }
 
     @DeleteMapping("/session/{sessionId}")

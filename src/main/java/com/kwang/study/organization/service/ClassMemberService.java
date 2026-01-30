@@ -16,7 +16,6 @@ import com.kwang.study.organization.pojo.Classes;
 import com.kwang.study.organization.pojo.SchoolMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

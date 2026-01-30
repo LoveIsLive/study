@@ -119,9 +119,72 @@ public class Tools {
         }
     }
 
+    @EqualsAndHashCode(callSuper = true)
+    @JsonClassDescription("当用户要求生成作业、测验、考试题目时，调用此工具。支持单选、多选、问答题。")
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    public static class HomeworkGenerationTool extends Tool {
+        @JsonPropertyDescription("作业的总标题")
+        public Optional<String> title;
+
+        @JsonPropertyDescription("作业的详细说明或导语 (Content)")
+        public Optional<String> content;
+
+        @JsonPropertyDescription("生成的题目列表")
+        public Optional<List<GeneratedQuestion>> questions;
+
+        @JsonPropertyDescription("需要删除的题目列表")
+        public Optional<List<String>> deleteQuestions;
+
+        @Data
+        public static class GeneratedQuestion {
+            @JsonPropertyDescription("题目ID。如果是修改已有的题目，必须回传原题目id；如果是新增题目，请置为null")
+            public Optional<String> id;
+
+            @JsonPropertyDescription("题目类型。必须是以下值之一: 'SINGLE_CHOICE' (单选), 'MULTI_CHOICE' (多选), 'TEXT' (简答/填空)")
+            public Optional<String> type;
+
+            @JsonPropertyDescription("题干内容")
+            public Optional<String> title;
+
+            @JsonPropertyDescription("该题分值")
+            public Optional<Integer> score;
+
+            @JsonPropertyDescription("选项列表。如果是选择题，必须提供。")
+            public Optional<List<GeneratedOption>> options;
+
+            @JsonPropertyDescription("正确答案列表。单选存一个标签如['A']；多选存多个标签如['A','B']；简答题存参考答案如['关键点1...']。")
+            public Optional<List<String>> correctAnswer;
+
+            @JsonPropertyDescription("题目解析。解释为什么选这个答案。")
+            public Optional<String> analysis;
+
+            @JsonPropertyDescription("AI评分标准。仅用于'TEXT'类型，描述得分点。")
+            public Optional<String> aiGradingCriteria;
+        }
+
+        @Data
+        public static class GeneratedOption {
+            @JsonPropertyDescription("选项ID。如果是修改已有的选项，必须回传原选项id；如果是新增选项，请置为null")
+            public Optional<String> id;
+            @JsonPropertyDescription("选项标号，如 A, B, C, D")
+            public Optional<String> label;
+            @JsonPropertyDescription("选项的具体内容")
+            public Optional<String> text;
+        }
+
+        @Override
+        public boolean isTerminal() {
+            return true;
+        }
+    }
+
     public static final List<Class<?>> SUPPORTED_TOOLS = List.of(ReplayTool.class,
             SqlExecutorTool.class,
-            EChartsTool.class
+            EChartsTool.class,
+            HomeworkGenerationTool.class
     );
 
     public static List<Tools.Tool> convert(ChatCompletionMessage message, List<Class<?>> toolClasses) {

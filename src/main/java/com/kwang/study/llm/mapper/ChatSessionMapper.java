@@ -7,8 +7,8 @@ import java.util.List;
 
 @Mapper
 public interface ChatSessionMapper {
-    @Insert("INSERT INTO chat_sessions(session_id, user_id, title, create_time, update_time) " +
-            "VALUES(#{sessionId}, #{userId}, #{title}, NOW(), NOW())")
+    @Insert("INSERT INTO chat_sessions(session_id, user_id, title, purpose, create_time, update_time) " +
+            "VALUES(#{sessionId}, #{userId}, #{title}, #{purpose}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(ChatSession session);
 
@@ -17,6 +17,9 @@ public interface ChatSessionMapper {
 
     @Select("SELECT * FROM chat_sessions WHERE user_id = #{userId} ORDER BY update_time DESC")
     List<ChatSession> findByUserId(Long userId);
+
+    @Select("SELECT * FROM chat_sessions WHERE user_id = #{userId} AND purpose = #{purpose} ORDER BY update_time DESC")
+    List<ChatSession> findByUserIdAndPurpose(Long userId, String purpose);
 
     @Update("UPDATE chat_sessions SET update_time = NOW() WHERE session_id = #{sessionId}")
     void updateTime(String sessionId);

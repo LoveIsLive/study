@@ -5,7 +5,12 @@ import com.kwang.study.auth.pojo.User;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import javax.servlet.http.HttpSession;
 
 @Component
 public class UserInfoUtils {
@@ -40,6 +45,15 @@ public class UserInfoUtils {
         String userName = AuthenticationUserUtil.getCurrentUserName();
         if (userName == null) return null;
 
-        return userMapper.findByUsernameWithOrgInfo(userName);
+        ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        // 存入session进行缓存
+        HttpSession session = attr.getRequest().getSession(true); // true 表示如果不存在则创建
+        if (session.getAttribute("auth#currentUserInfoWithOrgInfo") != null) {
+            return (User) session.getAttribute("auth#currentUserInfoWithOrgInfo");
+        }
+
+        User userWithOrgInfo = userMapper.findByUsernameWithOrgInfo(userName);
+        session.setAttribute("auth#currentUserInfoWithOrgInfo", userWithOrgInfo);
+        return userWithOrgInfo;
     }
 }

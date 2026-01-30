@@ -4,6 +4,7 @@ package com.kwang.study.homework.controller;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.common.R;
+import com.kwang.study.homework.dto.json.SubmissionGradingDTO;
 import com.kwang.study.homework.dto.request.HomeworkSubmissionUpdateDTO;
 import com.kwang.study.homework.dto.request.HomeworkUpdateDTO;
 import com.kwang.study.homework.dto.request.SubmissionCreateDTO;
@@ -91,5 +92,25 @@ public class SubmissionController {
     public ResponseEntity<R<HomeworkSubmissionDetail>> getStudentSubmission(@PathVariable Long homeworkId) {
         HomeworkSubmissionDetail submission = homeworkService.getSubmissionByStudent(homeworkId);
         return ResponseEntity.ok(R.success(submission));
+    }
+
+    /**
+     * 查看某个作业提交
+     * 权限：学生本人、相应教师、校长管理员
+     */
+    @GetMapping("/{submissionId}")
+    public ResponseEntity<R<HomeworkSubmissionDetail>> getSubmission(@PathVariable Long submissionId) {
+        HomeworkSubmissionDetail submission = homeworkService.getSubmissionById(submissionId);
+        return ResponseEntity.ok(R.success(submission));
+    }
+
+    /**
+     * 教师批改作业
+     * 权限：管理员、校长、教师（与作业发布者一致）
+     */
+    @PostMapping("/grade")
+    public ResponseEntity<R<HomeworkSubmissionDetail>> gradeSubmission(@RequestBody SubmissionGradingDTO dto) {
+        HomeworkSubmissionDetail gradedSubmission = homeworkService.gradeSubmission(dto);
+        return ResponseEntity.ok(R.success(gradedSubmission));
     }
 }

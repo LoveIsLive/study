@@ -11,6 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class AttachmentDetail extends Attachment {
+    private static final long serialVersionUID = 562316552837964769L;
     /**
      * mime类型名称
      */
