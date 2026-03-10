@@ -25,5 +25,6 @@ public class LLMGlobalConfig {
         private String modelName;
         private Double temperature;
         private String systemPromptTemplate;
+        private Boolean enable_thinking;
     }
 }

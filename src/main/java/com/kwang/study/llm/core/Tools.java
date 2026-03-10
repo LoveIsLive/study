@@ -8,10 +8,19 @@ import com.openai.models.chat.completions.ChatCompletionMessage;
 import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall;
 import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
 import lombok.*;
+import net.sf.jsqlparser.JSQLParserException;
+import net.sf.jsqlparser.expression.LongValue;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.select.SetOperationList;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.Assert;
 
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -64,34 +73,40 @@ public class Tools {
 
         @Override
         public Object execute() {
-            // 安全性检查
-            if (sql == null || !sql.trim().toUpperCase().startsWith("SELECT")) {
-                return "Error: Only SELECT statements are allowed for safety reasons.";
-            }
-
             try {
+                String processedSql = processSQL(sql);
                 // 获取 Spring 上下文中的 JdbcTemplate
                 JdbcTemplate jdbcTemplate = SpringContextUtil.getBean(JdbcTemplate.class);
 
-                // 执行查询
-                // limit 限制，防止大模型查出全表把内存撑爆
-                String finalSql = sql;
-                if (!sql.toUpperCase().contains("LIMIT")) {
-                    finalSql += " LIMIT 20";
-                }
-
-                List<Map<String, Object>> result = jdbcTemplate.queryForList(finalSql);
+                List<Map<String, Object>> result = jdbcTemplate.queryForList(processedSql);
 
                 if (result.isEmpty()) {
                     return "Query executed successfully but returned no results.";
                 }
                 return result;
-
             } catch (BadSqlGrammarException e) {
                 return "SQL Syntax Error: " + e.getSQLException().getMessage();
             } catch (Exception e) {
                 return "Database Error: " + e.getMessage();
             }
+        }
+
+        private String processSQL(String sql) throws JSQLParserException {
+            if (sql == null)
+                throw new IllegalArgumentException("sql is null");
+            // 1. 解析SQL
+            Statement statement = CCJSqlParserUtil.parse(sql);
+            if (!(statement instanceof Select))
+                throw new JSQLParserException("select statement is not Select");
+
+            Select select = (Select) statement;
+
+            Limit limit = new Limit();
+            limit.setRowCount(new LongValue(20));
+            select.setLimit(limit);
+
+            // 5. 重新生成 SQL 并追加分号
+            return statement + ";";
         }
     }
 
@@ -192,6 +207,7 @@ public class Tools {
         if (toolCallsTemp.isEmpty()) {
             return List.of();
         }
+        // TODO: 没选择工具可以将内容包装成ReplayTool返回
         List<ChatCompletionMessageToolCall> toolCalls = toolCallsTemp.get();
         HashMap<String, Class<?>> map = new HashMap<>(toolCalls.size());
         toolClasses.forEach(toolCall -> {
@@ -202,8 +218,7 @@ public class Tools {
                 .map(toolCall -> {
                     ChatCompletionMessageFunctionToolCall function = toolCall.asFunction();
                     Class<?> target = map.get(function.function().name());
-                    Assert.notNull(target, String.format("模型所选择工具不在传入的toolClasses中, %s, %s", function.function().name(), toolClasses));
-                    Tool tool = (Tool) function.function().arguments(target);
+                    Assert.notNull(target, String.format("模型所选择工具不在传入的toolClasses中, %s, %s", function.function().name(), toolClasses));Tool tool = (Tool) function.function().arguments(target);
                     tool.setToolCallId(function.id());
                     return tool;
                 }).collect(Collectors.toList());

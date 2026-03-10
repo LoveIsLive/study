@@ -126,11 +126,14 @@ public class RAG {
 
     private void baseInfo(Map<String, String> map) throws JsonProcessingException {
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        String userString = objectMapper.writeValueAsString(user);
+        // 需要进行脱敏、格式化处理
+//        String userString = objectMapper.writeValueAsString(user);
+        StringBuilder userString = new StringBuilder();
+        userString.append("姓名：").append(user.getUsername());
         String scene = request.getScene();
 
         map.putAll(Map.of("current_scene", scene,
-                "user_info", userString,
+                "user_info", userString.toString(),
                 "current_time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
     }
 

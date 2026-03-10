@@ -3,7 +3,10 @@ package com.kwang.study.llm.core;
 import com.kwang.study.llm.config.LLMGlobalConfig;
 import com.kwang.study.llm.util.OpenAIClientManager;
 import com.openai.client.OpenAIClient;
+import com.openai.core.JsonValue;
 import com.openai.core.http.StreamResponse;
+import com.openai.models.ResponseFormatJsonObject;
+import com.openai.models.audio.translations.TranslationCreateParams;
 import com.openai.models.chat.completions.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
@@ -46,6 +49,9 @@ public class LLM {
         }
         // 只要一个choice
         paramsBuilder.n(1);
+        if (config.getEnable_thinking() != null) {
+            paramsBuilder.putAdditionalBodyProperty("enable_thinking", JsonValue.from(config.getEnable_thinking()));
+        }
         this.params = paramsBuilder.build();
     }
 
@@ -71,8 +77,6 @@ public class LLM {
 
         // 工具集的选择应该也是可以按场景配置的，需要LLMContext
         tools.forEach(paramsBuilder::addTool);
-        // 必须调用tool
-        paramsBuilder.toolChoice(ChatCompletionToolChoiceOption.Auto.REQUIRED);
 
         prompt.getMessages().forEach(paramsBuilder::addMessage);
 
