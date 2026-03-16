@@ -170,7 +170,8 @@ public class Tools {
             @JsonPropertyDescription("选项列表。如果是选择题，必须提供。")
             public Optional<List<GeneratedOption>> options;
 
-            @JsonPropertyDescription("正确答案列表。单选存一个标签如['A']；多选存多个标签如['A','B']；简答题存参考答案如['关键点1...']。")
+            @JsonPropertyDescription("正确答案列表。单选存一个标签如['A']；多选存多个标签如['A','B']；简答题存参考答案如['关键点1...']。" +
+                    "在修改题目时，此值可能是已有的选项id而不是标签。")
             public Optional<List<String>> correctAnswer;
 
             @JsonPropertyDescription("题目解析。解释为什么选这个答案。")
@@ -196,10 +197,42 @@ public class Tools {
         }
     }
 
+    @EqualsAndHashCode(callSuper = true)
+    @JsonClassDescription("当系统请求你批改学生的主观题（简答题/填空题）时，调用此工具。你需要根据给定的题目内容、参考答案和评分标准，给出每道题的得分和评语，并给出一个总评。")
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class HomeworkGradingTool extends Tool {
+        @JsonPropertyDescription("教师对整份作业的总评语（鼓励为主，指出核心优缺点，语气要像一位负责任的老师）")
+        public String generalComment;
+
+        @JsonPropertyDescription("每道主观题的批改详情列表。")
+        public List<GradingDetail> details;
+
+        @Data
+        public static class GradingDetail {
+            @JsonPropertyDescription("题目ID (务必与输入数据中的题目ID保持完全一致)")
+            public String questionId;
+
+            @JsonPropertyDescription("该题得分 (必须是整数，且绝不能超过该题的满分)")
+            public Integer score;
+
+            @JsonPropertyDescription("该题的具体批改评语 (指出得分点或失分原因)")
+            public String comment;
+        }
+
+        @Override
+        public boolean isTerminal() {
+            return true;
+        }
+    }
+
+
     public static final List<Class<?>> SUPPORTED_TOOLS = List.of(ReplayTool.class,
             SqlExecutorTool.class,
             EChartsTool.class,
-            HomeworkGenerationTool.class
+            HomeworkGenerationTool.class,
+            HomeworkGradingTool.class
     );
 
     public static List<Tools.Tool> convert(ChatCompletionMessage message, List<Class<?>> toolClasses) {

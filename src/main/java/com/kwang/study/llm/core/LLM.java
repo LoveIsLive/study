@@ -84,7 +84,7 @@ public class LLM {
         ChatCompletionMessage message = completion.choices().get(0).message();
 
         // 没有调用工具
-        if (message.toolCalls().isEmpty()) {
+        if (message.toolCalls().isEmpty() && context.getRequest() != null) {
             log.warn("没有调用工具, {}", context.getRequest().getRequestId());
         }
 

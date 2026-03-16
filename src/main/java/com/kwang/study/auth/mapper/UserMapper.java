@@ -9,6 +9,7 @@ import java.util.List;
 
 @Mapper
 public interface UserMapper {
+    // 注意：返回的都是去掉后缀的，用户角度的用户名
     User findById(@Param("id") Long id);
 
     User findByIdWithOrgInfo(Long id);

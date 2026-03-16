@@ -41,7 +41,7 @@
             sm.role AS sm_role,
             sm.join_time AS sm_join_time,
             u.id AS u_id,
-            SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS u_username,
+            SUBSTRING_INDEX(u.username, '_', -1) AS u_username,
             u.enabled AS u_enabled
         FROM school_members sm
                  JOIN users u ON sm.user_id = u.id

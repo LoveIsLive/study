@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 允许各个模块的入口访问、登录接口，以及所有的静态资源
                         .antMatchers(AUTH_BASE_PREFIX + "/login",
-                                AUTH_BASE_PREFIX + "/public/schools",
+                                AUTH_BASE_PREFIX + "/public/**",
                                 "/",
                                 "/index.html",
                                 "/favicon.ico",

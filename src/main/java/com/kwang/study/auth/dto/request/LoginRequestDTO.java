@@ -15,6 +15,8 @@ public class LoginRequestDTO extends BaseRequestDTO {
 
     // 非必填，如果是Admin登录则不传
     private Long schoolId;
+    // 非必填，如果是Admin/校长登录则不传
+    private Long classId;
 
     @NotBlank(message = "账号不能为空")
     private String username;

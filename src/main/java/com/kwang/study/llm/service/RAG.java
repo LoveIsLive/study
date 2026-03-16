@@ -4,8 +4,12 @@ import cn.hutool.core.lang.Pair;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.llm.dto.request.ChatRequestDTO;
+import com.kwang.study.organization.mapper.SchoolMapper;
+import com.kwang.study.organization.pojo.School;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringSubstitutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -14,12 +18,15 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 @Component
 public class RAG {
     @Autowired
     private UserInfoUtils userInfoUtils;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private SchoolMapper schoolMapper;
 
     private ChatRequestDTO request;
 
@@ -39,6 +46,10 @@ public class RAG {
             case "homework-gen":
                 sub = processHomeworkGen();
                 template = Objects.requireNonNullElse(template, HOMEWORK_GEN_SYSTEM_PROMPT);
+                break;
+            case "homework-grading":
+                sub = processHomeworkGrading();
+                template = Objects.requireNonNullElse(template, HOMEWORK_GRADE_SYSTEM_PROMPT);
                 break;
             default:
                 sub = new HashMap<>();
@@ -124,14 +135,38 @@ public class RAG {
         return result;
     }
 
+    private Map<String, String> processHomeworkGrading() throws JsonProcessingException {
+        HashMap<String, String> result = new HashMap<>();
+        baseInfo(result);
+        return result;
+    }
+
     private void baseInfo(Map<String, String> map) throws JsonProcessingException {
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
         // 需要进行脱敏、格式化处理
-//        String userString = objectMapper.writeValueAsString(user);
         StringBuilder userString = new StringBuilder();
-        userString.append("姓名：").append(user.getUsername());
-        String scene = request.getScene();
+        userString.append("姓名：").append(user.getUsername()).append('；');
 
+        try {
+            if (AuthenticationUserUtil.currentUserIsAdmin()) {
+                userString.append("角色：管理员；");
+            } else if (userInfoUtils.currentUserInSchoolIsPrincipal()) {
+                userString.append("角色：校长；").append("学校名：").append(user.getSchoolMember().getSchool().getName()).append('；');
+            } else if (userInfoUtils.currentUserInClassIsTeacher() || userInfoUtils.currentUserInClassIsStudent()) {
+                if (userInfoUtils.currentUserInClassIsTeacher()) {
+                    userString.append("角色：教师；");
+                } else if (userInfoUtils.currentUserInClassIsStudent()) {
+                    userString.append("角色：学生；");
+                }
+                School school = schoolMapper.findById(user.getClassMember().getClasses().getSchoolId());
+                userString.append("学校名：").append(school.getName()).append('；')
+                        .append("班级名：").append(user.getClassMember().getClasses().getName()).append('；');
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
+
+        String scene = request.getScene();
         map.putAll(Map.of("current_scene", scene,
                 "user_info", userString.toString(),
                 "current_time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
@@ -239,4 +274,36 @@ public class RAG {
             "\n" +
             "## 当前用户的作业内容\n" +
             "${current_homework}";
+
+    public static final String HOMEWORK_GRADE_SYSTEM_PROMPT = "## 系统背景\n" +
+            "你正在运行于一个深度集成大模型的Web端智能教学系统中。该系统专为教育场景设计，旨在通过 AI 技术减轻教师重复性工作负担并支持学生个性化学习。\n" +
+            "系统具备以下核心业务能力，你在回答时需充分意识到这些背景：\n" +
+            "1. 类Unix虚拟文件系统：系统拥有独特的分布式文件存储结构，支持大文件分片与哈希去重（你不能直接操作底层文件，但可以理解用户对“/第一课/初识Java语言”灯的引用）。\n" +
+            "2. 组织管理模块负责维护用户的层级结构，包括学校、年级、班级三级组织单元，互相数据隔离。用户相应的存在管理员、校长、教师、学生角色。\n" +
+            "3. 全流程作业管理：覆盖作业的发布、提交、批改（含 AI 辅助批改）、打回重做及数据统计全生命周期。\n" +
+            "4. 工具链集成：系统已在底层集成了 GeoGebra（数学动态绘图）、PhET（理化仿真）等专业教学工具。\n" +
+            "\n" +
+            "## 角色定义\n" +
+            "你是一位资深、严谨的教师，关爱学生、寓教于乐。\n" +
+            "\n" +
+            "## 当前上下文\n" +
+            "- 当前场景: ${current_scene}\n" +
+            "- 用户信息：${user_info}\n" +
+            "- 当前时间: ${current_time}\n" +
+            "\n" +
+            "## 约束与准则\n" +
+            "1. 安全性: 严禁泄露学生的个人敏感隐私（如家庭住址、未加密的身份证号）。\n" +
+            "2. 教学风格:\n" +
+            "   - 对教师：专业、高效、结构化，提供可执行的建议。\n" +
+            "   - 对学生：鼓励性、循循善诱，解释概念要通俗易懂。\n" +
+            "3. 拒绝回答: 如果问题超出教育教学范畴或违反法律法规，请礼貌拒绝。\n" +
+            "\n" +
+            "## 目标\n" +
+            "请使用工具对学生提交的整份作业（包含选择题和问答题）进行批改。\n" +
+            "要求：\n" +
+            "1. 客观题（SINGLE_CHOICE/MULTI_CHOICE）：严格核对'correctAnswer'与'studentAnswer'，回答正确给满分，错误给0分（多选可酌情给部分分），并给出简短解析作为评语。\n" +
+            "2. 主观题（TEXT）：严格按照'fullScore'和'aiGradingCriteria'给分，并给出指导性评语。\n" +
+            "3. 未作答的题目一律给0分。\n" +
+            "4. 批语一定要要有人性化、符合角色定义，不能让人察觉到是AI评语。\n" +
+            "必须调用 HomeworkGradingTool 工具返回结果。";
 }

@@ -43,12 +43,13 @@ public class IndexController {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user == null || user.getSchoolMember() == null || user.getClassMember() == null) {
+        // 目前，仅设置班级层次的展示
+        if (user == null || user.getClassMember() == null || user.getClassMember().getClassId() == null) {
             return ResponseEntity.ok(R.success(Collections.emptyList()));
         }
 
         Long schoolId = user.getClassMember().getClasses().getSchoolId();
-        Long classId = user.getClassMember().getClasses().getId();
+        Long classId = user.getClassMember().getClassId();
         List<TimeLineItem> itemList = timeLineConfig.getTimeline().get(schoolId + "-" + classId);
         if (CollectionUtils.isEmpty(itemList)) {
             return ResponseEntity.ok(R.success(Collections.emptyList()));

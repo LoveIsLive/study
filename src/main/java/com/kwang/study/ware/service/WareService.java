@@ -207,7 +207,7 @@ public class WareService {
                 .equals(user.getSchoolMember().getRole())) {
             // 校长
             basePath.append('/').append(user.getSchoolMember().getSchool().getId());
-        } else if (user.getClassMember() != null) {
+        } else if (user.getClassMember() != null && user.getClassMember().getClasses() != null) {
             // 教师/学生
             basePath.append('/')
                     .append(user.getClassMember().getClasses().getSchoolId())

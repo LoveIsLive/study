@@ -1,5 +1,6 @@
 package com.kwang.study.llm.dto.request;
 
+import lombok.Builder;
 import lombok.Data;
 import javax.validation.constraints.NotBlank;
 import java.io.InputStream;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 @Data
+@Builder
 public class ChatRequestDTO {
     @NotBlank(message = "Session ID cannot be empty")
     private String sessionId;

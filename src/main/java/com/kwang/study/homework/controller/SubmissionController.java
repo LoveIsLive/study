@@ -113,4 +113,10 @@ public class SubmissionController {
         HomeworkSubmissionDetail gradedSubmission = homeworkService.gradeSubmission(dto);
         return ResponseEntity.ok(R.success(gradedSubmission));
     }
+
+    @PostMapping("/{submissionId}/ai-grade")
+    public ResponseEntity<R<SubmissionGradingDTO>> aiGradeSubmission(@PathVariable Long submissionId) {
+        SubmissionGradingDTO gradingDTO = homeworkService.aiGradeSubmission(submissionId);
+        return ResponseEntity.ok(R.success(gradingDTO));
+    }
 }

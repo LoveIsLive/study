@@ -51,8 +51,8 @@ public class ClassMemberService {
         // 2. 权限校验
         checkWritePermission(classes);
 
-        // 3. 准备用户名前缀 (S{schoolId}_)
-        String prefix = "S" + classes.getSchoolId() + "_";
+        // 3. 准备用户名前缀 前缀策略: S{schoolId}_C{classId}_{username}
+        String prefix = "S" + classes.getSchoolId() + "_C" + classId + "_";
 
         List<ClassMember> newMembers = new ArrayList<>();
 

@@ -4,7 +4,10 @@ import com.kwang.study.auth.dto.request.LoginRequestDTO;
 import com.kwang.study.common.R;
 import com.kwang.study.auth.component.JwtUtil;
 import com.kwang.study.auth.service.LoginAttemptService;
+import com.kwang.study.organization.mapper.ClassesMapper;
 import com.kwang.study.organization.mapper.SchoolMapper;
+import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.pojo.Classes;
 import com.kwang.study.organization.pojo.School;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,12 +40,19 @@ public class AuthController {
 
     private final SchoolMapper schoolMapper;
 
+    private final ClassesMapper classesMapper;
+
     @PostMapping("/login")
     public ResponseEntity<R<String>> login(@Valid @RequestBody LoginRequestDTO request) {
         String realUsername = request.getUsername();
+        // 前缀策略: S{schoolId}_C{classId}_{username}
+        if (request.getClassId() != null) {
+            realUsername = "C" + request.getClassId() + "_" + realUsername;
+        } else {
+            realUsername = "CA_" + realUsername;
+        }
         if (request.getSchoolId() != null) {
-            // 前缀策略: S{schoolId}_{username}
-            realUsername = "S" + request.getSchoolId() + "_" + request.getUsername();
+            realUsername = "S" + request.getSchoolId() + "_" + realUsername;
         }
 
         if (loginAttemptService.isBlocked(realUsername)) {
@@ -69,5 +79,10 @@ public class AuthController {
     @GetMapping("/public/schools")
     public ResponseEntity<R<List<School>>> getPublicSchools() {
         return ResponseEntity.ok(R.success(schoolMapper.findAll()));
+    }
+
+    @GetMapping("/public/{schoolId}/classes")
+    public ResponseEntity<R<List<Classes>>> getPublicClasses(@PathVariable Long schoolId) {
+        return ResponseEntity.ok(R.success(classesMapper.findAllBySchoolId(schoolId)));
     }
 }

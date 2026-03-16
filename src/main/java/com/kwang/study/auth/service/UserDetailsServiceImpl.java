@@ -49,7 +49,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             authorities.add(new SimpleGrantedAuthority(user.getSchoolMember().getRole()));
         }
 
-        return new CustomUserDetails(user.getId(), user.getUsername(),
+        return new CustomUserDetails(user.getId(), username,
                 user.getPassword(), user.getEnabled(), authorities);
     }
 

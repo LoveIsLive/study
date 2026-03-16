@@ -47,8 +47,8 @@ public class SchoolMemberService {
         List<SchoolMember> membersToInsert = new ArrayList<>();
 
         for (String rawUsername : dto.getUserNames()) {
-            // 3. 构建带前缀的真实用户名: S{schoolId}_{username}
-            String realUsername = "S" + schoolId + "_" + rawUsername;
+            // 3. 构建带前缀的真实用户名: S{schoolId}_CA_{username}
+            String realUsername = "S" + schoolId + "_CA_" + rawUsername;
 
             // 4. 检查用户是否已存在
             User existingUser = userMapper.findByUsername(realUsername);

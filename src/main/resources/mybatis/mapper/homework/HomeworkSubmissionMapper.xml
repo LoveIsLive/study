@@ -42,14 +42,14 @@
     </insert>
 
     <select id="findById" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.id = #{id}
     </select>
 
     <select id="findAllByStudentId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.student_id = #{studentId}
@@ -57,7 +57,7 @@
     </select>
 
     <select id="findAllByHomeworkId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.homework_id = #{homeworkId}
@@ -65,7 +65,7 @@
     </select>
 
     <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING(u.username, LOCATE('_', u.username) + 1) AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.homework_id = #{homeworkId} AND s.student_id = #{studentId}

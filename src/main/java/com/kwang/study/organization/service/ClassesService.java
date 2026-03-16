@@ -1,5 +1,6 @@
 package com.kwang.study.organization.service;
 
+import com.kwang.study.auth.pojo.Role;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
@@ -7,6 +8,7 @@ import com.kwang.study.enums.FileStorageModuleNameEnum;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.organization.dto.request.ClassCreateDTO;
 import com.kwang.study.organization.dto.result.ClassDetailDTO;
+import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.ClassesMapper;
 import com.kwang.study.organization.mapper.SchoolMapper;
 import com.kwang.study.organization.pojo.Classes;
@@ -231,8 +233,19 @@ public class ClassesService {
      */
     private Long getAndValidateCurrentSchoolId() {
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        Assert.isTrue(user != null && user.getSchoolMember() != null, "无法获取您的学校信息，请联系管理员");
-        return user.getSchoolMember().getSchoolId();
+        Assert.isTrue(user != null, "无法获取您的学校信息，请联系管理员");
+        Long schoolId = null;
+        // 校长和教师/学生区分
+        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
+            schoolId = user.getSchoolMember().getSchoolId();
+        } else if (user.getClassMember() != null &&
+                user.getClassMember().getClasses() != null &&
+                user.getClassMember().getClasses().getSchoolId() != null) {
+            schoolId = user.getClassMember().getClasses().getSchoolId();
+        } else {
+            throw new IllegalArgumentException("无法获取您的学校信息，请联系管理员");
+        }
+        return schoolId;
     }
 
     /**
