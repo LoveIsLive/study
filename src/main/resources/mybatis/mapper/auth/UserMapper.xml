@@ -17,8 +17,7 @@
 
     <select id="findById" parameterType="long" resultMap="UserWithRolesMap">
         SELECT
-            u.*,
-            SUBSTRING_INDEX(u.username, '_', -1) AS `username`
+            u.*
         FROM users u
         WHERE u.id = #{id}
     </select>
@@ -26,8 +25,7 @@
     <!-- 根据用户名查询用户 -->
     <select id="findByUsername" parameterType="string" resultMap="UserWithRolesMap">
         SELECT
-            u.*,
-            SUBSTRING_INDEX(u.username, '_', -1) AS `username`
+            u.*
         FROM users u
         WHERE u.username = #{username}
     </select>
@@ -41,22 +39,18 @@
 
 
     <resultMap id="UserWithOrgInfoMap" type="com.kwang.study.auth.pojo.User">
-        <!-- 1. 映射User自身的基本属性 -->
         <id property="id" column="user_id"/>
         <result property="username" column="username"/>
         <result property="password" column="password"/>
         <result property="enabled" column="enabled"/>
 
-        <!-- 3. 关联查询用户的班级成员信息 (ClassMember) -->
-        <!-- 如果用户没有班级, LEFT JOIN的结果为NULL, MyBatis会自动将classMember属性赋为null -->
-        <association property="classMember" javaType="com.kwang.study.organization.pojo.ClassMember">
+        <!-- 班级成员列表：注意 cm_id 的映射 -->
+        <collection property="classMembers" ofType="com.kwang.study.organization.pojo.ClassMember">
             <id property="id" column="cm_id"/>
-            <result property="userId" column="user_id"/>
+            <result property="userId" column="cm_user_id"/>
             <result property="classId" column="class_id"/>
             <result property="role" column="cm_role"/>
             <result property="joinTime" column="cm_join_time"/>
-
-            <!-- 4. 在ClassMember内部, 嵌套关联班级信息 (Classes) -->
             <association property="classes" javaType="com.kwang.study.organization.pojo.Classes">
                 <id property="id" column="class_id"/>
                 <result property="name" column="class_name"/>
@@ -64,11 +58,12 @@
                 <result property="updateTime" column="class_update_time" />
                 <result property="schoolId" column="c_school_id" />
             </association>
-        </association>
-        <!-- 关联查询用户的学校成员信息 (SchoolMember) -->
-        <association property="schoolMember" javaType="com.kwang.study.organization.pojo.SchoolMember">
+        </collection>
+
+        <!-- 学校成员列表：校长身份 -->
+        <collection property="schoolMembers" ofType="com.kwang.study.organization.pojo.SchoolMember">
             <id property="id" column="sm_id"/>
-            <result property="userId" column="user_id"/>
+            <result property="userId" column="sm_user_id"/>
             <result property="schoolId" column="s_school_id"/>
             <result property="role" column="sm_role"/>
             <result property="joinTime" column="sm_join_time"/>
@@ -80,7 +75,7 @@
                 <result property="createTime" column="school_create_time" />
                 <result property="updateTime" column="school_update_time" />
             </association>
-        </association>
+        </collection>
 
         <collection property="roles" ofType="com.kwang.study.auth.pojo.Role"
                     select="findRolesByUserId" column="user_id"/>
@@ -90,10 +85,11 @@
     <select id="findByIdWithOrgInfo" parameterType="long" resultMap="UserWithOrgInfoMap">
         SELECT
             u.id AS user_id,
-            SUBSTRING_INDEX(u.username, '_', -1) AS `username`,
+            u.username,
             u.password,
             u.enabled,
             cm.id AS cm_id,
+            cm.user_id AS cm_user_id,
             cm.role AS cm_role,
             cm.join_time AS cm_join_time,
             c.id AS class_id,
@@ -102,6 +98,7 @@
             c.update_time AS class_update_time,
             c.school_id AS c_school_id,
             sm.id AS sm_id,
+            sm.user_id AS sm_user_id,
             sm.role AS sm_role,
             sm.join_time AS sm_join_time,
             s.id AS s_school_id,
@@ -130,10 +127,11 @@
     <select id="findByUsernameWithOrgInfo" parameterType="string" resultMap="UserWithOrgInfoMap">
         SELECT
             u.id AS user_id,
-            SUBSTRING_INDEX(u.username, '_', -1) AS `username`,
+            u.username,
             u.password,
             u.enabled,
             cm.id AS cm_id,
+            cm.user_id AS cm_user_id,
             cm.role AS cm_role,
             cm.join_time AS cm_join_time,
             c.id AS class_id,
@@ -142,6 +140,7 @@
             c.update_time AS class_update_time,
             c.school_id AS c_school_id,
             sm.id AS sm_id,
+            sm.user_id AS sm_user_id,
             sm.role AS sm_role,
             sm.join_time AS sm_join_time,
             s.id AS s_school_id,
@@ -170,12 +169,27 @@
         VALUES (#{username}, #{password}, #{enabled})
     </insert>
 
+    <insert id="insertUserBatch" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (username, password, enabled)
+        VALUES
+        <foreach collection="userList" item="user" separator=",">
+            (
+            #{user.username},
+            #{user.password},
+            #{user.enabled}
+            )
+        </foreach>
+    </insert>
+
     <!-- 2. 修改用户信息 (动态SQL) -->
     <update id="updateUser" parameterType="com.kwang.study.auth.pojo.User">
         UPDATE users
         <set>
             <if test="password != null and password != ''">
                 password = #{password},
+            </if>
+            <if test="username != null and username != ''">
+                username = #{username},
             </if>
             <if test="enabled != null">
                 enabled = #{enabled},

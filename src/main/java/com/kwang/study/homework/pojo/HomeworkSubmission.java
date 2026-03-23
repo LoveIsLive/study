@@ -12,6 +12,7 @@ public class HomeworkSubmission implements Serializable {
     private Long id;
     private Long homeworkId;
     private Long studentId;
+    private Long classId;
     private String content;
     private String status; // 提交状态
     private Integer score; // 总分

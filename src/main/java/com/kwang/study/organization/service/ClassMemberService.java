@@ -1,8 +1,10 @@
 package com.kwang.study.organization.service;
 
+import cn.hutool.core.util.RandomUtil;
 import com.kwang.study.auth.constant.AuthConstant;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
+import com.kwang.study.auth.service.UserService;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
@@ -36,6 +38,7 @@ public class ClassMemberService {
     private final SchoolMemberMapper schoolMemberMapper;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final UserInfoUtils userInfoUtils;
 
     /**
      * 向班级中批量添加成员
@@ -43,51 +46,47 @@ public class ClassMemberService {
      * @param dto 包含用户ID列表和角色的数据传输对象
      */
     @Transactional
-    public void addMembers(Long classId, ClassMemberAddDTO dto) {
-        // 1. 获取班级信息
+    public List<String> addMembers(Long classId, ClassMemberAddDTO dto) {
         Classes classes = classesMapper.findById(classId);
-        Assert.notNull(classes, "班级不存在，ID: " + classId);
-
-        // 2. 权限校验
+        Assert.notNull(classes, "班级不存在");
         checkWritePermission(classes);
 
-        // 3. 准备用户名前缀 前缀策略: S{schoolId}_C{classId}_{username}
-        String prefix = "S" + classes.getSchoolId() + "_C" + classId + "_";
-
+        List<String> feedbackMessages = new ArrayList<>();
         List<ClassMember> newMembers = new ArrayList<>();
 
         for (String rawUserName : dto.getUserNames()) {
-            String realUsername = prefix + rawUserName;
-
-            // 4. 查找或创建用户
-            User user = userMapper.findByUsername(realUsername);
-            if (user == null) {
-                user = new User();
-                user.setUsername(realUsername);
+            // 1. 检查冲突
+            User existingUser = userMapper.findByUsername(rawUserName);
+            if (existingUser != null) {
+                // 如果该用户已经在该班级，直接跳过
+                ClassMember cm = classMemberMapper.findByClassIdAndUserId(classId, existingUser.getId());
+                // 目前没有将权限也纳入唯一key范围
+                if (cm != null) {
+                    feedbackMessages.add("用户 " + rawUserName + " 已在班级中，无需重复添加");
+                    continue;
+                }
+            } else {
+                // 3. 创建用户
+                User user = new User();
+                user.setUsername(rawUserName);
                 user.setPassword(passwordEncoder.encode(AuthConstant.DEFAULT_PASSWORD));
                 user.setEnabled(true);
                 userMapper.insertUser(user);
-                // 此时不再操作 user_roles 表，因为角色由 class_members 表决定
+                existingUser = user;
             }
 
-            // 5. 检查是否已经是该班级成员
-            ClassMember existingMember = classMemberMapper.findByClassIdAndUserId(classId, user.getId());
-            if (existingMember != null) {
-                log.info("用户 {} 已经是班级成员，跳过", realUsername);
-                continue;
-            }
-
+            // 4. 关联班级
             ClassMember member = new ClassMember();
             member.setClassId(classId);
-            member.setUserId(user.getId());
+            member.setUserId(existingUser.getId());
             member.setRole(dto.getRole());
             newMembers.add(member);
         }
 
         if (!newMembers.isEmpty()) {
             classMemberMapper.batchInsert(newMembers);
-            log.info("成功向班级 {} 添加了 {} 名新成员", classId, newMembers.size());
         }
+        return feedbackMessages; // 返回反馈信息
     }
 
     /**
@@ -159,22 +158,8 @@ public class ClassMemberService {
             return;
         }
 
-        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
-        Assert.notNull(currentUserId, "无法获取用户信息");
-
-        // 2. 检查是否是该校校长
-        SchoolMember schoolMember = schoolMemberMapper.findByUserId(currentUserId);
-        if (schoolMember != null &&
-                SchoolRoleEnum.PRINCIPAL.getRole().equals(schoolMember.getRole()) &&
-                Objects.equals(schoolMember.getSchoolId(), classes.getSchoolId())) {
+        if (userInfoUtils.inSchoolPrincipal(classes.getSchoolId()) || userInfoUtils.inClassTeacher(classes.getId()))
             return;
-        }
-
-        // 3. 检查是否是该班级的教师
-        ClassMember classMember = classMemberMapper.findByClassIdAndUserId(classes.getId(), currentUserId);
-        if (classMember != null && ClassesRoleEnum.TEACHER.getRole().equals(classMember.getRole())) {
-            return;
-        }
 
         throw new IllegalArgumentException("无权限操作该班级成员");
     }
@@ -189,25 +174,8 @@ public class ClassMemberService {
             return;
         }
 
-        Classes classes = classesMapper.findById(classId);
-        Assert.notNull(classes, "班级不存在");
-
-        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
-        Assert.notNull(currentUserId, "无法获取用户信息");
-
-        // 2. 检查是否是该校校长
-        SchoolMember schoolMember = schoolMemberMapper.findByUserId(currentUserId);
-        if (schoolMember != null &&
-                SchoolRoleEnum.PRINCIPAL.getRole().equals(schoolMember.getRole()) &&
-                Objects.equals(schoolMember.getSchoolId(), classes.getSchoolId())) {
+        if (userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))
             return;
-        }
-
-        // 3. 检查是否是该班级的成员 (老师或学生都可以看通讯录)
-        ClassMember classMember = classMemberMapper.findByClassIdAndUserId(classId, currentUserId);
-        if (classMember != null) {
-            return;
-        }
 
         throw new IllegalArgumentException("无权限查看该班级成员");
     }

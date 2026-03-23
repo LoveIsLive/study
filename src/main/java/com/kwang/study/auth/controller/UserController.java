@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 
+import java.util.Map;
+
 import static com.kwang.study.constant.ApiPrefixConstant.USER_BASE_PREFIX;
 
 @RestController
@@ -44,5 +46,12 @@ public class UserController {
         } else {
             return ResponseEntity.ok(R.error(resultDTO.getErrorMessage()));
         }
+    }
+
+    @PutMapping("/username")
+    public ResponseEntity<R<Void>> updateUsername(@RequestBody Map<String, String> body) {
+        String newUsername = body.get("username");
+        // 调用 UserService 中已经写好的 updateUsername 方法
+        return ResponseEntity.ok(userService.updateUsername(newUsername));
     }
 }

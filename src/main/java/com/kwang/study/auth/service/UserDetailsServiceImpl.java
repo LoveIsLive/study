@@ -29,28 +29,20 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             throw new UsernameNotFoundException("User not found with username: " + username);
         }
 
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        // 目前仅有特殊的admin管理员权限
+        List<SimpleGrantedAuthority> baseAuthorities = new ArrayList<>();
         if (!CollectionUtils.isEmpty(user.getRoles())) {
-            for (Role role : user.getRoles()) {
-                if ("ROLE_ADMIN".equals(role.getName())) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-                    break;
-                }
-            }
-        }
-        // 在学校-班级内的角色，前端使用
-        // 在班级内的角色
-        if (user.getClassMember() != null && user.getClassMember().getRole() != null) {
-            authorities.add(new SimpleGrantedAuthority(user.getClassMember().getRole()));
-        }
-        // 在学校层的角色
-        if (user.getSchoolMember() != null && user.getSchoolMember().getRole() != null) {
-            authorities.add(new SimpleGrantedAuthority(user.getSchoolMember().getRole()));
+            user.getRoles().forEach(r -> baseAuthorities.add(new SimpleGrantedAuthority(r.getName())));
         }
 
-        return new CustomUserDetails(user.getId(), username,
-                user.getPassword(), user.getEnabled(), authorities);
+        return CustomUserDetails.builder()
+                .id(user.getId())
+                .username(username)
+                .password(user.getPassword())
+                .enabled(user.getEnabled())
+                .classMembers(user.getClassMembers())   // 存储所有班级身份
+                .schoolMembers(user.getSchoolMembers()) // 存储所有学校身份
+                .authorities(baseAuthorities)           // 初始权限
+                .build();
     }
 
 }

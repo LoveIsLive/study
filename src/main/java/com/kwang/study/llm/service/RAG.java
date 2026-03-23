@@ -7,8 +7,12 @@ import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.llm.dto.request.ChatRequestDTO;
+import com.kwang.study.organization.enums.ClassesRoleEnum;
+import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.SchoolMapper;
+import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.pojo.School;
+import com.kwang.study.organization.pojo.SchoolMember;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringSubstitutor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -143,27 +147,26 @@ public class RAG {
 
     private void baseInfo(Map<String, String> map) throws JsonProcessingException {
         User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        // 需要进行脱敏、格式化处理
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        SchoolMember activeSM = userInfoUtils.getCurrentActiveSchoolMember();
+
         StringBuilder userString = new StringBuilder();
         userString.append("姓名：").append(user.getUsername()).append('；');
 
-        try {
-            if (AuthenticationUserUtil.currentUserIsAdmin()) {
-                userString.append("角色：管理员；");
-            } else if (userInfoUtils.currentUserInSchoolIsPrincipal()) {
-                userString.append("角色：校长；").append("学校名：").append(user.getSchoolMember().getSchool().getName()).append('；');
-            } else if (userInfoUtils.currentUserInClassIsTeacher() || userInfoUtils.currentUserInClassIsStudent()) {
-                if (userInfoUtils.currentUserInClassIsTeacher()) {
-                    userString.append("角色：教师；");
-                } else if (userInfoUtils.currentUserInClassIsStudent()) {
-                    userString.append("角色：学生；");
-                }
-                School school = schoolMapper.findById(user.getClassMember().getClasses().getSchoolId());
-                userString.append("学校名：").append(school.getName()).append('；')
-                        .append("班级名：").append(user.getClassMember().getClasses().getName()).append('；');
+        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            userString.append("角色：管理员；");
+        } else {
+            // 修正：根据激活的 Context 拼装提示词
+            if (activeSM != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(activeSM.getRole())) {
+                userString.append("角色：校长；")
+                        .append("当前管理学校：").append(activeSM.getSchool().getName()).append('；');
+            } else if (activeCM != null) {
+                School school = schoolMapper.findById(activeCM.getClasses().getSchoolId());
+                String roleName = activeCM.getRole().equals(ClassesRoleEnum.TEACHER.getRole()) ? "教师" : "学生";
+                userString.append("角色：").append(roleName).append("；")
+                        .append("学校名：").append(school.getName()).append('；')
+                        .append("当前班级：").append(activeCM.getClasses().getName()).append("；");
             }
-        } catch (Exception e) {
-            log.error(e.getMessage());
         }
 
         String scene = request.getScene();

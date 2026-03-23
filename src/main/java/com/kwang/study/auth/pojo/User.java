@@ -14,8 +14,6 @@ public class User {
     private Boolean enabled;
     private List<Role> roles;
 
-    // 目前一个用户(学生/教师)只能有一个班级
-    private ClassMember classMember;
-    // 目前一个用户(学校领导)只能有一个学校
-    private SchoolMember schoolMember;
+    private List<ClassMember> classMembers;
+    private List<SchoolMember> schoolMembers;
 }

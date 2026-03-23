@@ -37,8 +37,17 @@ public class SearchController {
     public void handleSearch(@Valid @RequestBody SearchRequestDTO request, Principal principal) {
         request.check();
 
+        Long classId = request.getActiveClassId();
+        Long schoolId = request.getActiveSchoolId();
+
         String userName  = principal.getName();
-        asyncSearchService.searchAndSendResults(request.getPath(), request.getNamePattern(),
-                userName, SecurityContextHolder.getContext());
+        asyncSearchService.searchAndSendResults(
+                request.getPath(),
+                request.getNamePattern(),
+                userName,
+                SecurityContextHolder.getContext(),
+                classId,
+                schoolId
+        );
     }
 }
