@@ -1,9 +1,6 @@
 package com.kwang.study.auth.config;
 
-import com.kwang.study.auth.filter.ContextConflictFilter;
 import com.kwang.study.auth.filter.JwtAuthenticationFilter;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,12 +20,15 @@ import static com.kwang.study.constant.ApiPrefixConstant.*;
 
 @Configuration
 @EnableGlobalMethodSecurity(prePostEnabled = true) // 开启方法级别的权限注解
-@AllArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
-    private final ContextConflictFilter identityConflictFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -59,7 +59,6 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态session
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(identityConflictFilter, JwtAuthenticationFilter.class)
                 .formLogin().disable()
                 .httpBasic().disable()
 //                .oauth2Login().disable()

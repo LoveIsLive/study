@@ -3,9 +3,7 @@ package com.kwang.study.ware.service;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
-import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.pojo.School;
-import com.kwang.study.organization.pojo.SchoolMember;
 import com.kwang.study.organization.service.ClassesService;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.organization.pojo.Classes;
@@ -199,26 +197,24 @@ public class WareService {
     // 返回用户该模块的根目录，不以/结尾
     private String buildBasePath() {
         StringBuilder basePath = new StringBuilder(FileStorageModuleNameEnum.WARE_NAME.getModuleName());
-
+        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+        Assert.isTrue(user != null, "没有查找到该用户");
         if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            // 管理员能看见all
             return basePath.toString();
         }
-
-        // 修正：调用感知 Header 的新方法
-        SchoolMember activeSM = userInfoUtils.getCurrentActiveSchoolMember();
-        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
-
-        if (activeSM != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(activeSM.getRole())) {
-            // 校长身份：进入学校根目录
-            basePath.append('/').append(activeSM.getSchoolId());
-        } else if (activeCM != null) {
-            // 教师/学生身份：进入 班级目录 /ware/{schoolId}/{classId}
+        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole()
+                .equals(user.getSchoolMember().getRole())) {
+            // 校长
+            basePath.append('/').append(user.getSchoolMember().getSchool().getId());
+        } else if (user.getClassMember() != null && user.getClassMember().getClasses() != null) {
+            // 教师/学生
             basePath.append('/')
-                    .append(activeCM.getClasses().getSchoolId())
+                    .append(user.getClassMember().getClasses().getSchoolId())
                     .append('/')
-                    .append(activeCM.getClassId());
+                    .append(user.getClassMember().getClasses().getId());
         } else {
-            throw new IllegalArgumentException("用户当前身份无法访问存储空间");
+            throw new IllegalArgumentException("用户既无班级信息也无学校信息");
         }
 
         return basePath.toString();
@@ -239,16 +235,18 @@ public class WareService {
                 path = path.replaceFirst(className, classes.getId().toString());
             }
         }
-        SchoolMember activeSM = userInfoUtils.getCurrentActiveSchoolMember();
-        // 校长逻辑修正：使用 activeSM 而不是 user.getSchoolMember()
-        if (!"/".equals(path) && activeSM != null &&
-                SchoolRoleEnum.PRINCIPAL.getRole().equals(activeSM.getRole())) {
-            String[] parts = path.split("/");
-            String className = parts[1];
-            // 确保在该校长的当前学校下查找班级
-            Classes classes = classesService.getClassByName(className, activeSM.getSchoolId());
-            Assert.isTrue(classes != null, "路径无效或无权访问该班级");
-            path = path.replaceFirst(className, classes.getId().toString());
+        // 校长，班级特殊处理规则
+        if (!"/".equals(path)) {
+            User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+            // 是校长
+            if (user != null && user.getSchoolMember() != null &&
+                    SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
+                String[] parts = path.split("/");
+                String className = parts[1];
+                Classes classes = classesService.getClassByName(className, user.getSchoolMember().getSchoolId());
+                Assert.isTrue(classes != null, "路径无班级名称");
+                path = path.replaceFirst(className, classes.getId().toString());
+            }
         }
 
         String basePath = buildBasePath();
@@ -260,68 +258,13 @@ public class WareService {
         return basePath + path;
     }
 
-    /**
-     * 将内部存储路径转换为用户可见的显示路径
-     * 内部路径示例: /ware/1/2/文件夹/文件.txt
-     * 教师显示: /文件夹/文件.txt
-     * 校长显示: /测试班级/文件夹/文件.txt
-     * 管理员显示: /测试学校/测试班级/文件夹/文件.txt
-     */
-    public String getDisplayPath(String fullInternalPath) {
-        // 1. 去掉模块前缀 /ware
-        String prefix = FileStorageModuleNameEnum.WARE_NAME.getModuleName();
-        if (!fullInternalPath.startsWith(prefix)) return fullInternalPath;
-        String pathWithoutModule = fullInternalPath.substring(prefix.length()); // 得到 /1/2/文件夹/文件.txt
-
-        String[] parts = pathWithoutModule.split("/");
-        // parts[0] 为空字符串，因为路径以 / 开头
-        // parts[1] 为 schoolId
-        // parts[2] 为 classId (如果存在)
-
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
-            // 管理员逻辑：/学校名/班级名/...
-            if (parts.length > 1) {
-                School school = schoolService.getSchoolById(Long.parseLong(parts[1]));
-                pathWithoutModule = pathWithoutModule.replaceFirst("/" + parts[1], "/" + school.getName());
-            }
-            if (parts.length > 2) {
-                Classes cls = classesService.getClassById(Long.parseLong(parts[2]));
-                pathWithoutModule = pathWithoutModule.replaceFirst("/" + parts[2], "/" + cls.getName());
-            }
-            return pathWithoutModule;
-        }
-
-        if (userInfoUtils.currentUserInSchoolIsPrincipal()) {
-            // 校长逻辑：去掉学校ID，将班级ID换成班级名 -> /班级名/...
-            // pathWithoutModule 此时是 /1/2/...
-            if (parts.length > 2) {
-                Classes cls = classesService.getClassById(Long.parseLong(parts[2]));
-                // 先去掉 /schoolId
-                String strippedSchool = pathWithoutModule.replaceFirst("/" + parts[1], "");
-                // 再把 /classId 换成 /className
-                return strippedSchool.replaceFirst("/" + parts[2], "/" + cls.getName());
-            }
-            return "/";
-        }
-
-        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
-        if (activeCM != null) {
-            // 师生逻辑：直接去掉 /schoolId/classId -> /...
-            if (parts.length > 2) {
-                return pathWithoutModule.replaceFirst("/" + parts[1] + "/" + parts[2], "");
-            }
-        }
-
-        return "/";
-    }
-
     private void validateWritePermission() {
-        SchoolMember acSM = userInfoUtils.getCurrentActiveSchoolMember();
-        ClassMember acCM = userInfoUtils.getCurrentActiveClassMember();
+        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
+        Assert.notNull(user, "无写权限");
 
         boolean have = AuthenticationUserUtil.currentUserIsAdmin() ||
-                (acSM != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(acSM.getRole())) ||
-                (acCM != null && ClassesRoleEnum.TEACHER.getRole().equals(acCM.getRole()))
+                (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) ||
+                (user.getClassMember() != null && ClassesRoleEnum.TEACHER.getRole().equals(user.getClassMember().getRole()))
                 ;
         Assert.isTrue(have, "无写权限");
     }

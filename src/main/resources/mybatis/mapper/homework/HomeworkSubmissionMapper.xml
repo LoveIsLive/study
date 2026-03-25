@@ -2,95 +2,86 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kwang.study.homework.mapper.HomeworkSubmissionMapper">
 
-    <!-- 结果集映射：处理多身份下的 class_id 以及多级关联 -->
     <resultMap id="SubmissionResultMap" type="com.kwang.study.homework.pojo.HomeworkSubmission">
         <id property="id" column="id"/>
         <result property="homeworkId" column="homework_id"/>
         <result property="studentId" column="student_id"/>
-        <result property="classId" column="class_id"/> <!-- 新增字段 -->
         <result property="content" column="content"/>
         <result property="status" column="status" />
         <result property="score" column="score" />
         <result property="answerData" column="answer_data" />
         <result property="gradingData" column="grading_data" />
+
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
 
-        <!-- 关联查询：作业基本信息 (用于学生查看“我的提交”列表时显示作业标题) -->
+        <!-- 多对一关联查询作业信息 -->
         <association property="homework" javaType="com.kwang.study.homework.pojo.Homework"
                      select="com.kwang.study.homework.mapper.HomeworkMapper.findById"
                      column="homework_id"/>
 
-        <!-- 一对多关联查询：该提交关联的所有附件 -->
-        <collection property="attachments" ofType="com.kwang.study.homework.pojo.AttachmentDetail"
+        <!-- 一对多关联查询附件 -->
+        <collection property="attachments" ofType="com.kwang.study.homework.pojo.Attachment"
                     select="com.kwang.study.homework.mapper.AttachmentMapper.findByOwner"
                     column="{ownerId=id, ownerType=owner_type}"/>
+
     </resultMap>
 
-    <!-- 详情映射：增加学生脱敏姓名 -->
     <resultMap id="SubmissionDetailResultMap" type="com.kwang.study.homework.pojo.HomeworkSubmissionDetail" extends="SubmissionResultMap">
         <result property="studentName" column="student_name"/>
     </resultMap>
 
-    <!-- 基础字段 SQL 片段，增加 class_id 并显式声明 owner_type 用于附件查询 -->
     <sql id="Join_Base_Column_List">
-        s.id, s.homework_id, s.student_id, s.class_id, s.content, s.status,
-        s.create_time, s.update_time, s.score, s.answer_data, s.grading_data, 'submission' AS owner_type
+        s.id, s.homework_id, s.student_id, s.content, s.status,
+            s.create_time, s.update_time, s.score, s.answer_data, s.grading_data, 'submission' AS owner_type
     </sql>
 
-    <!-- 1. 插入：必须包含班级上下文 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO homework_submission (homework_id, student_id, class_id, content, status, score, answer_data, grading_data)
-        VALUES (#{homeworkId}, #{studentId}, #{classId}, #{content}, #{status}, #{score}, #{answerData}, #{gradingData})
+        INSERT INTO homework_submission (homework_id, student_id, content, status, score, answer_data, grading_data)
+        VALUES (#{homeworkId}, #{studentId}, #{content}, #{status}, #{score}, #{answerData}, #{gradingData})
     </insert>
 
-    <!-- 2. 根据ID查询详情 -->
     <select id="findById" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.id = #{id}
     </select>
 
-    <!-- 3. 【关键】按学生和当前激活班级查询 -->
-    <select id="findAllByStudentIdAndClassId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+    <select id="findAllByStudentId" resultMap="SubmissionDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
-        WHERE s.student_id = #{studentId} AND s.class_id = #{classId}
-        ORDER BY s.update_time DESC
+        WHERE s.student_id = #{studentId}
+        ORDER BY update_time DESC
     </select>
 
-    <!-- 4. 按作业ID查询（教师视野） -->
     <select id="findAllByHomeworkId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.homework_id = #{homeworkId}
-        ORDER BY s.update_time DESC
+        ORDER BY update_time DESC
     </select>
 
-    <!-- 5. 校验学生在当前作业下的唯一提交 -->
     <select id="findByHomeworkIdAndStudentId" resultMap="SubmissionDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS student_name
+        SELECT <include refid="Join_Base_Column_List" />, SUBSTRING_INDEX(u.username, '_', -1) AS student_name
         FROM homework_submission s
         LEFT JOIN users u ON s.student_id = u.id
         WHERE s.homework_id = #{homeworkId} AND s.student_id = #{studentId}
     </select>
 
-    <!-- 6. 获取作业下的所有提交ID -->
     <select id="findIdsByHomeworkId" resultType="java.lang.Long">
         SELECT id FROM homework_submission WHERE homework_id = #{homeworkId}
     </select>
 
-    <!-- 7. 删除作业关联的提交 -->
     <delete id="deleteByHomeworkId">
         DELETE FROM homework_submission WHERE homework_id = #{homeworkId}
     </delete>
 
-    <!-- 8. 批量更新状态 -->
     <update id="batchUpdateStatus" >
-        UPDATE homework_submission
+        UPDATE
+        homework_submission
         SET status = #{status}
         WHERE id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
@@ -98,16 +89,25 @@
         </foreach>
     </update>
 
-    <!-- 9. 动态更新：支持批改和修改 -->
     <update id="updateById" parameterType="com.kwang.study.homework.pojo.HomeworkSubmission">
         UPDATE homework_submission
         <set>
-            <if test="content != null">content = #{content},</if>
-            <if test="status != null and status != ''">status = #{status},</if>
-            <if test="score != null">score = #{score},</if>
-            <if test="answerData != null">answer_data = #{answerData},</if>
-            <if test="gradingData != null">grading_data = #{gradingData},</if>
-            update_time = CURRENT_TIMESTAMP
+            <if test="content != null">
+                content = #{content},
+            </if>
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+            <if test="score != null">
+                score = #{score},
+            </if>
+            <if test="answerData != null">
+                answer_data = #{answerData},
+            </if>
+            <if test="gradingData != null">
+                grading_data = #{gradingData},
+            </if>
+            update_time = CURRENT_TIMESTAMP,
         </set>
         WHERE id = #{id}
     </update>

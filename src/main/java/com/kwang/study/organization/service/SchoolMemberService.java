@@ -3,9 +3,7 @@ package com.kwang.study.organization.service;
 import com.kwang.study.auth.constant.AuthConstant;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
-import com.kwang.study.auth.service.UserService;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
-import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.organization.dto.request.SchoolMemberAddDTO;
 import com.kwang.study.organization.mapper.SchoolMapper;
 import com.kwang.study.organization.mapper.SchoolMemberMapper;
@@ -32,53 +30,62 @@ public class SchoolMemberService {
     private final SchoolMapper schoolMapper;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final UserInfoUtils userInfoUtils;
 
     /**
      * 批量添加学校成员（通常是校长）
      * 只有 Admin 可以操作
      */
     @Transactional
-    public List<String> addMembers(Long schoolId, SchoolMemberAddDTO dto) {
+    public void addMembers(Long schoolId, SchoolMemberAddDTO dto) {
+        // 1. 权限校验
         Assert.isTrue(AuthenticationUserUtil.currentUserIsAdmin(), "无权限添加学校成员");
+
+        // 2. 校验学校是否存在
         School school = schoolMapper.findById(schoolId);
         Assert.notNull(school, "学校不存在");
 
-        List<String> feedback = new ArrayList<>();
         List<SchoolMember> membersToInsert = new ArrayList<>();
 
         for (String rawUsername : dto.getUserNames()) {
-            // 1. 检查冲突并生成新名
-            User existUser = userMapper.findByUsername(rawUsername);
-            if (existUser != null) {
-                SchoolMember member = schoolMemberMapper.findBySchoolAndUserId(schoolId, existUser.getId());
-                // 目前没有将权限也纳入唯一key范围
-                if (member != null) {
-                    feedback.add("用户 " + rawUsername + " 已在学校中，无需重复添加");
+            // 3. 构建带前缀的真实用户名: S{schoolId}_CA_{username}
+            String realUsername = "S" + schoolId + "_CA_" + rawUsername;
+
+            // 4. 检查用户是否已存在
+            User existingUser = userMapper.findByUsername(realUsername);
+            if (existingUser != null) {
+                // 如果用户已存在，检查是否已经是该校成员
+                SchoolMember existingMember = schoolMemberMapper.findByUserId(existingUser.getId());
+                if (existingMember != null) {
+                    log.warn("用户 {} 已经是成员，跳过", realUsername);
+                    continue;
                 }
+                // 直接建立关联
+                SchoolMember member = new SchoolMember();
+                member.setSchoolId(schoolId);
+                member.setUserId(existingUser.getId());
+                member.setRole(dto.getRole());
+                membersToInsert.add(member);
             } else {
-                // 2. 创建用户
+                // 5. 创建新用户
                 User newUser = new User();
-                newUser.setUsername(rawUsername);
+                newUser.setUsername(realUsername);
                 newUser.setPassword(passwordEncoder.encode(AuthConstant.DEFAULT_PASSWORD));
                 newUser.setEnabled(true);
                 userMapper.insertUser(newUser);
-                existUser = newUser;
-            }
 
-            // 3. 建立关联
-            SchoolMember member = new SchoolMember();
-            member.setSchoolId(schoolId);
-            member.setUserId(existUser.getId());
-            member.setRole(dto.getRole());
-            membersToInsert.add(member);
+                // 6. 建立关联
+                SchoolMember member = new SchoolMember();
+                member.setSchoolId(schoolId);
+                member.setUserId(newUser.getId());
+                member.setRole(dto.getRole());
+                membersToInsert.add(member);
+            }
         }
 
         if (!membersToInsert.isEmpty()) {
             schoolMemberMapper.batchInsert(membersToInsert);
             log.info("成功为学校 {} 添加 {} 名成员", schoolId, membersToInsert.size());
         }
-        return feedback;
     }
 
     /**
@@ -110,7 +117,9 @@ public class SchoolMemberService {
         // 权限校验
         if (!AuthenticationUserUtil.currentUserIsAdmin()) {
             // 如果不是Admin，检查是否是该校校长
-            Assert.isTrue(userInfoUtils.inSchoolPrincipal(schoolId), "无权限");
+            SchoolMember currentMember = schoolMemberMapper.findByUserId(AuthenticationUserUtil.getCurrentUserId());
+            Assert.notNull(currentMember, "无权限");
+            Assert.isTrue(Objects.equals(currentMember.getSchoolId(), schoolId), "无权限查看其他学校成员");
         }
 
         return schoolMemberMapper.findMembersBySchoolId(schoolId);

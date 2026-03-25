@@ -1,6 +1,5 @@
 package com.kwang.study.ware.service.async;
 
-import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.enums.FileStorageModuleNameEnum;
 import com.kwang.study.fs.dto.result.SearchNodeResult;
 import com.kwang.study.ware.service.WareService;
@@ -21,28 +20,22 @@ public class AsyncSearchService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    @Autowired
-    private UserInfoUtils userInfoUtils;
-
-
     @Async
-    public void searchAndSendResults(String path, String namePattern, String user, SecurityContext securityContext,
-                                     Long activeClassId, Long activeSchoolId) {
+    public void searchAndSendResults(String path, String namePattern, String user, SecurityContext securityContext) {
+        // 设置当前认证身份
+        SecurityContextHolder.setContext(securityContext);
 
         String destination = "/queue/search-results";
+        log.info("Async search started for user: {}, destination: {}", user, destination);
+
         try {
-            // 设置当前认证身份
-            SecurityContextHolder.setContext(securityContext);
-            userInfoUtils.setManualContext(activeClassId, activeSchoolId);
-
-            log.info("Async search started for user: {}, destination: {}", user, destination);
-
             wareService.searchNodesBFS(
                     path,
                     namePattern,
                     (SearchNodeResult foundNode) -> {
                         log.info("Found node for user {}, sending: {}", user, foundNode.getName());
-                        foundNode.setFullPath(wareService.getDisplayPath(foundNode.getFullPath()));
+                        foundNode.setFullPath(foundNode.getFullPath()
+                                .substring(FileStorageModuleNameEnum.WARE_NAME.getModuleName().length()));
                         messagingTemplate.convertAndSendToUser(user, destination, foundNode);
                     }
             );
@@ -52,9 +45,6 @@ public class AsyncSearchService {
         } catch (Exception e) {
             log.error("Error during async search for user: " + user, e);
             messagingTemplate.convertAndSendToUser(user, destination, "SEARCH_ERROR: " + e.getMessage());
-        } finally {
-            SecurityContextHolder.clearContext();
-            userInfoUtils.clearManualContext();
         }
     }
 }

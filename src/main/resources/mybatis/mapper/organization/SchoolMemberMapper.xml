@@ -29,10 +29,8 @@
         </foreach>
     </insert>
 
-    <select id="findBySchoolAndUserId" resultType="com.kwang.study.organization.pojo.SchoolMember">
-        SELECT id, school_id, user_id, role, join_time
-        FROM school_members
-        WHERE school_id = #{schoolId} AND user_id = #{userId}
+    <select id="findByUserId" resultType="com.kwang.study.organization.pojo.SchoolMember">
+        SELECT * FROM school_members WHERE user_id = #{userId}
     </select>
 
     <select id="findMembersBySchoolId" resultMap="SchoolMemberWithUserMap">
@@ -43,7 +41,7 @@
             sm.role AS sm_role,
             sm.join_time AS sm_join_time,
             u.id AS u_id,
-            u.username AS u_username,
+            SUBSTRING_INDEX(u.username, '_', -1) AS u_username,
             u.enabled AS u_enabled
         FROM school_members sm
                  JOIN users u ON sm.user_id = u.id
@@ -52,11 +50,6 @@
 
     <delete id="deleteByUserId">
         DELETE FROM school_members WHERE user_id = #{userId}
-    </delete>
-
-    <delete id="deleteBySchoolAndUserId">
-        DELETE FROM school_members
-        WHERE school_id = #{schoolId} AND user_id = #{userId}
     </delete>
 
     <delete id="deleteBySchoolIdAndUserIds">

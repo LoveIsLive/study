@@ -30,8 +30,9 @@ public class ClassMemberController {
      * @return 操作结果
      */
     @PostMapping("/add")
-    public ResponseEntity<R<List<String>>> addMembers(@PathVariable Long classId, @Valid @RequestBody ClassMemberAddDTO dto) {
-        return ResponseEntity.ok(R.success(classMemberService.addMembers(classId, dto)));
+    public ResponseEntity<R<Void>> addMembers(@PathVariable Long classId, @Valid @RequestBody ClassMemberAddDTO dto) {
+        classMemberService.addMembers(classId, dto);
+        return ResponseEntity.ok(R.success(null, "添加成员成功"));
     }
 
     /**

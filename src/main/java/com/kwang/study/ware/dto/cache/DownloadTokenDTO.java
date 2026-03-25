@@ -3,8 +3,6 @@ package com.kwang.study.ware.dto.cache;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 
 import java.io.Serializable;
@@ -19,7 +17,5 @@ public class DownloadTokenDTO implements Serializable {
 
     private String path;
     private String username;
-    private Long activeSM;
-    private Long activeCM;
     private Collection<? extends GrantedAuthority> authorities;
 }
