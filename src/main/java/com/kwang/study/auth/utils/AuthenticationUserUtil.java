@@ -60,13 +60,7 @@ public class AuthenticationUserUtil {
         return false;
     }
 
-    public static SecurityContext newSecurityContext(String username, Collection<? extends GrantedAuthority> authorities) {
-        CustomUserDetails userDetails = CustomUserDetails.builder()
-                .username(username)
-                .authorities(authorities)
-                .build();
-        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(userDetails,
-                null, userDetails.getAuthorities());
-        return new SecurityContextImpl(token);
+    public static SecurityContext newSecurityContext(Authentication authentication) {
+        return new SecurityContextImpl(authentication);
     }
 }

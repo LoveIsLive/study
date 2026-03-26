@@ -1,9 +1,12 @@
 package com.kwang.study.ware.controller;
 
+import com.kwang.study.auth.custom.CustomUserDetails;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.*;
+import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.pojo.SchoolMember;
 import com.kwang.study.utils.PathUtils;
 import com.kwang.study.ware.dto.cache.DownloadTokenDTO;
 import com.kwang.study.ware.dto.request.*;
@@ -13,7 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +32,7 @@ import javax.validation.Valid;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -42,6 +49,12 @@ public class WareController {
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private UserInfoUtils userInfoUtils;
+
+    @Autowired
+    private UserDetailsService userDetailsService;
 
     /**
      * 创建目录
@@ -149,10 +162,23 @@ public class WareController {
             response.setContentType("text/plain; charset=UTF-8");
             return;
         }
-        SecurityContextHolder.setContext(AuthenticationUserUtil
-                .newSecurityContext(downloadTokenDTO.getUsername(), downloadTokenDTO.getAuthorities()));
 
-        wareService.downloadFile(path, mode, request, response);
+        CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(downloadTokenDTO.getUsername());
+        userDetails.setAuthorities(downloadTokenDTO.getAuthorities());
+
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                userDetails, null, downloadTokenDTO.getAuthorities());
+
+        SecurityContextHolder.setContext(AuthenticationUserUtil
+                .newSecurityContext(authToken));
+
+        try {
+            userInfoUtils.setManualContext(downloadTokenDTO.getActiveCM(), downloadTokenDTO.getActiveSM());
+            wareService.downloadFile(path, mode, request, response);
+        } finally {
+            userInfoUtils.clearManualContext();
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @PostMapping("/chunk/init")
@@ -208,7 +234,16 @@ public class WareController {
         Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法:" + path);
         String downloadId = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, new DownloadTokenDTO(path,
-                AuthenticationUserUtil.getCurrentUserName(), AuthenticationUserUtil.getCurrentUserAuthorities()), 30, TimeUnit.MINUTES);
+                        AuthenticationUserUtil.getCurrentUserName(),
+                        Optional.ofNullable(userInfoUtils.getCurrentActiveSchoolMember())
+                                .map(SchoolMember::getSchoolId)
+                                .orElse(null),
+                        Optional.ofNullable(userInfoUtils.getCurrentActiveClassMember())
+                                .map(ClassMember::getClassId)
+                                .orElse(null),
+                        AuthenticationUserUtil.getCurrentUserAuthorities()
+                        ),
+                30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
     }
 

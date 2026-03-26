@@ -12,6 +12,7 @@ public class Homework implements Serializable {
 
     private Long id;
     private Long teacherId;
+    private Long classId;
     private String title;
     private String content;
     private String type; // "SIMPLE" or "STRUCTURED"

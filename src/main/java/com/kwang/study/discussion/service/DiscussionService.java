@@ -7,6 +7,11 @@ import com.kwang.study.discussion.dto.request.PostUpdateDTO;
 import com.kwang.study.discussion.mapper.DiscussionPostMapper;
 import com.kwang.study.discussion.pojo.DiscussionPost;
 import com.kwang.study.discussion.pojo.DiscussionPostDetail;
+import com.kwang.study.homework.mapper.HomeworkMapper;
+import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
+import com.kwang.study.homework.pojo.Homework;
+import com.kwang.study.homework.pojo.HomeworkDetail;
+import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +30,9 @@ public class DiscussionService {
     private final DiscussionPostMapper discussionPostMapper;
     private final UserInfoUtils userInfoUtils;
 
+    private final HomeworkMapper homeworkMapper;
+    private final HomeworkSubmissionMapper submissionMapper;
+
     // 定义常量避免魔法字符串
     public static final String OWNER_TYPE_HOMEWORK = "homework";
     public static final String OWNER_TYPE_SUBMISSION = "submission";
@@ -34,6 +42,8 @@ public class DiscussionService {
      */
     @Transactional
     public DiscussionPostDetail createPost(PostCreateDTO dto) {
+        readAccessOwner(dto.getOwnerId(), dto.getOwnerType());
+
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
         dto.setUserId(currentUserId);
 
@@ -53,6 +63,8 @@ public class DiscussionService {
      * 获取指定对象的整个讨论树
      */
     public List<DiscussionPostDetail> getDiscussionTree(Long ownerId, String ownerType) {
+        readAccessOwner(ownerId, ownerType);
+
         // 1. 获取该对象下的所有帖子（扁平列表）
         List<DiscussionPostDetail> allPosts = discussionPostMapper.findByOwner(ownerId, ownerType);
 
@@ -84,12 +96,7 @@ public class DiscussionService {
         DiscussionPostDetail post = discussionPostMapper.findDetailById(postId);
         Assert.notNull(post, "帖子不存在或已被删除");
 
-        // 权限校验：可以删除自己的帖子，或者管理员/作业发布教师也可以删除
-        Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
-        boolean isOwner = Objects.equals(post.getUserId(), currentUserId);
-        boolean isManage = AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.currentUserInClassIsTeacher();
-
-        Assert.isTrue(isOwner || isManage, "无权删除此帖子");
+        Assert.isTrue(canOperatePost(post), "无权删除此帖子");
 
         discussionPostMapper.softDeleteById(postId);
     }
@@ -134,5 +141,53 @@ public class DiscussionService {
             }
         }
         return tree;
+    }
+
+    // 是否能够访问owner
+    private void readAccessOwner(Long ownerId, String ownerType) {
+        if (AuthenticationUserUtil.currentUserIsAdmin())
+            return;
+
+        Long classId = null;
+        if (OWNER_TYPE_HOMEWORK.equals(ownerType)) {
+            HomeworkDetail homeworkDetail = homeworkMapper.findById(ownerId);
+            classId = homeworkDetail.getClassId();
+        } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
+            HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
+            classId = submissionDetail.getClassId();
+        }
+        if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))
+            return;
+
+        throw new IllegalArgumentException("无权访问");
+    }
+
+    private void writeAccessOwner(Long ownerId, String ownerType) {
+        if (AuthenticationUserUtil.currentUserIsAdmin())
+            return ;
+
+        Long classId = null;
+        if (OWNER_TYPE_HOMEWORK.equals(ownerType)) {
+            HomeworkDetail homeworkDetail = homeworkMapper.findById(ownerId);
+            classId = homeworkDetail.getClassId();
+        } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
+            HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
+            classId = submissionDetail.getClassId();
+        }
+        if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClassTeacher(classId))
+            return;
+
+        throw new IllegalArgumentException("无权访问");
+    }
+
+    private boolean canOperatePost(DiscussionPostDetail post) {
+        if (Objects.equals(post.getUserId(), AuthenticationUserUtil.getCurrentUserId()))
+            return true;
+        try {
+            writeAccessOwner(post.getOwnerId(), post.getOwnerType());
+        } catch (Exception e) {
+            return false;
+        }
+        return true;
     }
 }

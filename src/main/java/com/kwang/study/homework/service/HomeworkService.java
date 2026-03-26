@@ -32,6 +32,10 @@ import com.kwang.study.llm.service.RAG;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.ClassMemberMapper;
+import com.kwang.study.organization.mapper.ClassesMapper;
+import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.pojo.Classes;
+import com.kwang.study.organization.pojo.SchoolMember;
 import com.kwang.study.utils.CloneUtil;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +83,9 @@ public class HomeworkService {
     private UserInfoUtils userInfoUtils;
 
     @Autowired
+    private ClassesMapper classesMapper;
+
+    @Autowired
     private ClassMemberMapper classMemberMapper;
 
     @Autowired
@@ -101,11 +108,13 @@ public class HomeworkService {
      */
     @Transactional
     public HomeworkDetail createHomework(HomeworkCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher(), "当前登录用户不是教师");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        Assert.isTrue(activeCM != null && ClassesRoleEnum.TEACHER.getRole().equals(activeCM.getRole()), "请先切换到教师身份再发布作业");
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
 
         Homework homework = new Homework();
         homework.setTeacherId(currentUserId);
+        homework.setClassId(activeCM.getClassId());
         homework.setTitle(dto.getTitle());
         homework.setContent(dto.getContent());
 
@@ -134,7 +143,7 @@ public class HomeworkService {
     @Transactional
     public HomeworkDetail updateHomework(Long homeworkId, HomeworkUpdateDTO dto, List<MultipartFile> smallFiles) throws IOException {
         HomeworkDetail originalHomework = homeworkMapper.findById(homeworkId);
-        validateTeacherPermission(originalHomework.getTeacherId());
+        validateTeacherOperation(originalHomework.getClassId(), originalHomework.getTeacherId());
 
         Homework homeworkToUpdate = new Homework();
         homeworkToUpdate.setId(homeworkId);
@@ -220,9 +229,10 @@ public class HomeworkService {
      * 权限：仅教师本人
      */
     public List<HomeworkDetail> getHomeworksByTeacher() {
-        Assert.isTrue(userInfoUtils.currentUserInClassIsTeacher(), "当前登录用户不是教师");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        Assert.isTrue(activeCM != null && ClassesRoleEnum.TEACHER.getRole().equals(activeCM.getRole()), "身份错误");
 
-        return homeworkMapper.findAllByTeacherId(AuthenticationUserUtil.getCurrentUserId());
+        return homeworkMapper.findAllByTeacherIdAndClassId(AuthenticationUserUtil.getCurrentUserId(), activeCM.getClassId());
     }
 
     /**
@@ -231,7 +241,7 @@ public class HomeworkService {
      */
     public HomeworkDetail getHomeworkById(Long homeworkId) {
         HomeworkDetail result = homeworkMapper.findById(homeworkId);
-        validateStudentPermission(result.getTeacherId());
+        validateAccess(result.getClassId(), result.getTeacherId());
 
         return (HomeworkDetail) desensitization(result);
     }
@@ -243,7 +253,7 @@ public class HomeworkService {
     public HomeworkSubmissionDetail returnSubmission(Long submissionId) {
         HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(submissionId);
         Long teacherId = submissionDetail.getHomework().getTeacherId();
-        validateTeacherPermission(teacherId);
+        validateTeacherOperation(submissionDetail.getClassId(), teacherId);
 
         Assert.isTrue(!HomeworkSubmissionStatusEnum.GRADED.getValue().equals(submissionDetail.getStatus()), "已批改的作业无法退回");
 
@@ -262,9 +272,11 @@ public class HomeworkService {
     @Transactional
     public HomeworkSubmissionDetail createSubmission(SubmissionCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
-        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        Assert.isTrue(activeCM != null && ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole()), "身份错误");
+
         HomeworkDetail homeworkDetail = homeworkMapper.findById(dto.getHomeworkId());
-        validateStudentPermission(homeworkDetail.getTeacherId());
+        validateAccess(homeworkDetail.getClassId(), homeworkDetail.getTeacherId());
 
         // 校验是否重复提交
         HomeworkSubmissionDetail existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), currentUserId);
@@ -276,6 +288,7 @@ public class HomeworkService {
         HomeworkSubmission submission = new HomeworkSubmission();
         submission.setHomeworkId(dto.getHomeworkId());
         submission.setStudentId(currentUserId);
+        submission.setClassId(activeCM.getClassId());
         submission.setContent(dto.getContent());
         submission.setStatus(HomeworkSubmissionStatusEnum.SUBMITTED.getValue());
 
@@ -299,10 +312,11 @@ public class HomeworkService {
      * 权限：仅学生本人
      */
     public List<HomeworkSubmissionDetail> getSubmissionsByStudent() {
-        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        Assert.isTrue(activeCM != null && ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole()), "身份错误");
 
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
-        return submissionMapper.findAllByStudentId(currentUserId).stream()
+        return submissionMapper.findAllByStudentIdAndClassId(currentUserId, activeCM.getClassId()).stream()
                 .map(d -> (HomeworkSubmissionDetail) desensitization(d))
                 .collect(Collectors.toList());
     }
@@ -312,7 +326,8 @@ public class HomeworkService {
      * 权限：仅学生本人
      */
     public HomeworkSubmissionDetail getSubmissionByStudent(Long homeworkId) {
-        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前登录用户不是学生");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        Assert.isTrue(activeCM != null && ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole()), "身份错误");
 
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
 
@@ -325,7 +340,7 @@ public class HomeworkService {
      */
     public List<HomeworkSubmissionDetail> getHomeworkSubmissions(Long homeworkId) {
         HomeworkDetail homeworkDetail = homeworkMapper.findById(homeworkId);
-        validateTeacherPermission(homeworkDetail.getTeacherId());
+        validateTeacherOperation(homeworkDetail.getClassId(), homeworkDetail.getTeacherId());
 
         return submissionMapper.findAllByHomeworkId(homeworkId);
     }
@@ -336,12 +351,12 @@ public class HomeworkService {
      */
     @Transactional
     public List<HomeworkDetail> getAllHomeworksForStudent() {
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user == null || user.getClassMember() == null || !ClassesRoleEnum.STUDENT.getRole().equals(user.getClassMember().getRole())) {
-            throw new IllegalStateException("当前登录用户不是学生");
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+        if (activeCM == null || !ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole())) {
+            throw new IllegalStateException("请切换到学生身份");
         }
-
-        return this.getAllHomeworksInClass(user.getClassMember().getClassId()).stream()
+        // 【修改点】直接查当前班级下的作业，不再递归查询
+        return homeworkMapper.findAllByClassId(activeCM.getClassId()).stream()
                 .map(h -> (HomeworkDetail) desensitization(h))
                 .collect(Collectors.toList());
     }
@@ -357,7 +372,7 @@ public class HomeworkService {
         if (homework == null) {
             throw new IllegalArgumentException("Homework not found with id: " + homeworkId);
         }
-        validateTeacherPermission(homework.getTeacherId());
+        validateTeacherOperation(homework.getClassId(), homework.getTeacherId());
 
         // 2. 查找所有关联的附件路径，以便后续删除物理文件
         List<String> filePathsToDelete = new ArrayList<>();
@@ -392,14 +407,13 @@ public class HomeworkService {
 
     /**
      * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
-     * 权限：管理员、校长、教师
+     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
      */
     @Transactional
     public List<HomeworkDetail> getAllHomeworksInClass(Long classId) {
-        return classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.TEACHER.getRole())
-                .stream()
-                .flatMap(teacher -> this.innerGetHomeworksByTeacher(teacher.getUserId()).stream())
-                .collect(Collectors.toList());
+        validateAccess(classId, null);
+
+        return homeworkMapper.findAllByClassId(classId);
     }
 
     /**
@@ -416,7 +430,7 @@ public class HomeworkService {
                 "作业未提交，请提交作业");
 
         Homework homework = submission.getHomework();
-        validateTeacherPermission(homework.getTeacherId());
+        validateTeacherOperation(homework.getClassId(), homework.getTeacherId());
 
         // 3. 计算总分并构建 JSON
         Integer totalScore = dto.getManualTotalScore();
@@ -454,7 +468,7 @@ public class HomeworkService {
      */
     public HomeworkSubmissionDetail getSubmissionById(Long submissionId) {
         HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(submissionId);
-        validateStudentPermission(submissionDetail.getStudentId());
+        validateAccess(submissionDetail.getClassId(), submissionDetail.getHomeworkId());
         if (userInfoUtils.currentUserInClassIsStudent()) {
             Assert.isTrue(Objects.equals(AuthenticationUserUtil.getCurrentUserId(), submissionDetail.getStudentId()),
                     "学生查看非本人作业提交");
@@ -476,7 +490,7 @@ public class HomeworkService {
         Assert.notNull(submission, "提交记录不存在");
 
         HomeworkDetail homework = homeworkMapper.findById(submission.getHomeworkId());
-        validateTeacherPermission(homework.getTeacherId());
+        validateTeacherOperation(homework.getClassId(), homework.getTeacherId());
         Assert.isTrue("STRUCTURED".equals(homework.getType()), "仅支持结构化作业的 AI 批改");
 
         SubmissionGradingDTO resultDto = new SubmissionGradingDTO();
@@ -654,21 +668,6 @@ public class HomeworkService {
     }
 
     /**
-     * 查看某一个教师发布的所有作业
-     */
-    private List<HomeworkDetail> innerGetHomeworksByTeacher(Long teacherId) {
-        return homeworkMapper.findAllByTeacherId(teacherId);
-    }
-
-    private List<HomeworkDetail> innerGetAllHomeworksInClass(Long classId) {
-        return classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.TEACHER.getRole())
-                .stream()
-                .flatMap(teacher -> this.innerGetHomeworksByTeacher(teacher.getUserId()).stream())
-                .collect(Collectors.toList());
-    }
-
-
-    /**
      * 上传文件并构建附件对象列表
      */
     private List<Attachment> uploadAndBuildAttachments(List<MultipartFile> files, Long ownerId, String ownerType, Long uploaderId) throws IOException {
@@ -756,81 +755,37 @@ public class HomeworkService {
         return HOMEWORK_NAME.getModuleName() + "/" + uniqueFileName;
     }
 
-    // 验证当前登录用户与targetId(教师/学生)是否是管理员、校长、同一班级的教师
-    private void validateTeacherPermission(Long targetId) {
-        // 管理员
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+    /**
+     * 校验教师/管理侧操作权限
+     * 逻辑：
+     * 1. Admin 直接放行
+     * 2. 校长：当前激活学校必须匹配资源所属班级的学校 ID
+     * 3. 教师：当前激活班级必须匹配资源所属班级 ID
+     */
+    private void validateTeacherOperation(Long resourceClassId, Long resourceOwnerId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return;
+
+        if (userInfoUtils.inClassOfSchoolPrincipal(resourceClassId) || userInfoUtils.inClassTeacher(resourceClassId)) {
             return;
         }
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user == null)
-            throw new IllegalStateException("当前无登录账户");
-        User target = userMapper.findByIdWithOrgInfo(targetId);
-        if (target == null || target.getClassMember() == null)
-            throw new IllegalStateException("目标教师不存在");
 
-        // 校长
-        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
-            if (Objects.equals(user.getSchoolMember().getSchoolId(),
-                    target.getClassMember().getClasses().getSchoolId()))
-                return;
-        }
-        // 同班级的教师
-        if (user.getClassMember() != null && ClassesRoleEnum.TEACHER.getRole().equals(user.getClassMember().getRole())) {
-            if (Objects.equals(user.getClassMember().getClassId(),
-                    target.getClassMember().getClassId()))
-                return;
-        }
-        throw new IllegalStateException("你无权限操作");
-    }
-
-    // 验证当前登录用户与targetId(教师/学生)是否是管理员、校长、同一班级的教师/学生
-    private void validateStudentPermission(Long targetId) {
-        // 管理员
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
-            return;
-        }
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user == null)
-            throw new IllegalStateException("当前无登录账户");
-        User target = userMapper.findByIdWithOrgInfo(targetId);
-        if (target == null || target.getClassMember() == null)
-            throw new IllegalStateException("目标教师不存在");
-
-        // 校长
-        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
-            if (Objects.equals(user.getSchoolMember().getSchoolId(),
-                    target.getClassMember().getClasses().getSchoolId()))
-                return;
-        }
-        // 同班级
-        if (user.getClassMember() != null) {
-            if (Objects.equals(user.getClassMember().getClassId(),
-                    target.getClassMember().getClassId()))
-                return;
-        }
-        throw new IllegalStateException("你无权限操作");
+        throw new IllegalStateException("您在当前选中的身份下无权操作此资源，请检查当前班级/学校是否正确");
     }
 
     /**
-     * 辅助方法：从 JSON 中移除答案字段
+     * 校验资源访问权限 (通用)
+     * 逻辑：
+     * 1. Admin 直接放行
+     * 2. 校长：激活学校匹配
+     * 3. 教师/学生：激活班级必须匹配资源所属班级
      */
-    private String removeSensitiveData(String jsonString) throws IOException {
-        JsonNode root = objectMapper.readTree(jsonString);
+    private void validateAccess(Long resourceClassId, Long resourceOwnerId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return;
 
-        // 假设 metaData 结构为 { "questions": [ ... ] }
-        if (root.has("questions") && root.get("questions").isArray()) {
-            ArrayNode questions = (ArrayNode) root.get("questions");
-            for (JsonNode node : questions) {
-                if (node instanceof ObjectNode) {
-                    ObjectNode q = (ObjectNode) node;
-                    // 移除标准答案、AI评分标准、解析
-                    q.remove("correctAnswer");
-                    q.remove("aiGradingCriteria");
-                    q.remove("analysis");
-                }
-            }
+        if (userInfoUtils.inClassOfSchoolPrincipal(resourceClassId) || userInfoUtils.inClass(resourceClassId)) {
+            return;
         }
-        return root.toString();
+
+        throw new IllegalStateException("您在当前选中的身份下无法访问此班级的数据");
     }
 }

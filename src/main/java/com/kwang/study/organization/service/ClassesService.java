@@ -1,7 +1,5 @@
 package com.kwang.study.organization.service;
 
-import com.kwang.study.auth.pojo.Role;
-import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.enums.FileStorageModuleNameEnum;
@@ -11,8 +9,10 @@ import com.kwang.study.organization.dto.result.ClassDetailDTO;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.ClassesMapper;
 import com.kwang.study.organization.mapper.SchoolMapper;
+import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.pojo.Classes;
 import com.kwang.study.organization.pojo.School;
+import com.kwang.study.organization.pojo.SchoolMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -89,7 +89,7 @@ public class ClassesService {
 
     /**
      * 更新班级信息
-     * 权限规则：操作者必须有权限访问该班级所属的学校
+     * 权限规则：Admin, 该校校长
      */
     @Transactional
     public Classes updateClass(Long classId, ClassCreateDTO dto) {
@@ -98,7 +98,7 @@ public class ClassesService {
         Assert.notNull(existingClass, "班级不存在，ID: " + classId);
 
         // 2. 权限校验：检查操作者是否有权操作该学校的数据
-        validateSchoolAccess(existingClass.getSchoolId());
+        validateWriteClassAccess(existingClass.getSchoolId());
 
         // 3. 重名校验 (同一学校下)
         if (!existingClass.getName().equals(dto.getName())) {
@@ -122,7 +122,7 @@ public class ClassesService {
         Assert.notNull(existingClass, "班级不存在，ID: " + classId);
 
         // 权限校验
-        validateSchoolAccess(existingClass.getSchoolId());
+        validateWriteClassAccess(existingClass.getSchoolId());
 
         int affectedRows = classesMapper.deleteById(classId);
         if (affectedRows > 0) {
@@ -142,20 +142,22 @@ public class ClassesService {
      * 2. 非Admin: 强制只能查看自己所在学校
      */
     public List<Classes> getAllClasses(Long targetSchoolId) {
+        validateReadClassAccess(targetSchoolId);
+
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
         return classesMapper.findAllBySchoolId(resolvedSchoolId);
     }
 
     /**
      * 根据ID获取班级
-     * 权限规则：查出班级后，检查其 schoolId 是否属于当前用户可访问范围
+     * 权限规则：Admin，或者在该校
      */
     public Classes getClassById(Long id) {
         Classes classes = classesMapper.findById(id);
         Assert.notNull(classes, "班级不存在");
+        
+        validateReadClassAccess(classes.getSchoolId());
 
-        // 读取权限校验
-        validateSchoolAccess(classes.getSchoolId());
         return classes;
     }
 
@@ -185,6 +187,8 @@ public class ClassesService {
      * 根据名称搜索 (内部调用或精确查找)
      */
     public Classes getClassByName(String name, Long targetSchoolId) {
+        validateReadClassAccess(targetSchoolId);
+        
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
         return classesMapper.findByNameAndSchoolId(name, resolvedSchoolId);
     }
@@ -193,6 +197,8 @@ public class ClassesService {
      * 模糊搜索班级
      */
     public List<Classes> searchClassByName(String key, Long targetSchoolId) {
+        validateReadClassAccess(targetSchoolId);
+
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
         return classesMapper.matchByNameAndSchoolId(key, resolvedSchoolId);
     }
@@ -201,6 +207,9 @@ public class ClassesService {
 
     public List<ClassDetailDTO> getAllClassesDetail(Long targetSchoolId) {
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
+
+        validateReadClassAccess(resolvedSchoolId);
+
         return classesMapper.findAllDetailBySchoolId(resolvedSchoolId);
     }
 
@@ -209,16 +218,20 @@ public class ClassesService {
         Assert.notNull(detail, "班级不存在");
 
         // 读取权限校验
-        validateSchoolAccess(detail.getSchoolId());
+        validateReadClassAccess(detail.getSchoolId());
         return detail;
     }
 
     public ClassDetailDTO getClassDetailByName(String name, Long targetSchoolId) {
+        validateReadClassAccess(targetSchoolId);
+
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
         return classesMapper.findClassDetailByNameAndSchoolId(name, resolvedSchoolId);
     }
 
     public List<ClassDetailDTO> searchClassDetailByName(String key, Long targetSchoolId) {
+        validateReadClassAccess(targetSchoolId);
+
         Long resolvedSchoolId = resolveAndValidateSchoolId(targetSchoolId);
         return classesMapper.matchClassDetailByNameAndSchoolId(key, resolvedSchoolId);
     }
@@ -232,35 +245,41 @@ public class ClassesService {
      * 此方法主要用于 非Admin 用户。
      */
     private Long getAndValidateCurrentSchoolId() {
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        Assert.isTrue(user != null, "无法获取您的学校信息，请联系管理员");
-        Long schoolId = null;
-        // 校长和教师/学生区分
-        if (user.getSchoolMember() != null && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
-            schoolId = user.getSchoolMember().getSchoolId();
-        } else if (user.getClassMember() != null &&
-                user.getClassMember().getClasses() != null &&
-                user.getClassMember().getClasses().getSchoolId() != null) {
-            schoolId = user.getClassMember().getClasses().getSchoolId();
-        } else {
-            throw new IllegalArgumentException("无法获取您的学校信息，请联系管理员");
+        // 修正：从激活的身份中取，而不是从 User 的列表里盲目取
+        SchoolMember activeSM = userInfoUtils.getCurrentActiveSchoolMember();
+        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+
+        if (activeSM != null) {
+            return activeSM.getSchoolId();
+        } else if (activeCM != null) {
+            return activeCM.getClasses().getSchoolId();
         }
-        return schoolId;
+
+        throw new IllegalArgumentException("无法获取您当前激活的学校上下文");
     }
 
     /**
      * 校验当前用户是否有权访问指定的 schoolId。
      * - Admin: 允许访问所有。
-     * - Principal/Teacher/Student: 必须与自己的 schoolId 一致。
+     * - 当前激活身份是该校校长
      */
-    private void validateSchoolAccess(Long targetSchoolId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+    private void validateWriteClassAccess(Long targetSchoolId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.inSchoolPrincipal(targetSchoolId)) {
             return;
         }
-        Long currentSchoolId = getAndValidateCurrentSchoolId();
-        if (!Objects.equals(targetSchoolId, currentSchoolId)) {
-            throw new IllegalArgumentException("无权访问其他学校的数据");
+        throw new IllegalArgumentException("无权访问");
+    }
+
+    /**
+     * 校验当前用户是否有权访问指定的 schoolId。
+     * - Admin: 允许访问所有。
+     * - 在该校
+     */
+    private void validateReadClassAccess(Long targetSchoolId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.inSchool(targetSchoolId)) {
+            return;
         }
+        throw new IllegalArgumentException("无权访问");
     }
 
     /**

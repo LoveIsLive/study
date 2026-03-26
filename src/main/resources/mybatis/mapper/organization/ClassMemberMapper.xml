@@ -48,7 +48,7 @@
             cm.role AS cm_role,
             cm.join_time AS cm_join_time,
             u.id AS u_id,
-            SUBSTRING_INDEX(u.username, '_', -1) AS u_username
+            u.username AS u_username
         FROM
             class_members cm
                 JOIN

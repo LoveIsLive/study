@@ -9,7 +9,9 @@ import com.kwang.study.organization.dto.request.SchoolCreateDTO;
 import com.kwang.study.organization.dto.request.SchoolUpdateDTO;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.SchoolMapper;
+import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.pojo.School;
+import com.kwang.study.organization.pojo.SchoolMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -92,7 +94,7 @@ public class SchoolService {
     @Transactional
     public School updateSchool(Long schoolId, SchoolUpdateDTO dto) {
         // 1. 权限校验
-        validateOperatePermission(schoolId);
+        validateWritePermission(schoolId);
 
         // 2. 检查是否存在
         School existingSchool = schoolMapper.findById(schoolId);
@@ -171,7 +173,7 @@ public class SchoolService {
     public School getSchoolByName(String name) {
         School school = schoolMapper.findByName(name);
         Assert.notNull(school, "学校不存在");
-        validateOperatePermission(school.getId());
+        validateWritePermission(school.getId());
         return school;
     }
 
@@ -194,17 +196,8 @@ public class SchoolService {
      * 校长: 必须是本校 ID
      * 其他: 拒绝
      */
-    private void validateOperatePermission(Long targetSchoolId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
-            return;
-        }
-        // 检查是否是校长
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        if (user != null && user.getSchoolMember() != null
-                && SchoolRoleEnum.PRINCIPAL.getRole().equals(user.getSchoolMember().getRole())) {
-
-            Assert.isTrue(Objects.equals(targetSchoolId, user.getSchoolMember().getSchoolId()),
-                    "您无权操作其他学校");
+    private void validateWritePermission(Long targetSchoolId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.inSchoolPrincipal(targetSchoolId)) {
             return;
         }
         throw new IllegalArgumentException("无权限执行此操作");
@@ -216,11 +209,10 @@ public class SchoolService {
      * 校长/老师/学生: 必须是本校 ID
      */
     private void validateReadPermission(Long targetSchoolId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+        if (AuthenticationUserUtil.currentUserIsAdmin() || userInfoUtils.inSchool(targetSchoolId)) {
             return;
         }
-        User user = userInfoUtils.getCurrentUserInfoWithOrgInfo();
-        Assert.isTrue(user != null && user.getSchoolMember() != null, "无法获取您的学校信息");
-        Assert.isTrue(Objects.equals(targetSchoolId, user.getSchoolMember().getSchoolId()), "无权查看其他学校信息");
+        throw new IllegalArgumentException("无权限执行此操作");
     }
+    
 }

@@ -20,6 +20,9 @@ public class SearchRequestDTO extends BaseRequestDTO {
     @Pattern(regexp = "^[^/\\\\:*?\"<>|]+$", message = "搜索名称不能包含非法字符")
     private String namePattern; // 模糊查询的名称模式
 
+    private Long activeClassId;
+    private Long activeSchoolId;
+
     @Override
     public void check() {
         super.check();

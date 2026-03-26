@@ -28,6 +28,13 @@ public interface UserMapper {
     int insertUser(User user);
 
     /**
+     * 批量插入用户
+     * @param userList 用户列表
+     * @return 插入的行数
+     */
+    int insertUserBatch(@Param("userList") List<User> userList);
+
+    /**
      * 修改用户信息
      * @param user 用户对象
      * @return 受影响的行数

@@ -26,9 +26,8 @@ public class SchoolMemberController {
      * 向学校添加成员 (校长)
      */
     @PostMapping("/{schoolId}/add")
-    public ResponseEntity<R<Void>> addMembers(@PathVariable Long schoolId, @Valid @RequestBody SchoolMemberAddDTO dto) {
-        schoolMemberService.addMembers(schoolId, dto);
-        return ResponseEntity.ok(R.success(null, "添加成功"));
+    public ResponseEntity<R<List<String>>> addMembers(@PathVariable Long schoolId, @Valid @RequestBody SchoolMemberAddDTO dto) {
+        return ResponseEntity.ok(R.success(schoolMemberService.addMembers(schoolId, dto)));
     }
 
     /**
