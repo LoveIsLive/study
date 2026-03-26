@@ -1,6 +1,7 @@
 package com.kwang.study.auth.config;
 
 import com.kwang.study.auth.filter.ContextConflictFilter;
+import com.kwang.study.auth.filter.ExceptionHandlerFilter;
 import com.kwang.study.auth.filter.JwtAuthenticationFilter;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final ContextConflictFilter identityConflictFilter;
+    private final ExceptionHandlerFilter exceptionHandlerFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -60,6 +62,7 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(identityConflictFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(exceptionHandlerFilter, JwtAuthenticationFilter.class)
                 .formLogin().disable()
                 .httpBasic().disable()
 //                .oauth2Login().disable()
