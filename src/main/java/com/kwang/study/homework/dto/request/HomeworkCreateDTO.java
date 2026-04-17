@@ -17,6 +17,9 @@ public class HomeworkCreateDTO {
 
     private String content;
 
+    @NotNull(message = "必须指定所属课程ID")
+    private Long courseId;
+
     private String type = "SIMPLE"; // 默认为普通模式
 
     /**

@@ -6,6 +6,7 @@
         <id property="id" column="id"/>
         <result property="teacherId" column="teacher_id"/>
         <result property="classId" column="class_id"/> <!-- 新增映射 -->
+        <result property="courseId" column="course_id"/>
         <result property="title" column="title"/>
         <result property="content" column="content"/>
         <result property="type" column="type" />
@@ -20,40 +21,44 @@
 
     <resultMap id="HomeworkDetailResultMap" type="com.kwang.study.homework.pojo.HomeworkDetail" extends="HomeworkResultMap">
         <result property="teacherName" column="teacher_name"/>
+        <result property="courseName" column="course_name"/>
     </resultMap>
 
     <sql id="Join_Base_Column_List">
-        h.id, h.teacher_id, h.class_id, h.title, h.content, h.create_time, h.update_time, h.type, h.meta_data, 'homework' AS owner_type
+        h.id, h.course_id, h.teacher_id, h.class_id, h.title, h.content, h.create_time, h.update_time, h.type, h.meta_data, 'homework' AS owner_type
     </sql>
 
     <!-- 新增作业：必须传入 class_id -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO homework (teacher_id, class_id, title, content, type, meta_data)
-        VALUES (#{teacherId}, #{classId}, #{title}, #{content}, #{type}, #{metaData})
+        INSERT INTO homework (teacher_id, class_id, course_id, title, content, type, meta_data)
+        VALUES (#{teacherId}, #{classId}, #{courseId}, #{title}, #{content}, #{type}, #{metaData})
     </insert>
 
     <!-- 根据ID查询：不限制班级，权限由Service层通过返回对象的classId校验 -->
     <select id="findById" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name, c.name AS course_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
+        LEFT JOIN course c ON h.course_id = c.id
         WHERE h.id = #{id}
     </select>
 
     <!-- 【核心修改】教师查看：必须同时匹配教师ID和当前激活的班级ID -->
     <select id="findAllByTeacherIdAndClassId" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name, c.name AS course_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
+        LEFT JOIN course c ON h.course_id = c.id
         WHERE h.teacher_id = #{teacherId} AND h.class_id = #{classId}
         ORDER BY h.update_time DESC
     </select>
 
     <!-- 【新增】学生/校长查看：获取指定班级下的所有作业 -->
     <select id="findAllByClassId" resultMap="HomeworkDetailResultMap">
-        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name, c.name AS course_name
         FROM homework h
         LEFT JOIN users u ON h.teacher_id = u.id
+        LEFT JOIN course c ON h.course_id = c.id
         WHERE h.class_id = #{classId}
         ORDER BY h.update_time DESC
     </select>
@@ -73,5 +78,14 @@
         </set>
         WHERE id = #{id}
     </update>
+
+    <select id="findAllByCourseId" resultMap="HomeworkDetailResultMap">
+        SELECT <include refid="Join_Base_Column_List" />, u.username AS teacher_name, c.name AS course_name
+        FROM homework h
+        LEFT JOIN users u ON h.teacher_id = u.id
+        LEFT JOIN course c ON h.course_id = c.id
+        WHERE h.course_id = #{courseId}
+        ORDER BY h.update_time DESC
+    </select>
 
 </mapper>

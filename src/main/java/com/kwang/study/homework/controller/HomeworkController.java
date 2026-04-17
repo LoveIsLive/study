@@ -118,4 +118,14 @@ public class HomeworkController {
         HomeworkSubmissionDetail returnedSubmission = homeworkService.returnSubmission(subId);
         return ResponseEntity.ok(R.success(returnedSubmission));
     }
+
+    /**
+     * 查看某课程下的所有作业
+     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
+     */
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<R<List<HomeworkDetail>>> getHomeworksByCourseId(@PathVariable Long courseId) {
+        List<HomeworkDetail> result = homeworkService.getHomeworksByCourseId(courseId);
+        return ResponseEntity.ok(R.success(result));
+    }
 }

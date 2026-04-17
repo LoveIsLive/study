@@ -13,4 +13,5 @@ public class HomeworkDetail extends Homework {
     private static final long serialVersionUID = -6236070075646204194L;
 
     private String teacherName;
+    private String courseName;
 }

@@ -10,6 +10,8 @@ import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
+import com.kwang.study.course.mapper.CourseMapper;
+import com.kwang.study.course.pojo.Course;
 import com.kwang.study.fs.dto.result.MimeTypeIdResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.json.HomeworkMetaDTO;
@@ -77,22 +79,16 @@ public class HomeworkService {
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
-    private UserMapper userMapper;
-
-    @Autowired
     private UserInfoUtils userInfoUtils;
-
-    @Autowired
-    private ClassesMapper classesMapper;
-
-    @Autowired
-    private ClassMemberMapper classMemberMapper;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
     private HomeworkValidator homeworkValidator;
+
+    @Autowired
+    private CourseMapper courseMapper;
 
     @Autowired
     private RAG rag;
@@ -112,9 +108,14 @@ public class HomeworkService {
         Assert.isTrue(activeCM != null && ClassesRoleEnum.TEACHER.getRole().equals(activeCM.getRole()), "请先切换到教师身份再发布作业");
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
 
+        Course course = courseMapper.findById(dto.getCourseId());
+        Assert.notNull(course, "所选课程不存在");
+        Assert.isTrue(course.getClassId().equals(activeCM.getClassId()), "该课程不属于当前班级");
+
         Homework homework = new Homework();
         homework.setTeacherId(currentUserId);
         homework.setClassId(activeCM.getClassId());
+        homework.setCourseId(dto.getCourseId());
         homework.setTitle(dto.getTitle());
         homework.setContent(dto.getContent());
 
@@ -244,6 +245,17 @@ public class HomeworkService {
         validateAccess(result.getClassId(), result.getTeacherId());
 
         return (HomeworkDetail) desensitization(result);
+    }
+
+    /**
+     * 查看某课程下的所有作业
+     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
+     */
+    public List<HomeworkDetail> getHomeworksByCourseId(Long courseId) {
+        Course course = courseMapper.findById(courseId);
+        Assert.notNull(course, "课程不存在");
+        validateAccess(course.getClassId(), null); // 权限复用：能在该班级就有权限看
+        return homeworkMapper.findAllByCourseId(courseId);
     }
 
     /**

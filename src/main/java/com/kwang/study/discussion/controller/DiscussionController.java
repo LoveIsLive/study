@@ -42,13 +42,23 @@ public class DiscussionController {
     }
 
     /**
+     * 【新增】为一个课程获取讨论区内容
+     */
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<R<List<DiscussionPostDetail>>> getCourseDiscussion(@PathVariable Long courseId) {
+        List<DiscussionPostDetail> discussionTree = discussionService.getDiscussionTree(courseId, DiscussionService.OWNER_TYPE_COURSE);
+        return ResponseEntity.ok(R.success(discussionTree));
+    }
+
+    /**
      * 发布新帖子或回复
      */
     @PostMapping("/")
     public ResponseEntity<R<DiscussionPostDetail>> createPost(@Valid @RequestBody PostCreateDTO createDTO) {
         // 参数校验：ownerType必须是预定义的值, homework, submission
         if (!DiscussionService.OWNER_TYPE_HOMEWORK.equals(createDTO.getOwnerType()) &&
-                !DiscussionService.OWNER_TYPE_SUBMISSION.equals(createDTO.getOwnerType())) {
+                !DiscussionService.OWNER_TYPE_SUBMISSION.equals(createDTO.getOwnerType()) &&
+                !DiscussionService.OWNER_TYPE_COURSE.equals(createDTO.getOwnerType())) { // 增加放行
             return ResponseEntity.badRequest().body(R.error("Invalid ownerType"));
         }
 

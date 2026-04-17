@@ -18,6 +18,8 @@ public interface HomeworkMapper {
 
     List<HomeworkDetail> findAllByClassId(@Param("classId") Long classId);
 
+    List<HomeworkDetail> findAllByCourseId(@Param("courseId") Long courseId);
+
     int deleteById(@Param("id") Long id);
 
     int updateById(Homework homework);

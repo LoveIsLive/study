@@ -2,6 +2,8 @@ package com.kwang.study.discussion.service;
 
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
+import com.kwang.study.course.mapper.CourseMapper;
+import com.kwang.study.course.pojo.Course;
 import com.kwang.study.discussion.dto.request.PostCreateDTO;
 import com.kwang.study.discussion.dto.request.PostUpdateDTO;
 import com.kwang.study.discussion.mapper.DiscussionPostMapper;
@@ -13,6 +15,7 @@ import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.pojo.HomeworkDetail;
 import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -36,6 +39,10 @@ public class DiscussionService {
     // 定义常量避免魔法字符串
     public static final String OWNER_TYPE_HOMEWORK = "homework";
     public static final String OWNER_TYPE_SUBMISSION = "submission";
+    public static final String OWNER_TYPE_COURSE = "course";
+
+    @Autowired
+    private CourseMapper courseMapper;
 
     /**
      * 创建一个新的帖子/回复
@@ -155,6 +162,10 @@ public class DiscussionService {
         } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
             HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
             classId = submissionDetail.getClassId();
+        } else if (OWNER_TYPE_COURSE.equals(ownerType)) {
+            Course course = courseMapper.findById(ownerId);
+            Assert.notNull(course, "课程不存在");
+            classId = course.getClassId();
         }
         if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))
             return;
@@ -173,6 +184,10 @@ public class DiscussionService {
         } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
             HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
             classId = submissionDetail.getClassId();
+        } else if (OWNER_TYPE_COURSE.equals(ownerType)) {
+            Course course = courseMapper.findById(ownerId);
+            Assert.notNull(course, "课程不存在");
+            classId = course.getClassId();
         }
         if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClassTeacher(classId))
             return;
