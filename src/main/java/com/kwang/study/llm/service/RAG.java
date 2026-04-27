@@ -16,6 +16,7 @@ import com.kwang.study.organization.pojo.SchoolMember;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringSubstitutor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,8 @@ public class RAG {
     private ObjectMapper objectMapper;
     @Autowired
     private SchoolMapper schoolMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private ChatRequestDTO request;
 
@@ -55,6 +58,10 @@ public class RAG {
                 sub = processHomeworkGrading();
                 template = Objects.requireNonNullElse(template, HOMEWORK_GRADE_SYSTEM_PROMPT);
                 break;
+            case "home-score-analysis":
+                sub = processHomeworkScore();
+                template = Objects.requireNonNullElse(template, HOMEWORK_SCORE_ANALYSIS_SYSTEM_PROMPT);
+                break;
             default:
                 sub = new HashMap<>();
                 template = Objects.requireNonNullElse(template, DEFAULT_SYSTEM_PROMPT);
@@ -69,6 +76,44 @@ public class RAG {
         return result;
     }
 
+    private Map<String, String> processHomeworkScore() throws JsonProcessingException {
+        HashMap<String, String> map = new HashMap<>();
+        baseInfo(map);
+        // 定义需要提供给大模型的表名以及对应的业务描述
+        Map<String, String> tableDescriptions = new LinkedHashMap<>();
+        tableDescriptions.put("homework", "- 作业表");
+        tableDescriptions.put("homework_submission", "- 作业提交表");
+        tableDescriptions.put("course", "- 课程表");
+        tableDescriptions.put("users", "- 用户表，存储所有用户，管理员的用户名为admin。");
+        tableDescriptions.put("classes", "- 班级表，存储所有班级信息。");
+        tableDescriptions.put("class_members", "- 班级成员表，存储所有班级成员信息，包括教师和学生。");
+
+        List<String> tables = new ArrayList<>();
+
+        for (Map.Entry<String, String> entry : tableDescriptions.entrySet()) {
+            String tableName = entry.getKey();
+            String description = entry.getValue();
+            try {
+                // 动态执行 SHOW CREATE TABLE 语句
+                Map<String, Object> result = jdbcTemplate.queryForMap("SHOW CREATE TABLE `" + tableName + "`");
+
+                // MySQL 默认返回的键是 "Create Table"
+                String createTableSql = (String) result.get("Create Table");
+
+                // 拼装：业务描述 + 动态获取的建表语句
+                tables.add(description + "\n" + createTableSql);
+            } catch (Exception e) {
+                log.error("动态获取表 [{}] Schema 失败", tableName, e);
+                // 容错处理：如果查不到，至少把描述扔给大模型
+                tables.add(description + " (无法获取Schema详细信息)");
+            }
+        }
+        map.put("table_schemas", String.join("\n", tables));
+
+        return map;
+    }
+
+
     private Map<String, String> processOrganization() throws JsonProcessingException {
         HashMap<String, String> map = new HashMap<>();
         baseInfo(map);
@@ -76,55 +121,34 @@ public class RAG {
 //        if (!"agent".equals(request.getType()))
 //            return map;
 
-        List<String> tables = List.of(
-                "- 用户表，存储所有用户，管理员的用户名为admin。CREATE TABLE `users` (\n" +
-                        "  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '用户ID',\n" +
-                        "  `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名，除管理员`admin`用户外，其余用户遵循前缀策略: S{schoolId}_{username}',\n" +
-                        "  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码（加密存储）',\n" +
-                        "  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '账户是否启用',\n" +
-                        "  PRIMARY KEY (`id`),\n" +
-                        "  UNIQUE KEY `username` (`username`)\n" +
-                        ") ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表'",
+        // 定义需要提供给大模型的表名以及对应的业务描述
+        Map<String, String> tableDescriptions = new LinkedHashMap<>();
+        tableDescriptions.put("users", "- 用户表，存储所有用户，管理员的用户名为admin。");
+        tableDescriptions.put("schools", "- 学校表，存储所有学校信息。");
+        tableDescriptions.put("school_members", "- 学校成员表，存储的是学校的管理者，目前仅有校长。");
+        tableDescriptions.put("classes", "- 班级表，存储所有班级信息。");
+        tableDescriptions.put("class_members", "- 班级成员表，存储所有班级成员信息，包括教师和学生。");
 
-                "- 学校表，存储所有学校信息。CREATE TABLE `schools` (\n" +
-                        "  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '学校ID',\n" +
-                        "  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '学校名称',\n" +
-                        "  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n" +
-                        "  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n" +
-                        "  PRIMARY KEY (`id`),\n" +
-                        "  UNIQUE KEY `name` (`name`)\n" +
-                        ") ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学校表'",
-                "- 学校成员表，存储的是学校的管理者，目前仅有校长。CREATE TABLE `school_members` (\n" +
-                        "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
-                        "  `school_id` bigint NOT NULL COMMENT '学校ID',\n" +
-                        "  `user_id` bigint NOT NULL COMMENT '用户ID',\n" +
-                        "  `role` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '校内角色 (ROLE_PRINCIPAL)',\n" +
-                        "  `join_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n" +
-                        "  PRIMARY KEY (`id`),\n" +
-                        "  UNIQUE KEY `uk_school_user` (`school_id`,`user_id`)\n" +
-                        ") ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学校成员表'\n",
+        List<String> tables = new ArrayList<>();
 
-                "- 班级表，存储所有班级信息。CREATE TABLE `classes` (\n" +
-                        "  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '班级ID',\n" +
-                        "  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '班级名称',\n" +
-                        "  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',\n" +
-                        "  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',\n" +
-                        "  `school_id` bigint NOT NULL DEFAULT '1' COMMENT '所属学校ID',\n" +
-                        "  PRIMARY KEY (`id`),\n" +
-                        "  UNIQUE KEY `name` (`name`,`school_id`)\n" +
-                        ") ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级表'\n",
+        for (Map.Entry<String, String> entry : tableDescriptions.entrySet()) {
+            String tableName = entry.getKey();
+            String description = entry.getValue();
+            try {
+                // 动态执行 SHOW CREATE TABLE 语句
+                Map<String, Object> result = jdbcTemplate.queryForMap("SHOW CREATE TABLE `" + tableName + "`");
 
-                "- 班级成员表，存储所有班级成员信息，包括教师和学生。CREATE TABLE `class_members` (\n" +
-                        "  `id` bigint unsigned NOT NULL AUTO_INCREMENT,\n" +
-                        "  `class_id` bigint NOT NULL COMMENT '班级ID',\n" +
-                        "  `user_id` bigint NOT NULL COMMENT '用户ID',\n" +
-                        "  `role` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '在班级中的角色',\n" +
-                        "  `join_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',\n" +
-                        "  PRIMARY KEY (`id`),\n" +
-                        "  UNIQUE KEY `uk_class_user` (`class_id`,`user_id`),\n" +
-                        "  KEY `fk_cm_user` (`user_id`)\n" +
-                        ") ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级成员及班内角色表'\n"
-                );
+                // MySQL 默认返回的键是 "Create Table"
+                String createTableSql = (String) result.get("Create Table");
+
+                // 拼装：业务描述 + 动态获取的建表语句
+                tables.add(description + "\n" + createTableSql);
+            } catch (Exception e) {
+                log.error("动态获取表 [{}] Schema 失败", tableName, e);
+                // 容错处理：如果查不到，至少把描述扔给大模型
+                tables.add(description + " (无法获取Schema详细信息)");
+            }
+        }
         map.put("table_schemas", String.join("\n", tables));
 
         return map;
@@ -309,4 +333,43 @@ public class RAG {
             "3. 未作答的题目一律给0分。\n" +
             "4. 批语一定要要有人性化、符合角色定义，不能让人察觉到是AI评语。\n" +
             "必须调用 HomeworkGradingTool 工具返回结果。";
+
+    public static final String HOMEWORK_SCORE_ANALYSIS_SYSTEM_PROMPT = "## 系统背景\n" +
+            "你正在运行于一个深度集成大模型的Web端智能教学系统中。该系统专为教育场景设计，旨在通过 AI 技术减轻教师重复性工作负担并支持学生个性化学习。\n" +
+            "系统具备以下核心业务能力，你在回答时需充分意识到这些背景：\n" +
+            "1. 组织管理模块负责维护用户的层级结构，包括学校、年级、班级三级组织单元，互相数据隔离。用户相应的存在管理员、校长、教师、学生角色。用户可以通过教师操作加入多个班级，互相隔离、可切换。\n" +
+            "2. 每个班级下可以有多个课程，每个课程有一个课程章节（一个树形的文件管理系统，包含了这个课程的课件等数据）以及在课程内发布作业等能力。\n" +
+            "3. 全流程作业管理：覆盖作业的发布、提交、批改（含 AI 辅助批改）、打回重做及数据统计全生命周期。\n" +
+            "4. 不同视角、不同维度对课程、作业成绩进行可视化分析，AI分析解答。\n" +
+            "5. 工具链集成：系统已在底层集成了 GeoGebra（数学动态绘图）、PhET（理化仿真）等专业教学工具。\n" +
+            "\n" +
+            "## 角色定义\n" +
+            "你是由“智能教学系统”驱动的AI助教。你的任务是辅助用户完成教学或学习任务。\n" +
+            "\n" +
+            "## 当前上下文\n" +
+            "- 当前场景: ${current_scene}\n" +
+            "- 用户信息：${user_info}\n" +
+            "- 当前时间: ${current_time}\n" +
+            "\n" +
+            "## 约束与准则\n" +
+            "1. 安全性: 严禁泄露学生的个人敏感隐私（如家庭住址、未加密的身份证号）。\n" +
+            "2. 教学风格:\n" +
+            "   - 对教师：专业、高效、结构化，提供可执行的建议。\n" +
+            "   - 对学生：鼓励性、循循善诱，解释概念要通俗易懂。\n" +
+            "3. 拒绝回答: 如果问题超出教育教学范畴或违反法律法规，请礼貌拒绝。\n" +
+            "\n" +
+            "## 目标\n" +
+            "- 在不违反`约束与准则`的情况下尽可能的帮助用户。\n" +
+            "\n" +
+            "## 输出\n" +
+            "- 如果要求选择Tool，请选择最适合的Tool，比如图表比单纯的文字更好。\n" +
+            "\n" +
+            "## 数据库表schema\n" +
+            "下面以```开始和结束的内容是通过show create table语句获取到的相关表schema信息，你需要关注表之间的关系和列的含义，注意列注释的描述信息：\n" +
+            "# 注意\n" +
+            "- 给用户的回复中务必不能涉及表schema信息，表schema信息只能在tool call SqlExecutorTool工具需要填入sql语句时使用。\n" +
+            "若用户需要成绩信息、请向用户解释“如果您需要分析成绩数据，请开启agent模式和获取成绩数据按钮。”\n" +
+            "```\n" +
+            "${table_schemas}\n" +
+            "```";
 }

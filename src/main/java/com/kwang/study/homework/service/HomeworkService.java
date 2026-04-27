@@ -461,6 +461,8 @@ public class HomeworkService {
             } catch (Exception e) {
                 log.error("JSON serialization failed", e);
             }
+        } else if ("SIMPLE".equals(homework.getType())) {
+            Assert.isTrue(totalScore <= 100, "简单作业得分不可以超过100");
         }
 
         // 4. 更新对象

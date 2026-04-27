@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -50,7 +51,9 @@ public class LLM {
         // 只要一个choice
         paramsBuilder.n(1);
         if (config.getEnable_thinking() != null) {
+            // 适配多种启动
             paramsBuilder.putAdditionalBodyProperty("enable_thinking", JsonValue.from(config.getEnable_thinking()));
+            paramsBuilder.putAdditionalBodyProperty("thinking", JsonValue.from(Map.of("type", config.getEnable_thinking())));
         }
         this.params = paramsBuilder.build();
     }
