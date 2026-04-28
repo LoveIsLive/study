@@ -3,6 +3,7 @@ package com.kwang.study.auth.config;
 import com.kwang.study.auth.filter.ContextConflictFilter;
 import com.kwang.study.auth.filter.ExceptionHandlerFilter;
 import com.kwang.study.auth.filter.JwtAuthenticationFilter;
+import com.kwang.study.enums.FileStorageModuleNameEnum;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.context.annotation.Bean;

@@ -3,6 +3,8 @@ package com.kwang.study.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.ContentVersionStrategy;
@@ -10,6 +12,7 @@ import org.springframework.web.servlet.resource.PathResourceResolver;
 import org.springframework.web.servlet.resource.VersionResourceResolver;
 
 import java.io.IOException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.CacheControl;
 
@@ -51,5 +54,43 @@ public class WebConfig implements WebMvcConfigurer {
                         return new ClassPathResource("/static/index.html");
                     }
                 });
+    }
+
+    @Override
+    public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        // 1. 设置异步请求超时时间（单位毫秒）
+        // 生产环境建议设置，例如 60 秒。防止网络极差的用户一直占用服务器连接
+        configurer.setDefaultTimeout(60000L);
+
+        // 2. 配置专属的异步线程池
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        // 核心线程数：根据你的服务器 CPU 核数和图片请求并发量来定（例如 IO 密集型可设为 CPU核数 * 2）
+        executor.setCorePoolSize(2);
+
+        // 最大线程数：当核心线程都在忙，且队列满了时，最多能开多少个线程
+        executor.setMaxPoolSize(10);
+
+        // 队列容量：用来缓冲瞬时突发的高并发请求
+        executor.setQueueCapacity(20);
+
+        // 线程前缀名：强烈建议设置！当线上出现问题看日志或 jstack 时，能一眼认出这是用来下载图片的线程
+        executor.setThreadNamePrefix("img-async-");
+
+        // ================= 生产环境关键配置 =================
+
+        // 3. 拒绝策略（重要）：当最大线程数满了，队列也满了，新来的请求怎么办？
+        // CallerRunsPolicy 表示：把这个任务交回给调用方（即 Tomcat 的 NIO 线程）去同步执行。
+        // 这样既不会抛出异常导致用户图片加载失败，又能起到天然的限流作用。
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+
+        // 4. 优雅停机（重要）：当运维发版重启服务时，让正在下载图片的线程把图片传完再关闭，而不是直接杀掉
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30); // 最多等 30 秒
+
+        // =================================================
+
+        executor.initialize();
+        configurer.setTaskExecutor(executor);
     }
 }
