@@ -8,5 +8,4 @@ public class CourseDTO {
     @NotBlank(message = "课程名称不能为空")
     private String name;
     private String description;
-    private String coverImage;
 }

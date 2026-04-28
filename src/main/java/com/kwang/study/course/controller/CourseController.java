@@ -37,14 +37,14 @@ public class CourseController {
     private final FileStorageService fileStorageService;
 
     @PostMapping("/create")
-    public R<Course> createCourse(@Valid @RequestBody CourseDTO dto,
-                                  @RequestParam(value = "coverImage", required = false) MultipartFile coverImage) {
+    public R<Course> createCourse(@Valid @RequestPart("dto") CourseDTO dto,
+                                  @RequestPart(value = "coverImage", required = false) MultipartFile coverImage) {
         return R.success(courseService.createCourse(dto, coverImage));
     }
 
     @PutMapping("/{courseId}")
-    public R<Course> updateCourse(@PathVariable Long courseId, @Valid @RequestBody CourseDTO dto,
-                                  @RequestParam(value = "coverImage", required = false) MultipartFile coverImage) {
+    public R<Course> updateCourse(@PathVariable Long courseId, @Valid @RequestPart("dto") CourseDTO dto,
+                                  @RequestPart(value = "coverImage", required = false) MultipartFile coverImage) {
         return R.success(courseService.updateCourse(courseId, dto, coverImage));
     }
 
