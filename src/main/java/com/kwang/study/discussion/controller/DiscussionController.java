@@ -23,30 +23,10 @@ public class DiscussionController {
 
     private final DiscussionService discussionService;
 
-    /**
-     * 为一个作业获取讨论区内容
-     */
-    @GetMapping("/homework/{homeworkId}")
-    public ResponseEntity<R<List<DiscussionPostDetail>>> getHomeworkDiscussion(@PathVariable Long homeworkId) {
-        List<DiscussionPostDetail> discussionTree = discussionService.getDiscussionTree(homeworkId, DiscussionService.OWNER_TYPE_HOMEWORK);
-        return ResponseEntity.ok(R.success(discussionTree));
-    }
-
-    /**
-     * 为一个作业提交获取讨论区内容
-     */
-    @GetMapping("/submission/{submissionId}")
-    public ResponseEntity<R<List<DiscussionPostDetail>>> getSubmissionDiscussion(@PathVariable Long submissionId) {
-        List<DiscussionPostDetail> discussionTree = discussionService.getDiscussionTree(submissionId, DiscussionService.OWNER_TYPE_SUBMISSION);
-        return ResponseEntity.ok(R.success(discussionTree));
-    }
-
-    /**
-     * 【新增】为一个课程获取讨论区内容
-     */
-    @GetMapping("/course/{courseId}")
-    public ResponseEntity<R<List<DiscussionPostDetail>>> getCourseDiscussion(@PathVariable Long courseId) {
-        List<DiscussionPostDetail> discussionTree = discussionService.getDiscussionTree(courseId, DiscussionService.OWNER_TYPE_COURSE);
+    @GetMapping("/getall")
+    public ResponseEntity<R<List<DiscussionPostDetail>>> getAllDiscussion(@RequestParam("ownerId") Long ownerId,
+                                                                          @RequestParam("ownerType") String ownerType) {
+        List<DiscussionPostDetail> discussionTree = discussionService.getDiscussionTree(ownerId, ownerType);
         return ResponseEntity.ok(R.success(discussionTree));
     }
 
@@ -55,13 +35,6 @@ public class DiscussionController {
      */
     @PostMapping("/")
     public ResponseEntity<R<DiscussionPostDetail>> createPost(@Valid @RequestBody PostCreateDTO createDTO) {
-        // 参数校验：ownerType必须是预定义的值, homework, submission
-        if (!DiscussionService.OWNER_TYPE_HOMEWORK.equals(createDTO.getOwnerType()) &&
-                !DiscussionService.OWNER_TYPE_SUBMISSION.equals(createDTO.getOwnerType()) &&
-                !DiscussionService.OWNER_TYPE_COURSE.equals(createDTO.getOwnerType())) { // 增加放行
-            return ResponseEntity.badRequest().body(R.error("Invalid ownerType"));
-        }
-
         DiscussionPostDetail newPost = discussionService.createPost(createDTO);
         return ResponseEntity.ok(R.success(newPost));
     }

@@ -11,20 +11,19 @@ import com.kwang.study.discussion.pojo.DiscussionPost;
 import com.kwang.study.discussion.pojo.DiscussionPostDetail;
 import com.kwang.study.homework.mapper.HomeworkMapper;
 import com.kwang.study.homework.mapper.HomeworkSubmissionMapper;
-import com.kwang.study.homework.pojo.Homework;
 import com.kwang.study.homework.pojo.HomeworkDetail;
 import com.kwang.study.homework.pojo.HomeworkSubmissionDetail;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.kwang.study.discussion.service.DiscussionService.DiscussionType.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,9 +36,27 @@ public class DiscussionService {
     private final HomeworkSubmissionMapper submissionMapper;
 
     // 定义常量避免魔法字符串
-    public static final String OWNER_TYPE_HOMEWORK = "homework";
-    public static final String OWNER_TYPE_SUBMISSION = "submission";
-    public static final String OWNER_TYPE_COURSE = "course";
+    @Getter
+    public enum DiscussionType {
+        OWNER_TYPE_HOMEWORK("homework"),
+        OWNER_TYPE_SUBMISSION("submission"),
+        OWNER_TYPE_COURSE("course"),
+        OWNER_TYPE_GLOBAL("global");
+
+        /*
+        ownerType对应ownerId的含义：
+        homework: homeworkId
+        submission: homeSubmissionId
+        course: courseId
+        global: classId(所要查看班级的classId)
+         */
+
+        private final String type;
+        DiscussionType(String type) {
+            this.type = type;
+        }
+    }
+
 
     @Autowired
     private CourseMapper courseMapper;
@@ -49,6 +66,7 @@ public class DiscussionService {
      */
     @Transactional
     public DiscussionPostDetail createPost(PostCreateDTO dto) {
+        checkOwnerType(dto.getOwnerType());
         readAccessOwner(dto.getOwnerId(), dto.getOwnerType());
 
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
@@ -70,6 +88,8 @@ public class DiscussionService {
      * 获取指定对象的整个讨论树
      */
     public List<DiscussionPostDetail> getDiscussionTree(Long ownerId, String ownerType) {
+        checkOwnerType(ownerType);
+
         readAccessOwner(ownerId, ownerType);
 
         // 1. 获取该对象下的所有帖子（扁平列表）
@@ -156,16 +176,18 @@ public class DiscussionService {
             return;
 
         Long classId = null;
-        if (OWNER_TYPE_HOMEWORK.equals(ownerType)) {
+        if (OWNER_TYPE_HOMEWORK.getType().equals(ownerType)) {
             HomeworkDetail homeworkDetail = homeworkMapper.findById(ownerId);
             classId = homeworkDetail.getClassId();
-        } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
+        } else if (OWNER_TYPE_SUBMISSION.getType().equals(ownerType)) {
             HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
             classId = submissionDetail.getClassId();
-        } else if (OWNER_TYPE_COURSE.equals(ownerType)) {
+        } else if (OWNER_TYPE_COURSE.getType().equals(ownerType)) {
             Course course = courseMapper.findById(ownerId);
             Assert.notNull(course, "课程不存在");
             classId = course.getClassId();
+        } else if (OWNER_TYPE_GLOBAL.getType().equals(ownerType)) {
+            classId = ownerId;
         }
         if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))
             return;
@@ -178,16 +200,18 @@ public class DiscussionService {
             return ;
 
         Long classId = null;
-        if (OWNER_TYPE_HOMEWORK.equals(ownerType)) {
+        if (OWNER_TYPE_HOMEWORK.getType().equals(ownerType)) {
             HomeworkDetail homeworkDetail = homeworkMapper.findById(ownerId);
             classId = homeworkDetail.getClassId();
-        } else if (OWNER_TYPE_SUBMISSION.equals(ownerType)) {
+        } else if (OWNER_TYPE_SUBMISSION.getType().equals(ownerType)) {
             HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
             classId = submissionDetail.getClassId();
-        } else if (OWNER_TYPE_COURSE.equals(ownerType)) {
+        } else if (OWNER_TYPE_COURSE.getType().equals(ownerType)) {
             Course course = courseMapper.findById(ownerId);
             Assert.notNull(course, "课程不存在");
             classId = course.getClassId();
+        }  else if (OWNER_TYPE_GLOBAL.getType().equals(ownerType)) {
+            classId = ownerId;
         }
         if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClassTeacher(classId))
             return;
@@ -204,5 +228,10 @@ public class DiscussionService {
             return false;
         }
         return true;
+    }
+
+    private void checkOwnerType(String ownerType) {
+        Assert.isTrue(Arrays.stream(values()).anyMatch(type -> type.getType().equals(ownerType)),
+                ownerType + "为非法值");
     }
 }
