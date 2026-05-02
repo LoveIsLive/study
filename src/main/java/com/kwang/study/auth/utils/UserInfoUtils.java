@@ -14,8 +14,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Component
 public class UserInfoUtils {
@@ -57,6 +59,15 @@ public class UserInfoUtils {
             redis.opsForValue().set(USERINFO_PREFIX + userId, user, 5, TimeUnit.MINUTES);
         }
         return user;
+    }
+
+    public void deleteUserCache(Long userId) {
+        redis.delete(USERINFO_PREFIX + userId);
+    }
+
+    public void deleteUsersCache(List<Long> userIds) {
+        List<String> ids = userIds.stream().map(k -> USERINFO_PREFIX + k).collect(Collectors.toList());
+        redis.delete(ids);
     }
 
     /**

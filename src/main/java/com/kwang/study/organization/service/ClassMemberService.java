@@ -81,6 +81,7 @@ public class ClassMemberService {
             member.setUserId(existingUser.getId());
             member.setRole(dto.getRole());
             newMembers.add(member);
+            userInfoUtils.deleteUserCache(existingUser.getId());
         }
 
         if (!newMembers.isEmpty()) {
@@ -107,6 +108,7 @@ public class ClassMemberService {
 
         // 3. 执行删除
         int affectedRows = classMemberMapper.deleteByClassIdAndUserIds(classId, userIds);
+        userInfoUtils.deleteUsersCache(userIds);
 
         // 注意：这里仅移除班级关系，保留用户账号。
         // 如果业务要求学生退班即销号，可以在这里调用 userMapper.deleteUser(userId)

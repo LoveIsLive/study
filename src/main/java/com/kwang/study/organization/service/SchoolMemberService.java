@@ -72,6 +72,7 @@ public class SchoolMemberService {
             member.setUserId(existUser.getId());
             member.setRole(dto.getRole());
             membersToInsert.add(member);
+            userInfoUtils.deleteUserCache(existUser.getId());
         }
 
         if (!membersToInsert.isEmpty()) {
@@ -93,11 +94,7 @@ public class SchoolMemberService {
 
         // 2. 删除成员关联
         int rows = schoolMemberMapper.deleteBySchoolIdAndUserIds(schoolId, userIds);
-
-        // 既然用户名是绑定学校前缀的，移除了成员身份后，该账号实际上废弃了。
-        for (Long userId : userIds) {
-            userMapper.deleteUser(userId);
-        }
+        userInfoUtils.deleteUsersCache(userIds);
 
         log.info("从学校 {} 移除了 {} 名成员", schoolId, rows);
     }
