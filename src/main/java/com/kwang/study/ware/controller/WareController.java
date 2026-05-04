@@ -10,6 +10,8 @@ import com.kwang.study.organization.pojo.SchoolMember;
 import com.kwang.study.utils.PathUtils;
 import com.kwang.study.ware.dto.cache.DownloadTokenDTO;
 import com.kwang.study.ware.dto.request.*;
+import com.kwang.study.ware.mapper.NodeMetadataMapper;
+import com.kwang.study.ware.pojo.NodeMetadata;
 import com.kwang.study.ware.service.WareService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -245,6 +247,15 @@ public class WareController {
                         ),
                 30, TimeUnit.MINUTES);
         return ResponseEntity.ok(R.success(downloadId));
+    }
+
+    @PostMapping("/update/summary")
+    public ResponseEntity<R<VoidResult>> updateFileAISummary(@RequestParam("path") String path,
+                                                           @RequestParam("summary") String summary) throws IOException {
+        Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+
+        VoidResult voidResult = wareService.updateFileAISummary(path, summary);
+        return build(voidResult);
     }
 
 

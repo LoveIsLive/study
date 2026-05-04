@@ -1,6 +1,9 @@
 package com.kwang.study.ware.service;
 
 import com.kwang.study.auth.utils.UserInfoUtils;
+import com.kwang.study.fs.mapper.NodeMapper;
+import com.kwang.study.fs.pojo.Node;
+import com.kwang.study.llm.service.LLMService;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.pojo.ClassMember;
@@ -16,10 +19,13 @@ import com.kwang.study.fs.dto.result.*;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.organization.service.SchoolService;
 import com.kwang.study.utils.DownloadUtils;
+import com.kwang.study.ware.mapper.NodeMetadataMapper;
+import com.kwang.study.ware.pojo.NodeMetadata;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -39,6 +45,11 @@ public class WareService {
     private SchoolService schoolService;
     @Autowired
     private UserInfoUtils userInfoUtils;
+
+    @Autowired
+    private NodeMetadataMapper nodeMetadataMapper;
+    @Autowired
+    private NodeMapper nodeMapper;
 
     @Transactional
     public VoidResult createDirectory(String path) throws IOException {
@@ -195,6 +206,19 @@ public class WareService {
         return fsService.getAllMimeTypeNames();
     }
 
+    @Transactional
+    public VoidResult updateFileAISummary(String path, String summary) {
+        String actualPath = buildActualPath(path);
+
+        // 这里有点越权了，应该由fsService暴露一个系统内部使用的 获取node_id的方法。
+        Node node = nodeMapper.selectNodeByPath(actualPath);
+        nodeMetadataMapper.updateByNodeId(NodeMetadata.builder()
+                .nodeId(node.getId())
+                .aiSummary(summary)
+                .build());
+        return VoidResult.success();
+    }
+
 
     // 返回用户该模块的根目录，不以/结尾
     private String buildBasePath() {
@@ -224,7 +248,7 @@ public class WareService {
         return basePath.toString();
     }
 
-    private String buildActualPath(String path) {
+    public String buildActualPath(String path) {
         // 管理员，学校/班级特殊处理规则
         if (AuthenticationUserUtil.currentUserIsAdmin() && !"/".equals(path)) {
             String[] parts = path.split("/");

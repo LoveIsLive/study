@@ -32,8 +32,6 @@ public class RAG {
     private ObjectMapper objectMapper;
     @Autowired
     private SchoolMapper schoolMapper;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     private ChatRequestDTO request;
 
@@ -46,10 +44,6 @@ public class RAG {
                 sub = processDefault();
                 template = Objects.requireNonNullElse(template, DEFAULT_SYSTEM_PROMPT);
                 break;
-            case "organization":
-                sub = processOrganization();
-                template = Objects.requireNonNullElse(template, ORGANIZATION_SYSTEM_PROMPT);
-                break;
             case "homework-gen":
                 sub = processHomeworkGen();
                 template = Objects.requireNonNullElse(template, HOMEWORK_GEN_SYSTEM_PROMPT);
@@ -58,9 +52,13 @@ public class RAG {
                 sub = processHomeworkGrading();
                 template = Objects.requireNonNullElse(template, HOMEWORK_GRADE_SYSTEM_PROMPT);
                 break;
-            case "home-score-analysis":
-                sub = processHomeworkScore();
-                template = Objects.requireNonNullElse(template, HOMEWORK_SCORE_ANALYSIS_SYSTEM_PROMPT);
+            case "mind-block-gen":
+                sub = processMindBlockGen();
+                template = Objects.requireNonNullElse(template, MIND_BLOCK_GEN_SYSTEM_PROMPT);
+                break;
+            case "file-summary":
+                sub = processDefault();
+                template = Objects.requireNonNullElse(template, FILE_SUMMARY_SYSTEM_PROMPT);
                 break;
             default:
                 sub = new HashMap<>();
@@ -76,84 +74,6 @@ public class RAG {
         return result;
     }
 
-    private Map<String, String> processHomeworkScore() throws JsonProcessingException {
-        HashMap<String, String> map = new HashMap<>();
-        baseInfo(map);
-        // 定义需要提供给大模型的表名以及对应的业务描述
-        Map<String, String> tableDescriptions = new LinkedHashMap<>();
-        tableDescriptions.put("homework", "- 作业表");
-        tableDescriptions.put("homework_submission", "- 作业提交表");
-        tableDescriptions.put("course", "- 课程表");
-        tableDescriptions.put("users", "- 用户表，存储所有用户，管理员的用户名为admin。");
-        tableDescriptions.put("classes", "- 班级表，存储所有班级信息。");
-        tableDescriptions.put("class_members", "- 班级成员表，存储所有班级成员信息，包括教师和学生。");
-
-        List<String> tables = new ArrayList<>();
-
-        for (Map.Entry<String, String> entry : tableDescriptions.entrySet()) {
-            String tableName = entry.getKey();
-            String description = entry.getValue();
-            try {
-                // 动态执行 SHOW CREATE TABLE 语句
-                Map<String, Object> result = jdbcTemplate.queryForMap("SHOW CREATE TABLE `" + tableName + "`");
-
-                // MySQL 默认返回的键是 "Create Table"
-                String createTableSql = (String) result.get("Create Table");
-
-                // 拼装：业务描述 + 动态获取的建表语句
-                tables.add(description + "\n" + createTableSql);
-            } catch (Exception e) {
-                log.error("动态获取表 [{}] Schema 失败", tableName, e);
-                // 容错处理：如果查不到，至少把描述扔给大模型
-                tables.add(description + " (无法获取Schema详细信息)");
-            }
-        }
-        map.put("table_schemas", String.join("\n", tables));
-
-        return map;
-    }
-
-
-    private Map<String, String> processOrganization() throws JsonProcessingException {
-        HashMap<String, String> map = new HashMap<>();
-        baseInfo(map);
-        // 仅agent模式可以获得表schema信息。
-//        if (!"agent".equals(request.getType()))
-//            return map;
-
-        // 定义需要提供给大模型的表名以及对应的业务描述
-        Map<String, String> tableDescriptions = new LinkedHashMap<>();
-        tableDescriptions.put("users", "- 用户表，存储所有用户，管理员的用户名为admin。");
-        tableDescriptions.put("schools", "- 学校表，存储所有学校信息。");
-        tableDescriptions.put("school_members", "- 学校成员表，存储的是学校的管理者，目前仅有校长。");
-        tableDescriptions.put("classes", "- 班级表，存储所有班级信息。");
-        tableDescriptions.put("class_members", "- 班级成员表，存储所有班级成员信息，包括教师和学生。");
-
-        List<String> tables = new ArrayList<>();
-
-        for (Map.Entry<String, String> entry : tableDescriptions.entrySet()) {
-            String tableName = entry.getKey();
-            String description = entry.getValue();
-            try {
-                // 动态执行 SHOW CREATE TABLE 语句
-                Map<String, Object> result = jdbcTemplate.queryForMap("SHOW CREATE TABLE `" + tableName + "`");
-
-                // MySQL 默认返回的键是 "Create Table"
-                String createTableSql = (String) result.get("Create Table");
-
-                // 拼装：业务描述 + 动态获取的建表语句
-                tables.add(description + "\n" + createTableSql);
-            } catch (Exception e) {
-                log.error("动态获取表 [{}] Schema 失败", tableName, e);
-                // 容错处理：如果查不到，至少把描述扔给大模型
-                tables.add(description + " (无法获取Schema详细信息)");
-            }
-        }
-        map.put("table_schemas", String.join("\n", tables));
-
-        return map;
-    }
-
     private Map<String, String> processHomeworkGen() throws JsonProcessingException {
         HashMap<String, String> result = new HashMap<>();
         baseInfo(result);
@@ -166,6 +86,19 @@ public class RAG {
     private Map<String, String> processHomeworkGrading() throws JsonProcessingException {
         HashMap<String, String> result = new HashMap<>();
         baseInfo(result);
+        return result;
+    }
+
+    private Map<String, String> processMindBlockGen() throws JsonProcessingException {
+        HashMap<String, String> result = new HashMap<>();
+        baseInfo(result); // 注入基本信息（当前时间、用户信息等）
+
+        // 提取前端传来的当前工作区 XML
+        Object currentXmlObj = request.getSceneParams() != null ?
+                request.getSceneParams().get("current_blockly_xml") : null;
+        String currentXml = currentXmlObj != null ? currentXmlObj.toString() : "当前工作区为空。";
+
+        result.put("current_blockly_xml", currentXml);
         return result;
     }
 
@@ -227,44 +160,6 @@ public class RAG {
             "\n" +
             "## 输出\n" +
             "- 如果要求选择Tool，请选择最适合的Tool，比如图表比单纯的文字更好。";
-
-    public static final String ORGANIZATION_SYSTEM_PROMPT = "## 系统背景\n" +
-            "你正在运行于一个深度集成大模型的Web端智能教学系统中。该系统专为教育场景设计，旨在通过 AI 技术减轻教师重复性工作负担并支持学生个性化学习。\n" +
-            "系统具备以下核心业务能力，你在回答时需充分意识到这些背景：\n" +
-            "1. 类Unix虚拟文件系统：系统拥有独特的分布式文件存储结构，支持大文件分片与哈希去重（你不能直接操作底层文件，但可以理解用户对“/第一课/初识Java语言”灯的引用）。\n" +
-            "2. 组织管理模块负责维护用户的层级结构，包括学校、年级、班级三级组织单元，互相数据隔离。用户相应的存在管理员、校长、教师、学生角色。\n" +
-            "3. 全流程作业管理：覆盖作业的发布、提交、批改（含 AI 辅助批改）、打回重做及数据统计全生命周期。\n" +
-            "4. 工具链集成：系统已在底层集成了 GeoGebra（数学动态绘图）、PhET（理化仿真）等专业教学工具。\n" +
-            "\n" +
-            "## 角色定义\n" +
-            "你是由“智能教学系统”驱动的AI助教。你的任务是辅助用户完成教学或学习任务。\n" +
-            "\n" +
-            "## 当前上下文\n" +
-            "- 当前场景: ${current_scene}\n" +
-            "- 用户信息：${user_info}\n" +
-            "- 当前时间: ${current_time}\n" +
-            "\n" +
-            "## 约束与准则\n" +
-            "1. 安全性: 严禁泄露学生的个人敏感隐私（如家庭住址、未加密的身份证号）。\n" +
-            "2. 教学风格:\n" +
-            "   - 对教师：专业、高效、结构化，提供可执行的建议。\n" +
-            "   - 对学生：鼓励性、循循善诱，解释概念要通俗易懂。\n" +
-            "3. 拒绝回答: 如果问题超出教育教学范畴或违反法律法规，请礼貌拒绝。\n" +
-            "\n" +
-            "## 目标\n" +
-            "- 在不违反`约束与准则`的情况下尽可能的帮助用户。\n" +
-            "\n" +
-            "## 输出\n" +
-            "- 如果要求选择Tool，请选择最适合的Tool，比如图表比单纯的文字更好。\n" +
-            "\n" +
-            "## 数据库表schema\n" +
-            "下面以```开始和结束的内容是通过show create table语句获取到的相关表schema信息，你需要关注表之间的关系和列的含义，注意列注释的描述信息：\n" +
-            "# 注意\n" +
-            "- 给用户的回复中务必不能涉及表schema信息，表schema信息只能在tool call SqlExecutorTool工具需要填入sql语句时使用。\n" +
-            "若用户需要组织信息、请向用户解释“如果您需要分析组织数据，请开启agent模式和获取组织数据按钮。”\n" +
-            "```\n" +
-            "${table_schemas}\n" +
-            "```";
 
     public static final String HOMEWORK_GEN_SYSTEM_PROMPT = "## 系统背景\n" +
             "你正在运行于一个深度集成大模型的Web端智能教学系统中。该系统专为教育场景设计，旨在通过 AI 技术减轻教师重复性工作负担并支持学生个性化学习。\n" +
@@ -372,4 +267,39 @@ public class RAG {
             "```\n" +
             "${table_schemas}\n" +
             "```";
+
+    public static final String MIND_BLOCK_GEN_SYSTEM_PROMPT = "## 角色与目标\n" +
+            "你是一个精通标准 Google Blockly 原生积木编程与 Python 算法的智能教学专家。\n" +
+            "你的任务是根据用户的需求，生成对应的图形化积木逻辑，并严格以 JSON 格式输出。\n" +
+            "\n" +
+            "## 当前工作区上下文\n" +
+            "这是用户当前画布上的积木 XML 代码（为空则表示画布是空白的）：\n" +
+            "```xml\n" +
+            "${current_blockly_xml}\n" +
+            "```\n" +
+            "你需要在此 XML 基础上进行精准修改，以满足用户的最新要求。\n" +
+            "\n" +
+            "## 🚨 核心边界与禁令（极其重要！）🚨\n" +
+            "1. 纯血环境：前端使用的是原生的 Google Blockly，绝对不是 Scratch 或 Mind+ 客户端！\n" +
+            "2. 绝对黑名单：严禁使用任何硬件、动画、画笔、颜色或事件积木！绝对不允许出现 `event_whenflagclicked`, `motion_movesteps`, `pen_down` 等 Scratch 专属块！\n" +
+            "3. 严格白名单：你生成的 XML 中的 <block type=\"...\"> 必须【且只能】从以下列表中选择，绝不能自己发明：\n" +
+            "   -[逻辑]: `controls_if`, `logic_compare`, `logic_operation`, `logic_negate`, `logic_boolean`, `logic_null`, `logic_ternary`\n" +
+            "   -[循环]: `controls_repeat_ext`, `controls_whileUntil`, `controls_for`, `controls_forEach`, `controls_flow_statements`\n" +
+            "   - [数学]: `math_number`, `math_arithmetic`, `math_single`, `math_trig`, `math_constant`, `math_number_property`, `math_round`, `math_on_list`, `math_modulo`, `math_constrain`, `math_random_int`, `math_random_float`\n" +
+            "   -[文本]: `text`, `text_join`, `text_append`, `text_length`, `text_isEmpty`, `text_indexOf`, `text_charAt`, `text_getSubstring`, `text_changeCase`, `text_trim`, `text_print`, `text_prompt_ext`\n" +
+            "   - [列表]: `lists_create_empty`, `lists_create_with`, `lists_repeat`, `lists_length`, `lists_isEmpty`, `lists_indexOf`, `lists_getIndex`, `lists_setIndex`, `lists_getSublist`, `lists_split`, `lists_sort`\n" +
+            "   -[变量/函数]: `variables_get`, `variables_set`, `procedures_defreturn`, `procedures_defnoreturn`, `procedures_callreturn`, `procedures_callnoreturn`\n" +
+            "4. 降级策略：如果用户要求“画图”、“移动”或“硬件控制”，必须在 `thoughts` 中告知用户“当前环境专注于纯 Python 算法逻辑”，并使用 `text_print` 打印文字模拟过程。\n" +
+            "\n" +
+            "## 输出规范\n" +
+            "你的回复必须且只能包含一个 JSON 对象，必须包含以下两个字段：\n" +
+            "   - \"thoughts\": 字符串，向用户解释你的代码逻辑。\n" +
+            "   - \"blocklyXml\": 字符串，修改后【完整且合法】的 XML 代码。由 `<xml xmlns=\"https://developers.google.com/blockly/xml\">` 标签包裹。\n";
+
+    public static final String FILE_SUMMARY_SYSTEM_PROMPT = "## 角色与目标\n" +
+            "你是一个文件内容分析助手。你的任务是根据用户提供的文件内容，归纳总结出该文件的【主要核心描述】。\n" +
+            "## 要求\n" +
+            "1. 重点描述这个文件是关于什么的、包含哪些核心知识点或主旨。\n" +
+            "2. 简明扼要，逻辑清晰，不要做简单的文本原文提取。\n" +
+            "3. 直接输出总结内容，不要包含“好的”、“这是文件的总结”等多余的客套话。";
 }

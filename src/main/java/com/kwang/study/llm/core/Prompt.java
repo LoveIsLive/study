@@ -1,5 +1,6 @@
 package com.kwang.study.llm.core;
 
+import cn.hutool.core.io.unit.DataSizeUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kwang.study.dto.FileItem;
@@ -7,18 +8,17 @@ import com.kwang.study.fs.dto.result.FileObjectResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.llm.dto.request.ContentPartMessage;
 import com.kwang.study.llm.pojo.ChatMemory;
+import com.kwang.study.llm.util.DocumentParserUtil;
 import com.kwang.study.llm.util.OCR;
+import com.kwang.study.utils.SpringContextUtil;
 import com.kwang.study.utils.StreamUtil;
+import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.*;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.MimeType;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 // 负责 user, ai, tool的消息
@@ -67,6 +67,8 @@ public class Prompt {
             } else if ("assistant".equals(mem.getRole())) {
                 if ("text".equals(mem.getType())) {
                     this.addAssistant(mem.getContent());
+                } else if ("mind_result".equals(mem.getType())) {
+                    this.addAssistant(mem.getContent());
                 } else if ("tool".equals(mem.getType())) {
                     try {
                         ChatCompletionMessage message = objectMapper.readValue(mem.getContent(), ChatCompletionMessage.class);
@@ -112,21 +114,30 @@ public class Prompt {
 
         List<FileItem> files = contentPartMessage.getFiles();
         files.forEach(file -> {
-            if (file.getMimeTypeName() == null
-                    || (!file.getMimeTypeName().startsWith("image/") && !file.getMimeTypeName().startsWith("text/"))) {
-                throw new IllegalArgumentException("文件非法: 存在 ContentType 为空或非图片/文本格式的文件 -> " + file.getFileName());
+            if (file.getMimeTypeName() == null) {
+                throw new IllegalArgumentException("文件非法: 存在 ContentType 为空的文件 -> " + file.getFileName());
             }
         });
 
         files.stream()
                 .map(file -> {
                     if (file.getMimeTypeName().startsWith("image/")) {
+                        String imageUrl = null;
+                        if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
+                            imageUrl = OCR.base64Encoder(file);
+                        } else {
+                            int port = SpringContextUtil.getPort();
+                            imageUrl = "http://47.121.116.149:" + port + file.getPath();
+                        }
                         return ChatCompletionContentPart.ofImageUrl(ChatCompletionContentPartImage.builder()
                                 .imageUrl(ChatCompletionContentPartImage.ImageUrl.builder()
-                                        .url(OCR.base64Encoder(file))
+                                        .url(imageUrl)
                                         .build())
                                 .build());
                     } else if (file.getMimeTypeName().startsWith("text/")) {
+                        if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
+                            throw new IllegalArgumentException("文本文件太大，超过7MB");
+                        }
                         try {
                             byte[] bytes = StreamUtil.readExactly(file.getStream(), Math.toIntExact(file.getFileSize()));
                             return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
@@ -135,8 +146,28 @@ public class Prompt {
                         } catch (IOException e) {
                             throw new RuntimeException("读取文件失败: " + file.getFileName(), e);
                         }
+                    } else if (file.getMimeTypeName().startsWith("video/")) {
+                        // 视频处理
+                        String videoUrl = null;
+                        if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
+                            videoUrl = OCR.base64Encoder(file);
+                        } else {
+                            int port = SpringContextUtil.getPort();
+                            videoUrl = "http://47.121.116.149:" + port + file.getPath();
+                        }
+                        ChatCompletionContentPartText videoPart = ChatCompletionContentPartText.builder()
+                                .text("") // 填入空字符串绕过 SDK 原生非空校验，模型会忽略这个空文本
+                                .putAdditionalProperty("type", JsonValue.from("video_url")) // 强行注入 type
+                                .putAdditionalProperty("video_url", JsonValue.from(Map.of("url", videoUrl))) // 注入 video_url 节点
+                                .build();
+                        return ChatCompletionContentPart.ofText(videoPart);
+                    } else {
+                        // taki兜底
+                        String extractedText = DocumentParserUtil.extractText(file.getStream(), file.getFileName());
+                        return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
+                                .text(extractedText)
+                                .build());
                     }
-                    throw new IllegalArgumentException("文件非法: 存在 ContentType 为空或非图片/文本格式的文件 -> " + file.getFileName());
                 }).forEach(parts::add);
 
         messages.add(ChatCompletionMessageParam.ofUser(

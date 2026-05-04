@@ -27,6 +27,6 @@ public class ChatRequestDTO {
 
     private String requestId;
 
-    // 请求类型，stream / agent,由接口设置
+    // 请求类型，stream / agent / chat,由接口设置
     private String type;
 }

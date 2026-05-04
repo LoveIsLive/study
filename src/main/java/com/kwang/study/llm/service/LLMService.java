@@ -5,22 +5,34 @@ import cn.hutool.core.lang.UUID;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
+import com.kwang.study.dto.FileItem;
+import com.kwang.study.fs.dto.result.FileObjectResult;
+import com.kwang.study.fs.dto.result.GenericObjectResult;
+import com.kwang.study.fs.mapper.NodeMapper;
+import com.kwang.study.fs.pojo.Node;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.llm.config.LLMGlobalConfig;
 import com.kwang.study.llm.core.*;
+import com.kwang.study.llm.dto.request.AIFileSummaryDTO;
 import com.kwang.study.llm.dto.request.ChatRequestDTO;
 import com.kwang.study.llm.dto.request.ContentPartMessage;
+import com.kwang.study.llm.dto.response.MindGenResponseDTO;
 import com.kwang.study.llm.mapper.ChatMemoryMapper;
 import com.kwang.study.llm.mapper.ChatSessionMapper;
 import com.kwang.study.llm.pojo.ChatMemory;
 import com.kwang.study.llm.pojo.ChatSession;
+import com.kwang.study.ware.mapper.NodeMetadataMapper;
+import com.kwang.study.ware.pojo.NodeMetadata;
+import com.kwang.study.ware.service.WareService;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -48,6 +60,12 @@ public class LLMService {
     private FileStorageService fileStorageService;
     @Autowired
     private RAG rag;
+    @Autowired
+    private NodeMetadataMapper nodeMetadataMapper;
+    @Autowired
+    private WareService wareService;
+    @Autowired
+    private NodeMapper nodeMapper;
 
     /**
      * 生成新的会话ID
@@ -67,6 +85,33 @@ public class LLMService {
      */
     private void buildRequest(ChatRequestDTO request) {
         request.setRequestId(UUID.randomUUID().toString());
+
+        // 根据scene补充reques
+        String scene = request.getScene();
+        if ("file-summary".equals(scene)) {
+            Map<String, Object> sceneParams = request.getSceneParams();
+            Assert.notNull(sceneParams, "sceneParams is null");
+            Assert.notNull(sceneParams.get("path"), "sceneParams path is null");
+            String path = (String) sceneParams.get("path");
+            try {
+                String actualPath = wareService.buildActualPath(path);
+                FileObjectResult fileObject = fileStorageService.getFileObject(actualPath);
+
+                FileItem fileItem = FileItem.builder()
+                        .fileName(fileObject.getName())
+                        .mimeTypeName(fileObject.getMimeTypeName())
+                        .fileSize(fileObject.getSize())
+                        .path(actualPath)
+                        .stream(fileObject.getContent()) // 直接透传输入流
+                        .build();
+                request.setContentPartMessage(ContentPartMessage.builder()
+                        .text("请提取该文件的主要内容描述。")
+                        .files(Collections.singletonList(fileItem))
+                        .build());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     /**
@@ -76,7 +121,6 @@ public class LLMService {
         LLMGlobalConfig.SceneConfig sceneConfig = llmGlobalConfig.getScenes().getOrDefault(request.getScene(),
                 llmGlobalConfig.getScenes().get("default"));
 
-        // 存在附件时强制使用qwen3-vl-plus模型
         boolean existContentPart = request.getContentPartMessage() != null;
         if (!existContentPart) {
             List<ChatMemory> memories = chatMemoryMapper.findBySessionId(request.getSessionId());
@@ -151,6 +195,8 @@ public class LLMService {
             // 应当配合new_session的策略，根据session_id来判断是哪个purpose。这里只适配少数场景
             if ("homework-gen".equals(context.getScene())) {
                 purpose = "homework-gen";
+            } else if ("mind-block-gen".equals(context.getScene())) {
+                purpose = "mind-block-gen";
             }
 
             ChatSession newSession = ChatSession.builder()
@@ -286,6 +332,130 @@ public class LLMService {
             log.error("Agent Chat Error", e);
             throw new RuntimeException("Agent processing failed: " + e.getMessage());
         }
+    }
+
+    @Transactional
+    public MindGenResponseDTO mindChat(ChatRequestDTO request) {
+        Long userId = AuthenticationUserUtil.getCurrentUserId();
+        buildRequest(request);
+        LLMContext context = buildContext(request, userId);
+
+        // 1. 保存用户提问至 ChatMemory
+        Pair<String, String> pair = this.convert(request);
+        saveMemory(ChatMemory.builder()
+                .sessionId(request.getSessionId())
+                .userId(userId)
+                .role("user")
+                .type(pair.getKey()) // text 或 file
+                .content(pair.getValue())
+                .build(), context);
+
+        // 2. 加载历史记录并调用 LLM
+        LLM llm = LLM.create(context);
+        Prompt prompt = Prompt.create();
+        List<ChatMemory> history = chatMemoryMapper.findBySessionId(request.getSessionId());
+        prompt.addHistory(history, fileStorageService, objectMapper);
+
+        String responseText = llm.noStream(prompt, context);
+
+        // 3. 后处理：提取 JSON
+        MindGenResponseDTO dto = parseMindResponse(responseText);
+
+        // 4. 将 AI 结构化结果也保存到历史记录中，供前端渲染
+        try {
+            String aiContent = objectMapper.writeValueAsString(dto);
+            saveMemory(ChatMemory.builder()
+                    .sessionId(request.getSessionId())
+                    .userId(userId)
+                    .role("assistant")
+                    .content(aiContent)
+                    .type("mind_result") // 前端识别此类型并渲染出【一键导入】按钮
+                    .build(), context);
+        } catch (JsonProcessingException e) {
+            log.error("AI 历史记录序列化失败", e);
+        }
+
+        return dto;
+    }
+
+    /**
+     * 1. 异步后台处理：上传文件后触发，生成摘要并存入数据库
+     */
+    public void asyncAIFileSummary(AIFileSummaryDTO request) {
+        for (String path : request.getPaths()) {
+            String actualPath = wareService.buildActualPath(path);
+            Node node = nodeMapper.selectNodeByPath(actualPath);
+            taskExecutor.execute(() -> {
+                try {
+                    log.info("开始异步提取文件摘要: {}", path);
+                    String summary = generateFileSummary(path);
+                    nodeMetadataMapper.insert(NodeMetadata.builder()
+                            .nodeId(node.getId())
+                            .aiSummary(summary)
+                            .build());
+                    log.info("文件摘要提取完成: {}", path);
+                } catch (Exception e) {
+                    log.error("异步提取文件摘要失败: {}", path, e);
+                }
+            });
+        }
+    }
+
+    /**
+     * 通用内部方法：调用 LLM 获取文件摘要文本
+     */
+    private String generateFileSummary(String path) throws IOException {
+        FileObjectResult fileObject = fileStorageService.getFileObject(path);
+        FileItem fileItem = FileItem.builder()
+                .fileName(fileObject.getName())
+                .mimeTypeName(fileObject.getMimeTypeName())
+                .fileSize(fileObject.getSize())
+                .path(path)
+                .stream(fileObject.getContent())
+                .build();
+
+        ContentPartMessage cpm = ContentPartMessage.builder()
+                .text("请提取该文件的主要内容描述。")
+                .files(List.of(fileItem))
+                .build();
+
+        // 构建专属上下文
+        LLMGlobalConfig.SceneConfig sceneConfig = llmGlobalConfig.getScenes().getOrDefault("file-summary",
+                llmGlobalConfig.getScenes().get("default"));
+
+        LLMContext context = LLMContext.builder()
+                .scene("file-summary")
+                .llmConfig(sceneConfig)
+                .systemPrompt(RAG.FILE_SUMMARY_SYSTEM_PROMPT)
+                .build();
+
+        Prompt prompt = Prompt.create().addContentPartMessageMessageUser(cpm);
+        LLM llm = LLM.create(context);
+        return llm.noStream(prompt, context);
+    }
+
+    private MindGenResponseDTO parseMindResponse(String responseText) {
+        MindGenResponseDTO dto = new MindGenResponseDTO();
+        try {
+            String jsonContent = responseText.trim();
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("```(?:json)?\\s*(\\{.*?\\})\\s*```", java.util.regex.Pattern.DOTALL).matcher(jsonContent);
+            if (matcher.find()) {
+                jsonContent = matcher.group(1);
+            } else {
+                int start = jsonContent.indexOf("{");
+                int end = jsonContent.lastIndexOf("}");
+                if (start != -1 && end != -1) {
+                    jsonContent = jsonContent.substring(start, end + 1);
+                }
+            }
+            com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(jsonContent);
+            dto.setThoughts(rootNode.path("thoughts").asText("好的，为你生成了积木代码。"));
+            dto.setBlocklyXml(rootNode.path("blocklyXml").asText("<xml xmlns=\"https://developers.google.com/blockly/xml\"></xml>"));
+        } catch (Exception e) {
+            dto.setThoughts("AI 分析完成，但数据格式解析异常。原始返回：" + responseText);
+            dto.setBlocklyXml("<xml xmlns=\"https://developers.google.com/blockly/xml\"></xml>");
+        }
+        return dto;
     }
 
     // 将request转换为字符串的内容，第一个结果指示是否用户输入类型

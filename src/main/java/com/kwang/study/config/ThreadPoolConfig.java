@@ -13,13 +13,13 @@ public class ThreadPoolConfig {
     public Executor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         // 核心线程数：线程池创建时初始化的线程数
-        executor.setCorePoolSize(10);
+        executor.setCorePoolSize(2);
         // 最大线程数：线程池最大的线程数，只有在缓冲队列满了之后才会申请超过核心线程数的线程
-        executor.setMaxPoolSize(20);
+        executor.setMaxPoolSize(10);
         // 缓冲队列：用来缓冲执行任务的队列
-        executor.setQueueCapacity(200);
+        executor.setQueueCapacity(20);
         // 允许线程的空闲时间（单位：秒）：当超过了核心线程数之外的线程在空闲时间到达之后会被销毁
-        executor.setKeepAliveSeconds(60);
+        executor.setKeepAliveSeconds(30);
         // 线程名称前缀
         executor.setThreadNamePrefix("taskExecutor-");
         // 设置拒绝策略：当队列满了并且工作线程大于等于最大线程数的时候，会触发该策略

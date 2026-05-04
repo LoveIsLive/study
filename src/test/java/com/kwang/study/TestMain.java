@@ -11,12 +11,19 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.sax.BodyContentHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.util.MimeType;
 
 import javax.crypto.SecretKey;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -49,9 +56,24 @@ public class TestMain {
 
     @Test
     public void f() throws Exception {
-        HomeworkSubmissionDetail detail = new HomeworkSubmissionDetail();
-        detail.setId(1L);
-        HomeworkSubmissionDetail cloned = ObjectUtil.cloneByStream(detail);
-        System.out.println(cloned);
+        File file = new File("C:\\Users\\30107\\Desktop\\答辩秘书线下工作细则Checklist1-苏.pdf");
+        // AutoDetectParser 会自动识别文件类型并调用对应解析器
+        AutoDetectParser parser = new AutoDetectParser();
+        BodyContentHandler handler = new BodyContentHandler(-1); // -1 表示无字符数限制
+        Metadata metadata = new Metadata();
+        ParseContext context = new ParseContext();
+
+        try (InputStream stream = new FileInputStream(file)) {
+            parser.parse(stream, handler, metadata, context);
+        }
+
+        System.out.println("=== 文档内容 ===");
+        System.out.println(handler.toString());
+
+        System.out.println("=== 元数据 ===");
+        for (String name : metadata.names()) {
+            System.out.println(name + ": " + metadata.get(name));
+        }
     }
+
 }
