@@ -25,15 +25,4 @@ public class LLMFileDownloadController extends BaseFileDownloadController {
         super(fileStorageService, redisTemplate);
     }
 
-    @GetMapping("/get/downloadId")
-    public ResponseEntity<R<String>> produceDownloadUUID(String path, String fileName) {
-        return super.produceDownloadUUID(path, fileName);
-    }
-
-
-    @GetMapping("/download")
-    public void downloadFile(String path, String mode, String token,
-                             HttpServletRequest request, HttpServletResponse response) throws IOException {
-        super.downloadFile(path, mode, token, request, response);
-    }
 }

@@ -6,6 +6,7 @@ import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.result.DownloadDTO;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ public abstract class BaseFileDownloadController {
         this.redisTemplate = redisTemplate;
     }
 
+    @GetMapping("/get/downloadId")
     public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
                                                          @RequestParam("fileName") @NotBlank String fileName) {
         String downloadId = UUID.randomUUID().toString();
@@ -36,6 +38,7 @@ public abstract class BaseFileDownloadController {
     }
 
 
+    @GetMapping("/download")
     public void downloadFile(@RequestParam("path") @NotBlank String path,
                              @RequestParam(name = "mode", defaultValue = "attachment") String mode,
                              @RequestParam("token") @NotBlank String token,

@@ -10,6 +10,7 @@ import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
 import com.kwang.study.homework.dto.result.UploadInitResult;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -36,6 +37,7 @@ public abstract class BaseFileUploadController {
     /**
      * 批量初始化分块上传
      */
+    @PostMapping("/batch-init")
     public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(@Valid @RequestBody BatchUploadInitRequestDTO requestDTO)
             throws IOException {
         List<UploadInitResult> responseList = new ArrayList<>();
@@ -66,6 +68,7 @@ public abstract class BaseFileUploadController {
     /**
      * 上传文件块
      */
+    @PostMapping("/chunk")
     public ResponseEntity<R<GenericObjectResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
                                                               @RequestParam("chunkIndex") Integer chunkIndex,
                                                               @RequestParam("totalChunks") Integer totalChunks,
@@ -80,6 +83,7 @@ public abstract class BaseFileUploadController {
     /**
      * 合并文件块
      */
+    @PostMapping("/merge")
     public ResponseEntity<R<GenericObjectResult>> mergeChunk(@RequestParam("uploadId") String uploadId,
                                                              @RequestParam("totalChunks") Integer totalChunks) throws IOException {
         GenericObjectResult result = fileStorageService.
@@ -88,4 +92,7 @@ public abstract class BaseFileUploadController {
     }
 
     public abstract String produceFilePath(String fileName);
+
+
+    // TODO: 需要加一个终止上传操作
 }
