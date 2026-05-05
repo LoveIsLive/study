@@ -27,7 +27,8 @@ public abstract class BaseFileDownloadController {
         this.redisTemplate = redisTemplate;
     }
 
-    public ResponseEntity<R<String>> produceDownloadUUID(String path, String fileName) {
+    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
+                                                         @RequestParam("fileName") @NotBlank String fileName) {
         String downloadId = UUID.randomUUID().toString();
         DownloadDTO dto = new DownloadDTO(path, fileName);
         redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, dto, 30, TimeUnit.MINUTES);
@@ -35,7 +36,9 @@ public abstract class BaseFileDownloadController {
     }
 
 
-    public void downloadFile(String path, String mode, String token,
+    public void downloadFile(@RequestParam("path") @NotBlank String path,
+                             @RequestParam(name = "mode", defaultValue = "attachment") String mode,
+                             @RequestParam("token") @NotBlank String token,
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         DownloadDTO dto = (DownloadDTO) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
         if (dto == null || !Objects.equals(path, dto.getActualPath())) {

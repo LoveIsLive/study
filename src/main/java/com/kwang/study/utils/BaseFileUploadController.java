@@ -10,8 +10,12 @@ import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
 import com.kwang.study.homework.dto.result.UploadInitResult;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.validation.Valid;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -32,7 +36,7 @@ public abstract class BaseFileUploadController {
     /**
      * 批量初始化分块上传
      */
-    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(BatchUploadInitRequestDTO requestDTO)
+    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(@Valid @RequestBody BatchUploadInitRequestDTO requestDTO)
             throws IOException {
         List<UploadInitResult> responseList = new ArrayList<>();
 
@@ -62,8 +66,10 @@ public abstract class BaseFileUploadController {
     /**
      * 上传文件块
      */
-    public ResponseEntity<R<GenericObjectResult>> uploadChunk(String uploadId, Integer chunkIndex,
-                                                              Integer totalChunks, MultipartFile chunk) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
+                                                              @RequestParam("chunkIndex") Integer chunkIndex,
+                                                              @RequestParam("totalChunks") Integer totalChunks,
+                                                              @RequestPart("chunk") MultipartFile chunk) throws IOException {
         try (InputStream input = chunk.getInputStream()) {
             GenericObjectResult result = fileStorageService.
                     uploadChunk(uploadId, chunkIndex, totalChunks, input);
@@ -74,7 +80,8 @@ public abstract class BaseFileUploadController {
     /**
      * 合并文件块
      */
-    public ResponseEntity<R<GenericObjectResult>> mergeChunk(String uploadId, Integer totalChunks) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> mergeChunk(@RequestParam("uploadId") String uploadId,
+                                                             @RequestParam("totalChunks") Integer totalChunks) throws IOException {
         GenericObjectResult result = fileStorageService.
                 mergeChunk(uploadId, totalChunks);
         return ResponseEntity.ok(R.success(result));

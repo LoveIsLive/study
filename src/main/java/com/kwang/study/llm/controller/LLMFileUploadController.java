@@ -13,7 +13,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.validation.Valid;
 import java.io.IOException;
 import java.util.List;
 
@@ -33,7 +32,7 @@ public class LLMFileUploadController extends BaseFileUploadController {
      * 批量初始化分块上传
      */
     @PostMapping("/batch-init")
-    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(@Valid @RequestBody BatchUploadInitRequestDTO requestDTO)
+    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(BatchUploadInitRequestDTO requestDTO)
             throws IOException {
 
         return super.batchInitChunkUpload(requestDTO);
@@ -43,10 +42,8 @@ public class LLMFileUploadController extends BaseFileUploadController {
      * 上传文件块
      */
     @PostMapping("/chunk")
-    public ResponseEntity<R<GenericObjectResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
-                                            @RequestParam("chunkIndex") Integer chunkIndex,
-                                            @RequestParam("totalChunks") Integer totalChunks,
-                                            @RequestPart("chunk") MultipartFile chunk) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> uploadChunk(String uploadId, Integer chunkIndex,
+                                            Integer totalChunks, MultipartFile chunk) throws IOException {
         return super.uploadChunk(uploadId, chunkIndex, totalChunks, chunk);
     }
 
@@ -54,8 +51,7 @@ public class LLMFileUploadController extends BaseFileUploadController {
      * 合并文件块
      */
     @PostMapping("/merge")
-    public ResponseEntity<R<GenericObjectResult>> mergeChunk(@RequestParam("uploadId") String uploadId,
-                                                              @RequestParam("totalChunks") Integer totalChunks) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> mergeChunk(String uploadId, Integer totalChunks) throws IOException {
         return super.mergeChunk(uploadId, totalChunks);
     }
 

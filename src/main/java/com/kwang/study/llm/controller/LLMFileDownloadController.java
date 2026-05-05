@@ -8,12 +8,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.validation.constraints.NotBlank;
 import java.io.IOException;
 
 import static com.kwang.study.constant.ApiPrefixConstant.LLM_BASE_PREFIX;
@@ -28,16 +26,13 @@ public class LLMFileDownloadController extends BaseFileDownloadController {
     }
 
     @GetMapping("/get/downloadId")
-    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
-                                                         @NotBlank @RequestParam("fileName") String fileName) {
+    public ResponseEntity<R<String>> produceDownloadUUID(String path, String fileName) {
         return super.produceDownloadUUID(path, fileName);
     }
 
 
     @GetMapping("/download")
-    public void downloadFile(@NotBlank @RequestParam("path") String path,
-                             @RequestParam(name = "mode", defaultValue = "attachment") String mode,
-                             @NotBlank @RequestParam("token") String token,
+    public void downloadFile(String path, String mode, String token,
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         super.downloadFile(path, mode, token, request, response);
     }
