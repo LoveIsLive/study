@@ -32,6 +32,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StreamUtils;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -54,6 +55,7 @@ import static com.kwang.study.constant.RedisKeyPrefixConstant.DOWNLOAD_ID_PREFIX
 @RestController
 @RequestMapping(LLM_BASE_PREFIX) // /api/v1/llm
 @RequiredArgsConstructor
+@Validated
 public class LLMController {
 
     private final LLMService llmService;
