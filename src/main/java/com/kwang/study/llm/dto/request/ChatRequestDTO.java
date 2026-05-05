@@ -23,6 +23,7 @@ public class ChatRequestDTO {
     /* 非前端传入部分 */
 
     // 当存在时，表示前端有附件上传
+    private List<FileNameAndPath> uploadFiles; // 大文件的fileName和filePath
     private ContentPartMessage contentPartMessage;
 
     private String requestId;

@@ -665,6 +665,8 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new IllegalArgumentException("Invalid fileId or the file is not in chunk uploading state.");
         }
         int chunkSize = fsConfig.getChunkSize();
+        if ((long) chunkIndex * chunkSize > DataSize.ofGigabytes(1).toBytes())
+            throw new IllegalArgumentException("文件过大超过1GB");
         byte[] content = new byte[chunkSize];
         int readSize = ChunkUtil.readChunk(chunkStream, content);
         if (readSize == -1) {
@@ -731,6 +733,9 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                         os.write(buffer, 0, bytesRead);
                         sha256.update(buffer, 0, bytesRead);
                         totalSize += bytesRead;
+                        if (totalSize > DataSize.ofGigabytes(1).toBytes()) {
+                            throw new IllegalArgumentException("文件过大，超过1GB");
+                        }
                     }
                 }
             }

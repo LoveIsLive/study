@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.kwang.study.constant.ApiPrefixConstant.LLM_BASE_PREFIX;
+
 // 负责 user, ai, tool的消息
 public class Prompt {
 
@@ -153,7 +155,8 @@ public class Prompt {
                             videoUrl = OCR.base64Encoder(file);
                         } else {
                             int port = SpringContextUtil.getPort();
-                            videoUrl = "http://47.121.116.149:" + port + file.getPath();
+                            videoUrl = "http://47.121.116.149:" + port +
+                                    LLM_BASE_PREFIX + "/getFile?path=" + file.getPath();
                         }
                         ChatCompletionContentPartText videoPart = ChatCompletionContentPartText.builder()
                                 .text("") // 填入空字符串绕过 SDK 原生非空校验，模型会忽略这个空文本

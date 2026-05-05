@@ -10,4 +10,5 @@ import lombok.NoArgsConstructor;
 public class UploadInitResult {
     private String originalFileName; // 返回原始文件名，便于前端匹配
     private String uploadId;         // 用于分块上传的ID
+    private String filePath;         // 文件事实路径
 }

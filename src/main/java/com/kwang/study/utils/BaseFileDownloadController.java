@@ -1,18 +1,12 @@
-package com.kwang.study.homework.controller;
+package com.kwang.study.utils;
 
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.FileObjectResult;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.homework.dto.result.DownloadDTO;
-import com.kwang.study.utils.DownloadUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -22,21 +16,18 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static com.kwang.study.constant.ApiPrefixConstant.ATTACHE_DOWNLOAD_BASE_PREFIX;
 import static com.kwang.study.constant.RedisKeyPrefixConstant.DOWNLOAD_ID_PREFIX;
 
-@RestController
-@RequestMapping(ATTACHE_DOWNLOAD_BASE_PREFIX)
-@Validated
-public class FileDownloadController {
-    @Autowired
-    private FileStorageService fileStorageService;
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+public abstract class BaseFileDownloadController {
+    private final FileStorageService fileStorageService;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    @GetMapping("/get/downloadId")
-    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
-                                                         @NotBlank @RequestParam("fileName") String fileName) {
+    public BaseFileDownloadController(FileStorageService fileStorageService, RedisTemplate<String, Object> redisTemplate) {
+        this.fileStorageService = fileStorageService;
+        this.redisTemplate = redisTemplate;
+    }
+
+    public ResponseEntity<R<String>> produceDownloadUUID(String path, String fileName) {
         String downloadId = UUID.randomUUID().toString();
         DownloadDTO dto = new DownloadDTO(path, fileName);
         redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, dto, 30, TimeUnit.MINUTES);
@@ -44,10 +35,7 @@ public class FileDownloadController {
     }
 
 
-    @GetMapping("/download")
-    public void downloadFile(@NotBlank @RequestParam("path") String path,
-                             @RequestParam(name = "mode", defaultValue = "attachment") String mode,
-                             @NotBlank @RequestParam("token") String token,
+    public void downloadFile(String path, String mode, String token,
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         DownloadDTO dto = (DownloadDTO) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
         if (dto == null || !Objects.equals(path, dto.getActualPath())) {

@@ -15,6 +15,7 @@ import com.kwang.study.llm.core.Tools;
 import com.kwang.study.llm.dto.request.AIFileSummaryDTO;
 import com.kwang.study.llm.dto.request.ChatRequestDTO;
 import com.kwang.study.llm.dto.request.ContentPartMessage;
+import com.kwang.study.llm.dto.request.FileNameAndPath;
 import com.kwang.study.llm.dto.response.MindGenResponseDTO;
 import com.kwang.study.llm.mapper.ChatMemoryMapper;
 import com.kwang.study.llm.pojo.ChatMemory;
@@ -58,7 +59,7 @@ public class LLMController {
     private final LLMService llmService;
     private final ChatMemoryMapper chatMemoryMapper;
     private final FileStorageService fileStorageService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final LLMFileUploadController llmFileUploadController;
 
     /**
      * 1. 获取新的 Session ID
@@ -112,35 +113,6 @@ public class LLMController {
     public ResponseEntity<R<Void>> deleteSession(@PathVariable String sessionId) {
         llmService.deleteSession(sessionId);
         return ResponseEntity.ok(R.success(null));
-    }
-
-    // 下载
-    @GetMapping("/get/downloadId")
-    public ResponseEntity<R<String>> produceDownloadUUID(@NotBlank @RequestParam("path") String path,
-                                                         @NotBlank @RequestParam("fileName") String fileName) {
-        String downloadId = UUID.randomUUID().toString();
-        DownloadDTO dto = new DownloadDTO(path, fileName);
-        redisTemplate.opsForValue().set(DOWNLOAD_ID_PREFIX + downloadId, dto, 30, TimeUnit.MINUTES);
-        return ResponseEntity.ok(R.success(downloadId));
-    }
-
-
-    @GetMapping("/download")
-    public void downloadFile(@NotBlank @RequestParam("path") String path,
-                             @RequestParam(name = "mode", defaultValue = "attachment") String mode,
-                             @NotBlank @RequestParam("token") String token,
-                             HttpServletRequest request, HttpServletResponse response) throws IOException {
-        DownloadDTO dto = (DownloadDTO) redisTemplate.opsForValue().get(DOWNLOAD_ID_PREFIX + token);
-        if (dto == null || !Objects.equals(path, dto.getActualPath())) {
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            response.getWriter().print("没有权限");
-            response.setContentType("text/plain; charset=UTF-8");
-            return;
-        }
-
-        FileObjectResult fileObject = fileStorageService.getFileObject(path);
-        fileObject.setName(dto.getFileName());
-        DownloadUtils.downloadFile(fileObject, mode, request, response);
     }
 
     @PostMapping("/chat/mind")
@@ -197,29 +169,44 @@ public class LLMController {
     private void processFile(List<MultipartFile> smallFiles, ChatRequestDTO request) throws IOException {
         checkFileSize(smallFiles);
 
-        if (!CollectionUtils.isEmpty(smallFiles)) {
-            // 先存储文件
+        if (!CollectionUtils.isEmpty(smallFiles) || !CollectionUtils.isEmpty(request.getUploadFiles())) {
             ArrayList<FileItem> fileItems = new ArrayList<>();
-            for (MultipartFile smallFile : smallFiles) {
-                String fileName = smallFile.getOriginalFilename();
-                String ext = fileName == null ? "" : fileName.substring(fileName.lastIndexOf('.'));
-                String path = FileStorageModuleNameEnum.LLMCHAT_NAME.getModuleName()
-                        + "/" + cn.hutool.core.lang.UUID.randomUUID().toString(true) + ext;
-                try (InputStream inputStream = smallFile.getInputStream()) {
-                    fileStorageService.createFile(path, inputStream, smallFile.getContentType());
-                }
+            // 先处理小文件
+            if (!CollectionUtils.isEmpty(smallFiles)) {
+                for (MultipartFile smallFile : smallFiles) {
+                    String fileName = smallFile.getOriginalFilename();
+                    String path = llmFileUploadController.produceFilePath(fileName);
+                    try (InputStream inputStream = smallFile.getInputStream()) {
+                        fileStorageService.createFile(path, inputStream, smallFile.getContentType());
+                    }
 
-                FileObjectResult fileObject = fileStorageService.getFileObject(path);
-                fileItems.add(FileItem.builder()
-                        // original fileName
-                        .fileName(fileName)
-                        .mimeTypeName(fileObject.getMimeTypeName())
-                        .fileSize(fileObject.getSize())
-                        .path(path)
-                        .stream(fileObject.getContent())
-                        .build());
+                    FileObjectResult fileObject = fileStorageService.getFileObject(path);
+                    fileItems.add(FileItem.builder()
+                            // original fileName
+                            .fileName(fileName)
+                            .mimeTypeName(fileObject.getMimeTypeName())
+                            .fileSize(fileObject.getSize())
+                            .path(path)
+                            .stream(fileObject.getContent())
+                            .build());
+                }
+                log.info("上传图片, {}", fileItems);
             }
-            log.info("上传图片, {}", fileItems);
+            // 再处理大文件
+            if (!CollectionUtils.isEmpty(request.getUploadFiles())) {
+                for (FileNameAndPath fileNameAndPath : request.getUploadFiles()) {
+                    FileObjectResult fileObject = fileStorageService.getFileObject(fileNameAndPath.getFilePath());
+                    fileItems.add(FileItem.builder()
+                            // original fileName
+                            .fileName(fileNameAndPath.getFileName())
+                            .mimeTypeName(fileObject.getMimeTypeName())
+                            .fileSize(fileObject.getSize())
+                            .path(fileNameAndPath.getFilePath())
+                            .stream(fileObject.getContent())
+                            .build());
+                }
+            }
+
             request.setContentPartMessage(ContentPartMessage.builder()
                     .text(request.getMessage())
                     .files(fileItems)
@@ -227,6 +214,7 @@ public class LLMController {
         }
     }
 
+    // 可以不要，Spring已经提供了
     private void checkFileSize(List<MultipartFile> files) {
         if (!CollectionUtils.isEmpty(files)) {
             long allSize = 0;

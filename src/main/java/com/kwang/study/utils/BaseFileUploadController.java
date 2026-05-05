@@ -1,4 +1,4 @@
-package com.kwang.study.homework.controller;
+package com.kwang.study.utils;
 
 import com.kwang.study.common.R;
 import com.kwang.study.fs.dto.result.GenericObjectResult;
@@ -8,59 +8,52 @@ import com.kwang.study.homework.dto.request.BatchUploadInitRequestDTO;
 import com.kwang.study.homework.dto.request.FileMetaDTO;
 import com.kwang.study.homework.dto.request.UploadInfoRedisDTO;
 import com.kwang.study.homework.dto.result.UploadInitResult;
-import com.kwang.study.homework.service.HomeworkService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.validation.Valid;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static com.kwang.study.constant.ApiPrefixConstant.ATTACHE_UPLOAD_BASE_PREFIX;
 import static com.kwang.study.constant.RedisKeyPrefixConstant.UPLOAD_ID_PREFIX;
 
-@RestController
-@RequestMapping(ATTACHE_UPLOAD_BASE_PREFIX)
-@Validated
-public class FileUploadController {
-    @Autowired
-    private FileStorageService fileStorageService;
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+public abstract class BaseFileUploadController {
+    private final FileStorageService fileStorageService;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    protected BaseFileUploadController(FileStorageService fileStorageService, RedisTemplate<String, Object> redisTemplate) {
+        this.fileStorageService = fileStorageService;
+        this.redisTemplate = redisTemplate;
+    }
 
     /**
      * 批量初始化分块上传
      */
-    @PostMapping("/batch-init")
-    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(@Valid @RequestBody BatchUploadInitRequestDTO requestDTO)
+    public ResponseEntity<R<List<UploadInitResult>>> batchInitChunkUpload(BatchUploadInitRequestDTO requestDTO)
             throws IOException {
         List<UploadInitResult> responseList = new ArrayList<>();
 
         for (FileMetaDTO fileMeta : requestDTO.getFiles()) {
-            String filePath = HomeworkService.produceAttachPath(fileMeta.getFileName());
+            String filePath = produceFilePath(fileMeta.getFileName());
 
             // 2. 初始化文件存储服务
             InitMultiUploadResult result = fileStorageService.initMultiUpload(filePath, fileMeta.getMimeTypeName());
             String uploadId = result.getUploadId();
 
             redisTemplate.opsForValue().set(UPLOAD_ID_PREFIX + uploadId, UploadInfoRedisDTO.builder()
-                    .uploaderId(uploadId)
-                    .fileSize(fileMeta.getFileSize())
-                    .mimeTypeName(fileMeta.getMimeTypeName())
-                    .filePath(filePath)
-                    .fileName(fileMeta.getFileName())
-                    .build()
+                            .uploaderId(uploadId)
+                            .fileSize(fileMeta.getFileSize())
+                            .mimeTypeName(fileMeta.getMimeTypeName())
+                            .filePath(filePath)
+                            .fileName(fileMeta.getFileName())
+                            .build()
                     , 60, TimeUnit.MINUTES);
 
             // 4. 准备返回给前端的信息
-            responseList.add(new UploadInitResult(fileMeta.getFileName(), uploadId));
+            responseList.add(new UploadInitResult(fileMeta.getFileName(), uploadId, filePath));
         }
 
         return ResponseEntity.ok(R.success(responseList));
@@ -69,11 +62,8 @@ public class FileUploadController {
     /**
      * 上传文件块
      */
-    @PostMapping("/chunk")
-    public ResponseEntity<R<GenericObjectResult>> uploadChunk(@RequestParam("uploadId") String uploadId,
-                                            @RequestParam("chunkIndex") Integer chunkIndex,
-                                            @RequestParam("totalChunks") Integer totalChunks,
-                                            @RequestPart("chunk") MultipartFile chunk) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> uploadChunk(String uploadId, Integer chunkIndex,
+                                                              Integer totalChunks, MultipartFile chunk) throws IOException {
         try (InputStream input = chunk.getInputStream()) {
             GenericObjectResult result = fileStorageService.
                     uploadChunk(uploadId, chunkIndex, totalChunks, input);
@@ -84,13 +74,11 @@ public class FileUploadController {
     /**
      * 合并文件块
      */
-    @PostMapping("/merge")
-    public ResponseEntity<R<GenericObjectResult>> mergeChunk(@RequestParam("uploadId") String uploadId,
-                                                              @RequestParam("totalChunks") Integer totalChunks) throws IOException {
+    public ResponseEntity<R<GenericObjectResult>> mergeChunk(String uploadId, Integer totalChunks) throws IOException {
         GenericObjectResult result = fileStorageService.
                 mergeChunk(uploadId, totalChunks);
         return ResponseEntity.ok(R.success(result));
     }
 
-    // TODO: 需要加一个终止上传操作
+    public abstract String produceFilePath(String fileName);
 }
