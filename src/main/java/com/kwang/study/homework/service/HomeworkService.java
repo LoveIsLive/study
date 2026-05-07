@@ -1,13 +1,9 @@
 package com.kwang.study.homework.service;
 
-import cn.hutool.core.util.ObjectUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.kwang.study.auth.mapper.UserMapper;
-import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.course.mapper.CourseMapper;
@@ -32,13 +28,7 @@ import com.kwang.study.llm.core.Tools;
 import com.kwang.study.llm.dto.request.ChatRequestDTO;
 import com.kwang.study.llm.service.RAG;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
-import com.kwang.study.organization.enums.SchoolRoleEnum;
-import com.kwang.study.organization.mapper.ClassMemberMapper;
-import com.kwang.study.organization.mapper.ClassesMapper;
 import com.kwang.study.organization.pojo.ClassMember;
-import com.kwang.study.organization.pojo.Classes;
-import com.kwang.study.organization.pojo.SchoolMember;
-import com.kwang.study.utils.CloneUtil;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -53,7 +43,6 @@ import cn.hutool.core.lang.UUID;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -280,6 +269,7 @@ public class HomeworkService {
     /**
      * 学生提交作业
      * 权限：学生，与作业发布者保持一致
+     * 访客也不能提交作业
      */
     @Transactional
     public HomeworkSubmissionDetail createSubmission(SubmissionCreateDTO dto, List<MultipartFile> smallFiles) throws IOException {
@@ -359,16 +349,25 @@ public class HomeworkService {
 
     /**
      * 学生查看所有作业列表（即学生所在班级的所有作业列表）
-     * 权限：仅学生本人
+     * 权限：仅学生本人，以及访客（过滤）
      */
     @Transactional
     public List<HomeworkDetail> getAllHomeworksForStudent() {
         ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
-        if (activeCM == null || !ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole())) {
+        if (activeCM == null ||
+                (ClassesRoleEnum.TEACHER.getRole().equals(activeCM.getRole()))) {
             throw new IllegalStateException("请切换到学生身份");
         }
-        // 【修改点】直接查当前班级下的作业，不再递归查询
-        return homeworkMapper.findAllByClassId(activeCM.getClassId()).stream()
+
+        List<HomeworkDetail> list = homeworkMapper.findAllByClassId(activeCM.getClassId());
+
+        // === 新增：如果是访客，过滤掉无权访问的课程的作业 ===
+        if (ClassesRoleEnum.GUEST.getRole().equals(activeCM.getRole())) {
+            List<Long> allowed = activeCM.getAllowedCourseIds() == null ? List.of() : activeCM.getAllowedCourseIds();
+            list = list.stream().filter(h -> allowed.contains(h.getCourseId())).collect(Collectors.toList());
+        }
+
+        return list.stream()
                 .map(h -> (HomeworkDetail) desensitization(h))
                 .collect(Collectors.toList());
     }
@@ -418,12 +417,15 @@ public class HomeworkService {
     }
 
     /**
-     * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
-     * 权限：管理员、校长、教师、学生，与作业发布者保持一致
+     * 查看某个班级的所有作业
+     * 权限：管理员、校长、教师
      */
     @Transactional
     public List<HomeworkDetail> getAllHomeworksInClass(Long classId) {
-        validateAccess(classId, null);
+        if (!(AuthenticationUserUtil.currentUserIsAdmin()
+                || userInfoUtils.inClassOfSchoolPrincipal(classId)
+                || userInfoUtils.inClassTeacher(classId)))
+            throw new IllegalArgumentException("身份错误");
 
         return homeworkMapper.findAllByClassId(classId);
     }
@@ -482,7 +484,7 @@ public class HomeworkService {
      */
     public HomeworkSubmissionDetail getSubmissionById(Long submissionId) {
         HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(submissionId);
-        validateAccess(submissionDetail.getClassId(), submissionDetail.getHomeworkId());
+        validateAccess(submissionDetail.getClassId(), submissionDetail.getHomework().getCourseId());
         if (userInfoUtils.currentUserInClassIsStudent()) {
             Assert.isTrue(Objects.equals(AuthenticationUserUtil.getCurrentUserId(), submissionDetail.getStudentId()),
                     "学生查看非本人作业提交");
@@ -640,7 +642,7 @@ public class HomeworkService {
             throw new IllegalStateException("异常：" + e.getMessage());
         }
         BeanUtils.copyProperties(homeworkDetail, result);
-        if (userInfoUtils.currentUserInClassIsStudent() && "STRUCTURED".equals(result.getType()) && result.getMetaData() != null) {
+        if (!userInfoUtils.currentUserInClassIsTeacher() && "STRUCTURED".equals(result.getType()) && result.getMetaData() != null) {
             try {
                 JsonNode root = objectMapper.readTree(result.getMetaData());
                 if (root.has("questions")) {

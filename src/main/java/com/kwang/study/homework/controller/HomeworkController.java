@@ -31,7 +31,6 @@ import static com.kwang.study.constant.ApiPrefixConstant.HOMEWORK_BASE_PREFIX;
 public class HomeworkController {
 
     private final HomeworkService homeworkService;
-    private final UserInfoUtils userInfoUtils;
 
     // --- Teacher Endpoints ---
 
@@ -100,7 +99,7 @@ public class HomeworkController {
     }
 
     /**
-     * 查看某个班级的所有作业，本质上是查看某个班级的所有教师发布的作业
+     * 查看某个班级的所有作业
      * 权限：管理员、校长、教师
      */
     @GetMapping("/class/{classId}")

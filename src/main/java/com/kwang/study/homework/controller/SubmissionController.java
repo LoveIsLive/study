@@ -37,9 +37,6 @@ public class SubmissionController {
     @Autowired
     private HomeworkService homeworkService; // 也可以拆分为 SubmissionService
 
-    @Autowired
-    private UserInfoUtils userInfoUtils;
-
     /**
      * 学生提交作业
      * 权限：学生，与作业发布者保持一致
