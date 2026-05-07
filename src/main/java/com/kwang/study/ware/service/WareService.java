@@ -281,7 +281,26 @@ public class WareService {
         if (path.endsWith("/"))
             path = path.substring(0, path.length() - 1);
 
-        return basePath + path;
+        String actualPath = basePath + path;
+        // === 新增：文件系统底层安全拦截 - 防访客越权 ===
+        // 师生/访客的 actualPath 结构通常为：/ware/{schoolId}/{classId}/{courseId}/...
+        if (userInfoUtils.currentUserInClassIsGuest()) {
+            String[] parts = actualPath.split("/");
+            // parts[0]="", parts[1]="ware", parts[2]=schoolId, parts[3]=classId, parts[4]=courseId
+            if (parts.length > 4) {
+                try {
+                    Long classId = Long.parseLong(parts[3]);
+                    Long courseId = Long.parseLong(parts[4]);
+                    if (!userInfoUtils.canAccessCourse(courseId, classId)) {
+                        throw new IllegalArgumentException("越权拦截：访客无权访问该课程的资料");
+                    }
+                } catch (NumberFormatException ignored) {
+                    // 如果解析不出 ID，说明可能在访问根目录等非课程节点，放行
+                }
+            }
+        }
+
+        return actualPath;
     }
 
     /**

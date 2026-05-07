@@ -176,21 +176,32 @@ public class DiscussionService {
             return;
 
         Long classId = null;
+        Long courseId = null;
         if (OWNER_TYPE_HOMEWORK.getType().equals(ownerType)) {
             HomeworkDetail homeworkDetail = homeworkMapper.findById(ownerId);
             classId = homeworkDetail.getClassId();
+            courseId = homeworkDetail.getCourseId();
         } else if (OWNER_TYPE_SUBMISSION.getType().equals(ownerType)) {
             HomeworkSubmissionDetail submissionDetail = submissionMapper.findById(ownerId);
             classId = submissionDetail.getClassId();
+            HomeworkDetail homeworkDetail = homeworkMapper.findById(submissionDetail.getHomeworkId());
+            courseId = homeworkDetail.getCourseId();
         } else if (OWNER_TYPE_COURSE.getType().equals(ownerType)) {
             Course course = courseMapper.findById(ownerId);
             Assert.notNull(course, "课程不存在");
             classId = course.getClassId();
+            courseId = course.getId();
         } else if (OWNER_TYPE_GLOBAL.getType().equals(ownerType)) {
             classId = ownerId;
         }
-        if (classId != null && userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))
-            return;
+
+        if (courseId != null) {
+            // 如果讨论帖隶属于某个具体课程（或作业），走精细化课程鉴权（拦截越权访客）
+            if (userInfoUtils.canAccessCourse(courseId, classId)) return;
+        } else {
+            // 如果是全局公共区，只需判断是否在班级即可
+            if (classId != null && (userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId))) return;
+        }
 
         throw new IllegalArgumentException("无权访问");
     }

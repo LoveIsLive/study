@@ -1,21 +1,19 @@
 package com.kwang.study.organization.service;
 
-import cn.hutool.core.util.RandomUtil;
 import com.kwang.study.auth.constant.AuthConstant;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
-import com.kwang.study.auth.service.UserService;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
+import com.kwang.study.organization.dto.request.GuestCourseUpdateDTO;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
-import com.kwang.study.organization.enums.SchoolRoleEnum;
 import com.kwang.study.organization.mapper.ClassMemberMapper;
 import com.kwang.study.organization.mapper.ClassesMapper;
-import com.kwang.study.organization.mapper.SchoolMemberMapper;
+import com.kwang.study.organization.mapper.CourseGuestMapper;
 import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.pojo.Classes;
-import com.kwang.study.organization.pojo.SchoolMember;
+import com.kwang.study.organization.pojo.CourseGuest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,8 +23,6 @@ import org.springframework.util.Assert;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -35,10 +31,10 @@ public class ClassMemberService {
 
     private final ClassMemberMapper classMemberMapper;
     private final ClassesMapper classesMapper;
-    private final SchoolMemberMapper schoolMemberMapper;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final UserInfoUtils userInfoUtils;
+    private final CourseGuestMapper courseGuestMapper; // 新增注入
 
     /**
      * 向班级中批量添加成员
@@ -86,6 +82,26 @@ public class ClassMemberService {
 
         if (!newMembers.isEmpty()) {
             classMemberMapper.batchInsert(newMembers);
+
+            // === 新增：如果是访客角色，需要向 course_guests 表插入授权数据 ===
+            if (ClassesRoleEnum.GUEST.getRole().equals(dto.getRole())
+                    && dto.getAllowedCourseIds() != null
+                    && !dto.getAllowedCourseIds().isEmpty()) {
+
+                List<CourseGuest> guestList = new ArrayList<>();
+                for (ClassMember cm : newMembers) {
+                    for (Long courseId : dto.getAllowedCourseIds()) {
+                        CourseGuest cg = new CourseGuest();
+                        cg.setCourseId(courseId);
+                        cg.setUserId(cm.getUserId());
+                        cg.setClassId(classId);
+                        guestList.add(cg);
+                    }
+                }
+                if (!guestList.isEmpty()) {
+                    courseGuestMapper.batchInsert(guestList);
+                }
+            }
         }
         return feedbackMessages; // 返回反馈信息
     }
@@ -108,6 +124,9 @@ public class ClassMemberService {
 
         // 3. 执行删除
         int affectedRows = classMemberMapper.deleteByClassIdAndUserIds(classId, userIds);
+        // === 新增：清理被踢出班级的用户的访客课程授权 ===
+        courseGuestMapper.deleteByClassIdAndUserIds(classId, userIds);
+
         userInfoUtils.deleteUsersCache(userIds);
 
         // 注意：这里仅移除班级关系，保留用户账号。
@@ -146,6 +165,48 @@ public class ClassMemberService {
         // 统计接口权限可以稍微放宽，或者与 Read 保持一致
         checkReadPermission(classId);
         return classMemberMapper.countMemberByClassId(classId);
+    }
+
+    /**
+     * 重新分配访客的课程权限 (全量覆盖)
+     */
+    @Transactional
+    public void updateGuestCourses(Long classId, Long guestUserId, GuestCourseUpdateDTO dto) {
+        Classes classes = classesMapper.findById(classId);
+        Assert.notNull(classes, "班级不存在");
+        checkWritePermission(classes);
+
+        ClassMember cm = classMemberMapper.findByClassIdAndUserId(classId, guestUserId);
+        Assert.notNull(cm, "该用户不是本班成员");
+        Assert.isTrue(ClassesRoleEnum.GUEST.getRole().equals(cm.getRole()), "只能对访客重新分配课程");
+
+        // 1. 删除旧的授权关系
+        courseGuestMapper.deleteByClassIdAndUserId(classId, guestUserId);
+
+        // 2. 插入新的授权关系
+        if (dto.getCourseIds() != null && !dto.getCourseIds().isEmpty()) {
+            List<CourseGuest> guestList = new ArrayList<>();
+            for (Long courseId : dto.getCourseIds()) {
+                CourseGuest cg = new CourseGuest();
+                cg.setCourseId(courseId);
+                cg.setUserId(guestUserId);
+                cg.setClassId(classId);
+                guestList.add(cg);
+            }
+            courseGuestMapper.batchInsert(guestList);
+        }
+
+        // 3. 强制清理用户缓存，让其 Token 权限立刻刷新
+        userInfoUtils.deleteUserCache(guestUserId);
+    }
+
+
+    /**
+     * 获取班级的所有访客列表
+     */
+    public List<ClassMember> getGuestsInClass(Long classId) {
+        checkReadPermission(classId);
+        return classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.GUEST.getRole());
     }
 
     // ============================ 权限校验辅助方法 ============================

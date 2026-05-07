@@ -6,7 +6,7 @@ import lombok.Getter;
 public enum ClassesRoleEnum {
     TEACHER("ROLE_TEACHER"),
     STUDENT("ROLE_STUDENT"),
-
+    GUEST("ROLE_GUEST"),
     ;
 
     private final String role;

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.organization.mapper.CourseGuestMapper">
+
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO course_guests (course_id, user_id, class_id, grant_time)
+        VALUES
+        <foreach collection="guests" item="item" separator=",">
+            (#{item.courseId}, #{item.userId}, #{item.classId}, NOW())
+        </foreach>
+    </insert>
+
+    <delete id="deleteByClassIdAndUserId">
+        DELETE FROM course_guests WHERE class_id = #{classId} AND user_id = #{userId}
+    </delete>
+
+    <delete id="deleteByClassIdAndUserIds">
+        DELETE FROM course_guests WHERE class_id = #{classId} AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteByCourseId">
+        DELETE FROM course_guests WHERE course_id = #{courseId}
+    </delete>
+
+    <select id="findCourseIdsByClassAndUser" resultType="java.lang.Long">
+        SELECT course_id FROM course_guests
+        WHERE class_id = #{classId} AND user_id = #{userId}
+    </select>
+
+</mapper>

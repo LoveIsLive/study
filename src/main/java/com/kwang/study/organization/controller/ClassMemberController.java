@@ -4,6 +4,7 @@ import com.kwang.study.common.R;
 import com.kwang.study.constant.ApiPrefixConstant;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
 import com.kwang.study.organization.dto.request.ClassMemberDeleteDTO;
+import com.kwang.study.organization.dto.request.GuestCourseUpdateDTO;
 import com.kwang.study.organization.pojo.ClassMember;
 import com.kwang.study.organization.service.ClassMemberService;
 import lombok.RequiredArgsConstructor;
@@ -77,5 +78,33 @@ public class ClassMemberController {
     public ResponseEntity<R<Long>> countMemberByClassId(@PathVariable Long classId) {
         Long count = classMemberService.countMemberByClassId(classId);
         return ResponseEntity.ok(R.success(count));
+    }
+
+    /**
+     * 获取班级的所有访客列表（附带授权的课程ID）
+     * @param classId 班级ID
+     * @return 访客列表
+     */
+    @GetMapping("/guests")
+    public ResponseEntity<R<List<ClassMember>>> getGuestsInClass(@PathVariable Long classId) {
+        List<ClassMember> guests = classMemberService.getGuestsInClass(classId);
+        return ResponseEntity.ok(R.success(guests));
+    }
+
+    /**
+     * 修改访客的课程可见权限
+     * @param classId 班级ID
+     * @param userId 访客的用户ID
+     * @param dto 包含全量覆盖的 courseIds 列表
+     * @return 操作结果
+     */
+    @PutMapping("/guest/{userId}/courses")
+    public ResponseEntity<R<Void>> updateGuestCourses(
+            @PathVariable Long classId,
+            @PathVariable Long userId,
+            @Valid @RequestBody GuestCourseUpdateDTO dto) {
+
+        classMemberService.updateGuestCourses(classId, userId, dto);
+        return ResponseEntity.ok(R.success(null, "访客课程权限更新成功"));
     }
 }

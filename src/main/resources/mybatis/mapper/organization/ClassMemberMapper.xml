@@ -14,6 +14,9 @@
             <id property="id" column="u_id"/>
             <result property="username" column="u_username"/>
         </association>
+        <collection property="allowedCourseIds" ofType="java.lang.Long"
+                    select="com.kwang.study.organization.mapper.CourseGuestMapper.findCourseIdsByClassAndUser"
+                    column="{classId=cm_class_id, userId=cm_user_id}"/>
     </resultMap>
 
     <!-- 批量插入班级成员 -->

@@ -58,6 +58,10 @@
                 <result property="updateTime" column="class_update_time" />
                 <result property="schoolId" column="c_school_id" />
             </association>
+
+            <collection property="allowedCourseIds" ofType="java.lang.Long"
+                        select="com.kwang.study.organization.mapper.CourseGuestMapper.findCourseIdsByClassAndUser"
+                        column="{classId=class_id, userId=cm_user_id}"/>
         </collection>
 
         <!-- 学校成员列表：校长身份 -->

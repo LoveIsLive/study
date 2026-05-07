@@ -242,7 +242,7 @@ public class HomeworkService {
      */
     public HomeworkDetail getHomeworkById(Long homeworkId) {
         HomeworkDetail result = homeworkMapper.findById(homeworkId);
-        validateAccess(result.getClassId(), result.getTeacherId());
+        validateAccess(result.getClassId(), result.getCourseId());
 
         return (HomeworkDetail) desensitization(result);
     }
@@ -254,7 +254,7 @@ public class HomeworkService {
     public List<HomeworkDetail> getHomeworksByCourseId(Long courseId) {
         Course course = courseMapper.findById(courseId);
         Assert.notNull(course, "课程不存在");
-        validateAccess(course.getClassId(), null); // 权限复用：能在该班级就有权限看
+        validateAccess(course.getClassId(), courseId); // 权限复用：能在该班级就有权限看
         return homeworkMapper.findAllByCourseId(courseId);
     }
 
@@ -288,7 +288,7 @@ public class HomeworkService {
         Assert.isTrue(activeCM != null && ClassesRoleEnum.STUDENT.getRole().equals(activeCM.getRole()), "身份错误");
 
         HomeworkDetail homeworkDetail = homeworkMapper.findById(dto.getHomeworkId());
-        validateAccess(homeworkDetail.getClassId(), homeworkDetail.getTeacherId());
+        validateAccess(homeworkDetail.getClassId(), homeworkDetail.getCourseId());
 
         // 校验是否重复提交
         HomeworkSubmissionDetail existing = submissionMapper.findByHomeworkIdAndStudentId(dto.getHomeworkId(), currentUserId);
@@ -793,13 +793,10 @@ public class HomeworkService {
      * 2. 校长：激活学校匹配
      * 3. 教师/学生：激活班级必须匹配资源所属班级
      */
-    private void validateAccess(Long resourceClassId, Long resourceOwnerId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) return;
-
-        if (userInfoUtils.inClassOfSchoolPrincipal(resourceClassId) || userInfoUtils.inClass(resourceClassId)) {
-            return;
+    private void validateAccess(Long resourceClassId, Long courseId) {
+        // 核心改造：作业的查看权限现在与所属的课程权限严格绑定
+        if (!userInfoUtils.canAccessCourse(courseId, resourceClassId)) {
+            throw new IllegalStateException("您在当前选中的身份下无权访问此课程或班级的数据");
         }
-
-        throw new IllegalStateException("您在当前选中的身份下无法访问此班级的数据");
     }
 }

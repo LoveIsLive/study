@@ -183,4 +183,47 @@ public class UserInfoUtils {
         return active != null && Objects.equals(active.getRole(), ClassesRoleEnum.STUDENT.getRole()) &&
                 Objects.equals(active.getClassId(), tagetClassId);
     }
+
+    // ================== 新增：访客与课程级权限校验 ==================
+
+    /**
+     * 判断当前在班级内是否是访客
+     */
+    public boolean currentUserInClassIsGuest() {
+        ClassMember active = getCurrentActiveClassMember();
+        return active != null && ClassesRoleEnum.GUEST.getRole().equals(active.getRole());
+    }
+
+    /**
+     * 核心权限校验方法：判断当前身份是否有权限访问某课程
+     */
+    public boolean canAccessCourse(Long courseId, Long classId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return true;
+        if (inClassOfSchoolPrincipal(classId)) return true;
+
+        ClassMember active = getCurrentActiveClassMember();
+        if (active == null || !Objects.equals(active.getClassId(), classId)) return false;
+
+        // 如果是老师或学生，班级内所有课程均可访问
+        if (ClassesRoleEnum.TEACHER.getRole().equals(active.getRole()) ||
+                ClassesRoleEnum.STUDENT.getRole().equals(active.getRole())) {
+            return true;
+        }
+
+        // 如果是访客，必须校验 allowedCourseIds 白名单
+        if (ClassesRoleEnum.GUEST.getRole().equals(active.getRole())) {
+            return active.getAllowedCourseIds() != null && active.getAllowedCourseIds().contains(courseId);
+        }
+
+        return false;
+    }
+
+    /**
+     * 针对写操作：判断当前身份是否有权限修改某课程 (仅 Admin/校长/本班教师)
+     */
+    public boolean canWriteCourse(Long classId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return true;
+        if (inClassOfSchoolPrincipal(classId)) return true;
+        return inClassTeacher(classId);
+    }
 }

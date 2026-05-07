@@ -11,6 +11,7 @@ import com.kwang.study.fs.dto.result.VoidResult;
 import com.kwang.study.fs.exception.PathAlreadyExistsException;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
+import com.kwang.study.organization.mapper.CourseGuestMapper;
 import com.kwang.study.organization.pojo.ClassMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.kwang.study.enums.FileStorageModuleNameEnum.COVERIMAGE_NAME;
 import static com.kwang.study.enums.FileStorageModuleNameEnum.HOMEWORK_NAME;
@@ -36,6 +38,7 @@ public class CourseService {
     private final FileStorageService fileStorageService;
     private final UserInfoUtils userInfoUtils;
     private final FileStorageService fsService;
+    private final CourseGuestMapper courseGuestMapper; // 新增注入
 
     @Transactional(rollbackFor = Exception.class)
     public Course createCourse(CourseDTO dto, MultipartFile coverImage) {
@@ -113,6 +116,7 @@ public class CourseService {
         // 仅删除课程主表数据。
         // 保留底层 /ware 下的文件系统数据，保留 homework 试卷记录，保障数据安全。
         courseMapper.deleteById(courseId);
+        courseGuestMapper.deleteByCourseId(courseId);
         log.info("课程 {} 已被删除。关联文件及试卷予以保留。", courseId);
     }
 
@@ -121,8 +125,25 @@ public class CourseService {
     }
 
     public List<Course> getCoursesByClassId(Long classId) {
-        validateReadAccess(classId);
-        return courseMapper.findAllByClassId(classId);
+        // 先校验是否有班级读取权限 (复用判断是否在班级中)
+        if (!AuthenticationUserUtil.currentUserIsAdmin() &&
+                !userInfoUtils.inClassOfSchoolPrincipal(classId) &&
+                !userInfoUtils.inClass(classId)) {
+            throw new IllegalArgumentException("您无法访问该班级的课程");
+        }
+
+        List<Course> allCourses = courseMapper.findAllByClassId(classId);
+
+        // === 新增：如果是访客，只返回其被授权的课程 ===
+        if (userInfoUtils.currentUserInClassIsGuest()) {
+            ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
+            List<Long> allowed = activeCM.getAllowedCourseIds() == null ? List.of() : activeCM.getAllowedCourseIds();
+            return allCourses.stream()
+                    .filter(c -> allowed.contains(c.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return allCourses;
     }
 
     // ================== 权限校验辅助方法 ==================
@@ -131,22 +152,19 @@ public class CourseService {
         Course course = courseMapper.findById(courseId);
         Assert.notNull(course, "课程不存在");
 
-        if (isWrite) validateWriteAccess(course.getClassId());
-        else validateReadAccess(course.getClassId());
+        if (isWrite) {
+            Assert.isTrue(userInfoUtils.canWriteCourse(course.getClassId()), "无权操作该课程数据");
+        } else {
+            validateCourseReadAccess(courseId, course.getClassId()); // 改为按课程校验
+        }
 
         return course;
     }
 
-    private void validateWriteAccess(Long classId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) return;
-        if (userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClassTeacher(classId)) return;
-        throw new IllegalArgumentException("无权操作该课程数据");
-    }
-
-    private void validateReadAccess(Long classId) {
-        if (AuthenticationUserUtil.currentUserIsAdmin()) return;
-        if (userInfoUtils.inClassOfSchoolPrincipal(classId) || userInfoUtils.inClass(classId)) return;
-        throw new IllegalArgumentException("您无法访问该班级的课程");
+    private void validateCourseReadAccess(Long courseId, Long classId) {
+        if (!userInfoUtils.canAccessCourse(courseId, classId)) {
+            throw new IllegalArgumentException("您无权访问该课程");
+        }
     }
 
     private void initCourseWareDirectory(Long schoolId, Long classId, Long courseId) {

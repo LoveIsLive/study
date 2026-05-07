@@ -22,4 +22,10 @@ public class ClassMemberAddDTO {
      */
     @NotNull(message = "角色不能为空")
     private String role;
+
+    /**
+     * 【新增】分配给访客的课程ID列表。
+     * 当 role 为 "ROLE_GUEST" 时，此字段生效。
+     */
+    private List<Long> allowedCourseIds;
 }
