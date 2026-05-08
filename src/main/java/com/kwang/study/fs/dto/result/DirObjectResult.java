@@ -25,6 +25,8 @@ public class DirObjectResult extends GenericObjectResult {
          */
         private Integer type;
 
+        private Integer isHidden;
+
         /**
          * 对象的创建时间
          */

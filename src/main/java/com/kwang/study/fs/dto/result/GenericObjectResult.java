@@ -17,6 +17,8 @@ public class GenericObjectResult extends BaseResult {
      */
     private Integer type;
 
+    private Integer isHidden;
+
     /**
      * 对象的创建时间
      */

@@ -103,4 +103,10 @@ public interface NodeMapper {
      */
     NodeDetail selectNodeDetailByPath(@Param("path") String path);
 
+    /**
+     * 检查当前节点或其任何祖先节点是否被隐藏
+     * @param nodeId 当前节点ID
+     * @return true: 包含隐藏节点(不可见); false: 全局公开(可见)
+     */
+    boolean isNodeOrAncestorHidden(@Param("nodeId") Long nodeId);
 }

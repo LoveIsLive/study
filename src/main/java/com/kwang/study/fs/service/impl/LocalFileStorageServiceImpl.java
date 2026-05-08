@@ -103,6 +103,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         node.setParentId(parentNode == null ? null : parentNode.getId());
         node.setName(resolvedPath.getName());
         node.setType(ObjectTypeEnum.DIR.getCode());
+        node.setIsHidden(0);
         node.setSize(0L);
         // 目录没有hashId和mimeType
         node.setHashId(null);
@@ -175,6 +176,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         node.setParentId(parentNode == null ? null : parentNode.getId());
         node.setName(resolvedPath.getName());
         node.setType(ObjectTypeEnum.FILE.getCode());
+        node.setIsHidden(0);
         node.setSize((long) readSize);
         node.setHashId(hashRefNum.getId());
         node.setMimeTypeId(mimeTypeId);
@@ -508,6 +510,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         node.setName(resolvedPath.getName());
         // 设置为分块上传中间态
         node.setType(ObjectTypeEnum.CHUNK_INTERM.getCode());
+        node.setIsHidden(0);
         // 此时文件大小为0，也没有hash
         node.setSize(0L);
         // hash_id 暂时为空
@@ -651,6 +654,24 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         return result;
     }
 
+    @Override
+    @Transactional
+    public VoidResult updateNodeHiddenStatus(String path, Integer isHidden) throws IOException {
+        if (!isOrdinaryPath(path)) throw new InvalidPathException(path);
+
+        Node originalNode = nodeMapper.selectNodeByPath(path);
+        if (originalNode == null) {
+            throw new PathNotFoundException(path);
+        }
+
+        Node node = new Node();
+        node.setId(originalNode.getId());
+        node.setIsHidden(isHidden);
+
+        nodeMapper.updateNode(node);
+        return VoidResult.success();
+    }
+
     /**
      * 上传单个文件分片
      *
@@ -773,6 +794,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         Node updateNode = new Node();
         updateNode.setId(fileId);
         updateNode.setType(ObjectTypeEnum.FILE.getCode());
+        updateNode.setIsHidden(0);
         updateNode.setSize(totalSize);
         updateNode.setHashId(hashRefNum.getId());
         updateNode.setModifyTime(null); // 由数据库自动更新

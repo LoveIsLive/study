@@ -152,6 +152,14 @@ public class WareService {
                 result.getFileObjectDescs().get(i).setName(classesList.get(i).getName());
             }
         }
+
+        // 过滤
+        if (userInfoUtils.currentUserInClassIsStudent() || userInfoUtils.currentUserInClassIsGuest()) {
+            List<DirObjectResult.FileObjectDesc> filtered = result.getFileObjectDescs().stream()
+                    .filter(desc -> desc.getIsHidden() == null || desc.getIsHidden() == 0)
+                    .collect(Collectors.toList());
+            result.setFileObjectDescs(filtered);
+        }
         return result;
     }
 
@@ -161,18 +169,27 @@ public class WareService {
     @Transactional
     public GenericObjectResult getNodeDetails(String path) throws IOException {
         String actualPath = buildActualPath(path);
+
+        checkNodeVisibilityForStudent(actualPath);
+
         return fsService.getObjectDesc(actualPath);
     }
 
     public void downloadFile(String path, String mode, HttpServletRequest request,
                              HttpServletResponse response) throws IOException {
         String actualPath = buildActualPath(path);
+
+        checkNodeVisibilityForStudent(actualPath);
+
         FileObjectResult fileObject = fsService.getFileObject(actualPath);
         DownloadUtils.downloadFile(fileObject, mode, request, response);
     }
 
     public VoidResult searchNodesBFS(String path, String namePattern, Consumer<SearchNodeResult> resultConsumer) {
         String actualPath = buildActualPath(path);
+
+        checkNodeVisibilityForStudent(actualPath);
+
         return fsService.searchNodesBFS(actualPath, namePattern, resultConsumer);
     }
 
@@ -217,6 +234,18 @@ public class WareService {
                 .aiSummary(summary)
                 .build());
         return VoidResult.success();
+    }
+
+    /**
+     * 教师设置文件/目录的隐藏状态
+     */
+    @Transactional
+    public VoidResult setNodeHidden(String path, Integer isHidden) throws IOException {
+        // 只有教师或以上的权限可以修改隐藏状态
+        validateWritePermission();
+
+        String actualPath = buildActualPath(path);
+        return fsService.updateNodeHiddenStatus(actualPath, isHidden);
     }
 
 
@@ -367,5 +396,27 @@ public class WareService {
                 (acCM != null && ClassesRoleEnum.TEACHER.getRole().equals(acCM.getRole()))
                 ;
         Assert.isTrue(have, "无写权限");
+    }
+
+    /**
+     * 校验学生对目标节点的访问权限（向上追溯父节点隐藏状态）
+     */
+    private void checkNodeVisibilityForStudent(String actualPath) {
+        // 如果不是学生/访客，直接放行
+        if (!userInfoUtils.currentUserInClassIsStudent() && !userInfoUtils.currentUserInClassIsGuest()) {
+            return;
+        }
+
+        // 1. 获取目标节点
+        Node targetNode = nodeMapper.selectNodeByPath(actualPath);
+        if (targetNode == null) {
+            throw new IllegalArgumentException("文件或目录不存在");
+        }
+
+        // 2. 利用 CTE 高效查询是否被隐藏
+        boolean isHidden = nodeMapper.isNodeOrAncestorHidden(targetNode.getId());
+        if (isHidden) {
+            throw new IllegalArgumentException("当前资源或其上级目录已被教师隐藏，您无权访问");
+        }
     }
 }

@@ -131,4 +131,6 @@ public interface FileStorageService {
     MimeTypeResult getAllMimeTypeNames();
 
     MimeTypeIdResult getMimeTypeId(String mimeTypeName);
+
+    VoidResult updateNodeHiddenStatus(String path, Integer isHidden) throws IOException;
 }

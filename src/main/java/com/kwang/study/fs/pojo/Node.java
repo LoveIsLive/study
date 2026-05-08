@@ -31,6 +31,8 @@ public class Node implements Serializable {
      */
     private Integer type;
 
+    private Integer isHidden; // 0:公开, 1:隐藏
+
     /**
      * 路径项的大小，以字节为单位，目录设置0
      */

@@ -258,6 +258,21 @@ public class WareController {
         return build(voidResult);
     }
 
+    /**
+     * 设置文件/目录的隐藏状态 (仅教师及以上权限)
+     */
+    @PostMapping("/update/hidden")
+    public ResponseEntity<R<VoidResult>> updateNodeHidden(
+            @RequestParam("path") String path,
+            @RequestParam("isHidden") Integer isHidden) throws IOException {
+
+        Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+        Assert.isTrue(isHidden == 0 || isHidden == 1, "非法的隐藏状态值");
+
+        VoidResult voidResult = wareService.setNodeHidden(path, isHidden);
+        return build(voidResult);
+    }
+
 
     private <T extends BaseResult> ResponseEntity<R<T>> build(T baseResult) {
         if (baseResult == null || !Boolean.TRUE.equals(baseResult.getSuccess())) {
