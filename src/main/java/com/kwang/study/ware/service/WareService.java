@@ -248,6 +248,34 @@ public class WareService {
         return fsService.updateNodeHiddenStatus(actualPath, isHidden);
     }
 
+    /**
+     * 归档目录
+     */
+    @Transactional
+    public VoidResult archiveDirectory(String sourceDirPath, String zipFileName) throws IOException {
+        validateWritePermission(); // 校验教师及以上权限
+
+        String actualSourcePath = buildActualPath(sourceDirPath);
+        // 压缩包默认放在源目录的同级目录下
+        String parentPath = actualSourcePath.substring(0, actualSourcePath.lastIndexOf('/'));
+        String actualZipPath = parentPath + "/" + zipFileName;
+
+        return fsService.archiveDirectory(actualSourcePath, actualZipPath);
+    }
+
+    /**
+     * 解压文件
+     */
+    @Transactional
+    public VoidResult unarchiveFile(String zipFilePath, String targetDirPath) throws IOException {
+        validateWritePermission(); // 校验教师及以上权限
+
+        String actualZipPath = buildActualPath(zipFilePath);
+        String actualTargetDirPath = buildActualPath(targetDirPath);
+
+        return fsService.unarchiveFile(actualZipPath, actualTargetDirPath);
+    }
+
 
     // 返回用户该模块的根目录，不以/结尾
     private String buildBasePath() {

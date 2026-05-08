@@ -273,6 +273,26 @@ public class WareController {
         return build(voidResult);
     }
 
+    /**
+     * 将目录归档为 ZIP 压缩包 (教师及以上权限)
+     */
+    @PostMapping("/archive")
+    public ResponseEntity<R<VoidResult>> archiveDirectory(@Valid @RequestBody ArchiveRequestDTO requestDTO) throws IOException {
+        requestDTO.check();
+        VoidResult result = wareService.archiveDirectory(requestDTO.getSourceDirPath(), requestDTO.getZipFileName());
+        return build(result);
+    }
+
+    /**
+     * 将 ZIP 压缩包解压到指定目录 (教师及以上权限)
+     */
+    @PostMapping("/unarchive")
+    public ResponseEntity<R<VoidResult>> unarchiveFile(@Valid @RequestBody UnarchiveRequestDTO requestDTO) throws IOException {
+        requestDTO.check();
+        VoidResult result = wareService.unarchiveFile(requestDTO.getZipFilePath(), requestDTO.getTargetDirPath());
+        return build(result);
+    }
+
 
     private <T extends BaseResult> ResponseEntity<R<T>> build(T baseResult) {
         if (baseResult == null || !Boolean.TRUE.equals(baseResult.getSuccess())) {

@@ -29,17 +29,18 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StreamUtils;
 import org.springframework.util.unit.DataSize;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import static com.kwang.study.utils.PathUtils.*;
 
@@ -670,6 +671,220 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
         nodeMapper.updateNode(node);
         return VoidResult.success();
+    }
+
+    @Override
+    @Transactional
+    public VoidResult archiveDirectory(String sourceDirPath, String destZipPath) throws IOException {
+        Node sourceNode = nodeMapper.selectNodeByPath(sourceDirPath);
+        if (sourceNode == null || !Objects.equals(sourceNode.getType(), ObjectTypeEnum.DIR.getCode())) {
+            throw new NotADirectoryException(sourceDirPath);
+        }
+
+        ResolvedPath destPath = parsePath(destZipPath);
+        Node destParentNode = nodeMapper.selectNodeByPath(destPath.getParentPath());
+        if (destParentNode == null) throw new PathNotFoundException(destPath.getParentPath());
+        if (nodeMapper.selectNodeByParentIdAndName(destParentNode.getId(), destPath.getName()) != null) {
+            throw new PathAlreadyExistsException(destZipPath);
+        }
+
+        // 1. 创建服务器本地临时文件，防止内存溢出(OOM)
+        File tempZipFile = File.createTempFile("archive-", ".zip");
+        try {
+            // 2. 递归遍历节点并写入 ZipOutputStream
+            try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(tempZipFile))) {
+                zipRecursive(sourceNode, "", zos);
+            }
+
+            // 3. 计算临时文件的 Hash 并存入底层文件系统
+            long fileSize = tempZipFile.length();
+            String hash;
+            try (InputStream is = new FileInputStream(tempZipFile)) {
+                // 使用现有的 HashUtil 对流进行摘要 (需要稍微改造或一次性读, 考虑到文件可能很大, 这里提供流式摘要思路)
+                MessageDigest sha256 = HashUtil.sha256();
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    sha256.update(buffer, 0, bytesRead);
+                }
+                hash = HashUtil.bytesToHex(sha256.digest());
+            }
+
+            // 处理去重与物理存储
+            HashRefNum hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
+            String fileKey;
+            if (hashRefNum != null) {
+                hashRefNumMapper.incrementRefNum(hashRefNum.getId());
+            } else {
+                fileKey = UUID.randomUUID().toString();
+                try (InputStream is = new FileInputStream(tempZipFile)) {
+                    fileStorage.putFile(fileKey, is);
+                }
+                hashRefNum = new HashRefNum();
+                hashRefNum.setHash(hash);
+                hashRefNum.setRefPath(fileKey);
+                hashRefNum.setRefNum(1);
+                hashRefNum.setSize(fileSize);
+                hashRefNumMapper.insertHash(hashRefNum);
+            }
+
+            // 4. 插入节点数据 (获取 application/zip 的 MimeTypeId)
+            Integer mimeTypeId = mimeTypeService.getMimeTypeId("application/zip");
+            Node node = new Node();
+            node.setParentId(destParentNode.getId());
+            node.setName(destPath.getName());
+            node.setType(ObjectTypeEnum.FILE.getCode());
+            node.setSize(fileSize);
+            node.setHashId(hashRefNum.getId());
+            node.setMimeTypeId(mimeTypeId == null ? 1 : mimeTypeId); // 兜底
+            nodeMapper.insertNode(node);
+
+        } finally {
+            tempZipFile.delete(); // 清理临时文件
+        }
+        return VoidResult.success();
+    }
+
+    // 递归打包辅助方法
+    private void zipRecursive(Node dirNode, String basePath, ZipOutputStream zos) throws IOException {
+        List<Node> children = nodeMapper.selectChildrenByParentId(dirNode.getId());
+        for (Node child : children) {
+            String entryName = basePath + child.getName();
+            if (Objects.equals(child.getType(), ObjectTypeEnum.DIR.getCode())) {
+                zos.putNextEntry(new ZipEntry(entryName + "/"));
+                zos.closeEntry();
+                zipRecursive(child, entryName + "/", zos);
+            } else {
+                zos.putNextEntry(new ZipEntry(entryName));
+                if (child.getHashId() != null) {
+                    HashRefNum hashRefNum = hashRefNumMapper.selectById(child.getHashId());
+                    if (hashRefNum != null) {
+                        try (InputStream is = fileStorage.getFile(hashRefNum.getRefPath())) {
+                            StreamUtils.copy(is, zos);
+                        }
+                    }
+                }
+                zos.closeEntry();
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public VoidResult unarchiveFile(String zipFilePath, String destDirPath) throws IOException {
+        Node zipNode = nodeMapper.selectNodeByPath(zipFilePath);
+        if (zipNode == null || !Objects.equals(zipNode.getType(), ObjectTypeEnum.FILE.getCode())) {
+            throw new NotAFileException(zipFilePath);
+        }
+        Node destDirNode = nodeMapper.selectNodeByPath(destDirPath);
+        if (destDirNode == null || !Objects.equals(destDirNode.getType(), ObjectTypeEnum.DIR.getCode())) {
+            throw new NotADirectoryException(destDirPath);
+        }
+
+        HashRefNum zipHashRef = hashRefNumMapper.selectById(zipNode.getHashId());
+        if (zipHashRef == null) return VoidResult.fail("压缩包底层文件丢失");
+
+        try (ZipInputStream zis = new ZipInputStream(fileStorage.getFile(zipHashRef.getRefPath()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String entryName = entry.getName();
+
+                // 【安全校验】防御 Zip Slip 目录穿越漏洞
+                if (entryName.contains("..")) continue;
+
+                String fullTargetPath = destDirPath + (destDirPath.endsWith("/") ? "" : "/") + entryName;
+                ResolvedPath targetRes = parsePath(fullTargetPath);
+
+                if (entry.isDirectory()) {
+                    ensureDirExistsInternal(fullTargetPath);
+                } else {
+                    // 确保文件的父目录存在 (ZIP 压缩包中可能不显式包含目录结构)
+                    Node parentNode = ensureDirExistsInternal(targetRes.getParentPath());
+
+                    // 遇到文件，借用临时文件处理
+                    File tempFile = File.createTempFile("unzip-", ".tmp");
+                    try {
+                        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                            StreamUtils.copy(zis, fos);
+                        }
+
+                        long fileSize = tempFile.length();
+                        String hash;
+                        try (InputStream is = new FileInputStream(tempFile)) {
+                            MessageDigest sha256 = HashUtil.sha256();
+                            byte[] buffer = new byte[8192];
+                            int bytesRead;
+                            while ((bytesRead = is.read(buffer)) != -1) {
+                                sha256.update(buffer, 0, bytesRead);
+                            }
+                            hash = HashUtil.bytesToHex(sha256.digest());
+                        }
+
+                        // 判重与插入逻辑
+                        HashRefNum hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
+                        if (hashRefNum != null) {
+                            hashRefNumMapper.incrementRefNum(hashRefNum.getId());
+                        } else {
+                            String fileKey = UUID.randomUUID().toString();
+                            try (InputStream is = new FileInputStream(tempFile)) {
+                                fileStorage.putFile(fileKey, is);
+                            }
+                            hashRefNum = new HashRefNum();
+                            hashRefNum.setHash(hash);
+                            hashRefNum.setRefPath(fileKey);
+                            hashRefNum.setRefNum(1);
+                            hashRefNum.setSize(fileSize);
+                            hashRefNumMapper.insertHash(hashRefNum);
+                        }
+
+                        // 动态获取 MimeType
+                        String mimeTypeName = java.nio.file.Files.probeContentType(new File(entryName).toPath());
+                        if (mimeTypeName == null) mimeTypeName = "application/octet-stream";
+                        Integer mimeTypeId = mimeTypeService.getMimeTypeId(mimeTypeName);
+
+                        // 检查文件是否已存在，存在则覆盖，不存在则新增
+                        Node existingFile = nodeMapper.selectNodeByParentIdAndName(parentNode.getId(), targetRes.getName());
+                        if (existingFile != null) {
+                            existingFile.setHashId(hashRefNum.getId());
+                            existingFile.setSize(fileSize);
+                            existingFile.setMimeTypeId(mimeTypeId == null ? 1 : mimeTypeId);
+                            nodeMapper.updateNode(existingFile);
+                        } else {
+                            Node node = new Node();
+                            node.setParentId(parentNode.getId());
+                            node.setName(targetRes.getName());
+                            node.setType(ObjectTypeEnum.FILE.getCode());
+                            node.setSize(fileSize);
+                            node.setHashId(hashRefNum.getId());
+                            node.setMimeTypeId(mimeTypeId == null ? 1 : mimeTypeId);
+                            nodeMapper.insertNode(node);
+                        }
+                    } finally {
+                        tempFile.delete();
+                    }
+                }
+                zis.closeEntry();
+            }
+        }
+        return VoidResult.success();
+    }
+
+    // 内部辅助方法：确保多级目录存在，不存在则自动创建，返回叶子目录节点
+    private Node ensureDirExistsInternal(String path) {
+        if ("/".equals(path)) return null;
+        Node node = nodeMapper.selectNodeByPath(path);
+        if (node != null) return node;
+
+        ResolvedPath res = parsePath(path);
+        Node parentNode = ensureDirExistsInternal(res.getParentPath());
+
+        Node newNode = new Node();
+        newNode.setParentId(parentNode == null ? null : parentNode.getId());
+        newNode.setName(res.getName());
+        newNode.setType(ObjectTypeEnum.DIR.getCode());
+        newNode.setSize(0L);
+        nodeMapper.insertNode(newNode);
+        return newNode;
     }
 
     /**

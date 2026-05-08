@@ -133,4 +133,14 @@ public interface FileStorageService {
     MimeTypeIdResult getMimeTypeId(String mimeTypeName);
 
     VoidResult updateNodeHiddenStatus(String path, Integer isHidden) throws IOException;
+
+    /**
+     * 归档目录到指定ZIP文件
+     */
+    VoidResult archiveDirectory(String sourceDirPath, String destZipPath) throws IOException;
+
+    /**
+     * 解压ZIP文件到指定目录
+     */
+    VoidResult unarchiveFile(String zipFilePath, String destDirPath) throws IOException;
 }
