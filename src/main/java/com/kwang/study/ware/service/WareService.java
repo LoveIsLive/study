@@ -227,6 +227,15 @@ public class WareService {
     }
 
     @Transactional
+    public NodeMetadata getFileAISummary(String path) {
+        String actualPath = buildActualPath(path);
+
+        // 这里有点越权了，应该由fsService暴露一个系统内部使用的 获取node_id的方法。
+        Node node = nodeMapper.selectNodeByPath(actualPath);
+        return nodeMetadataMapper.selectByNodeId(node.getId());
+    }
+
+    @Transactional
     public VoidResult updateFileAISummary(String path, String summary) {
         String actualPath = buildActualPath(path);
 

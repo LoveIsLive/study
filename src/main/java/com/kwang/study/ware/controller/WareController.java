@@ -249,6 +249,14 @@ public class WareController {
         return ResponseEntity.ok(R.success(downloadId));
     }
 
+    @GetMapping("/get/summary")
+    public ResponseEntity<R<NodeMetadata>> updateFileAISummary(@RequestParam("path") String path) throws IOException {
+        Assert.isTrue(PathUtils.isOrdinaryPath(path), "路径非法: " + path);
+
+        NodeMetadata aiSummary = wareService.getFileAISummary(path);
+        return ResponseEntity.ok(R.success(aiSummary));
+    }
+
     @PostMapping("/update/summary")
     public ResponseEntity<R<VoidResult>> updateFileAISummary(@RequestParam("path") String path,
                                                            @RequestParam("summary") String summary) throws IOException {
