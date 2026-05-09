@@ -21,6 +21,7 @@ import com.kwang.study.organization.service.SchoolService;
 import com.kwang.study.utils.DownloadUtils;
 import com.kwang.study.ware.mapper.NodeMetadataMapper;
 import com.kwang.study.ware.pojo.NodeMetadata;
+import com.kwang.study.ware.service.async.AsyncWareTaskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,8 @@ public class WareService {
     private NodeMetadataMapper nodeMetadataMapper;
     @Autowired
     private NodeMapper nodeMapper;
+    @Autowired
+    private AsyncWareTaskService asyncWareTaskService;
 
     @Transactional
     public VoidResult createDirectory(String path) throws IOException {
@@ -249,31 +252,34 @@ public class WareService {
     }
 
     /**
-     * 归档目录
+     * 提交打包任务
      */
-    @Transactional
-    public VoidResult archiveDirectory(String sourceDirPath, String zipFileName) throws IOException {
-        validateWritePermission(); // 校验教师及以上权限
-
+    public void submitArchiveTask(String sourceDirPath, String zipFileName) {
+        // 1. 主线程鉴权
+        validateWritePermission();
+        // 2. 主线程获取当前用户名
+        String username = AuthenticationUserUtil.getCurrentUserName();
+        // 3. 计算底层真实路径
         String actualSourcePath = buildActualPath(sourceDirPath);
-        // 压缩包默认放在源目录的同级目录下
         String parentPath = actualSourcePath.substring(0, actualSourcePath.lastIndexOf('/'));
         String actualZipPath = parentPath + "/" + zipFileName;
-
-        return fsService.archiveDirectory(actualSourcePath, actualZipPath);
+        // 4. 提交异步任务
+        asyncWareTaskService.executeArchiveTask(actualSourcePath, actualZipPath, username, sourceDirPath, zipFileName);
     }
 
     /**
-     * 解压文件
+     * 提交解压任务
      */
-    @Transactional
-    public VoidResult unarchiveFile(String zipFilePath, String targetDirPath) throws IOException {
-        validateWritePermission(); // 校验教师及以上权限
-
+    public void submitUnarchiveTask(String zipFilePath, String targetDirPath) {
+        // 1. 主线程鉴权
+        validateWritePermission();
+        // 2. 主线程获取当前用户名
+        String username = AuthenticationUserUtil.getCurrentUserName();
+        // 3. 计算底层真实路径
         String actualZipPath = buildActualPath(zipFilePath);
         String actualTargetDirPath = buildActualPath(targetDirPath);
-
-        return fsService.unarchiveFile(actualZipPath, actualTargetDirPath);
+        // 4. 提交异步任务
+        asyncWareTaskService.executeUnarchiveTask(actualZipPath, actualTargetDirPath, username, zipFilePath, targetDirPath);
     }
 
 

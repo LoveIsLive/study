@@ -6,72 +6,90 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PathUtils {
+
+    // 基础非法字符正则（不包含斜杠，因为路径拆分时会用到）
     private static final Pattern FORBIDDEN_CHARS_PATTERN =
             Pattern.compile("[<>&|;`$\"'*?#~!:]");
 
-    // 需要是合法的unix路径
     /**
      * 判断一个字符串是否是合法的Unix路径，遵循以下严格规则：
      * 1. 不允许出现 shell 特殊字符。
      * 2. 不允许路径项为 "." 或 "..".
      * 3. 不允许路径项为空 (即不允许出现 "//").
      * 4. 路径不能以 "/" 结尾（根目录 "/" 除外）.
+     *
      * @param path 要校验的路径字符串
      * @return 如果路径合法则返回 true，否则返回 false
      */
     public static boolean isValidPath(String path) {
-        // 规则：处理null和空字符串
+        // 1. 处理null和空字符串
         if (path == null || path.isEmpty()) {
             return false;
         }
 
-        // 规则：根目录 "/" 是唯一允许以斜杠结尾的合法路径
+        // 2. 根目录 "/" 是唯一允许以斜杠结尾的合法路径
         if (path.equals("/")) {
             return true;
         }
 
-        // 规则：路径项不能为空，所以不能包含 "//"
+        // 3. 路径项不能为空，不能包含连续斜杠 "//"
         if (path.contains("//")) {
             return false;
         }
 
-        // 规则：路径不能以 "/" 结尾 (根目录已在前面处理)
+        // 4. 路径不能以 "/" 结尾 (根目录已在前面处理)
         if (path.endsWith("/")) {
             return false;
         }
 
-        // 将路径按 "/" 分割成各个部分
+        // 5. 必须是绝对路径 (你的系统似乎要求所有路径以 "/" 开头)
+        if (!path.startsWith("/")) {
+            return false;
+        }
+
+        // 6. 将路径按 "/" 分割成各个部分进行校验
         String[] components = path.split("/");
 
+        // 因为路径以 "/" 开头，components[0] 是空字符串，从索引 1 开始遍历
         for (int i = 1; i < components.length; i++) {
-            String component = components[i];
-            // 规则：不允许路径项为 "." 或 ".."
-            String trimComponent = component.trim();
-            if (trimComponent.equals(".") || trimComponent.equals("..")) {
-                return false;
-            }
-
-            // 规则：不允许路径项包含应避免的特殊字符
-            Matcher matcher = FORBIDDEN_CHARS_PATTERN.matcher(component);
-            if (matcher.find()) {
+            // ★ 核心优化：路径里的每一段，本质上就是一个 Name，直接复用 isValidName
+            if (!isValidName(components[i])) {
                 return false;
             }
         }
-        // 所有检查都通过
+
         return true;
     }
 
+    /**
+     * 判断是否为普通的合法路径 (是有效路径且不是根目录)
+     */
     public static boolean isOrdinaryPath(String path) {
-        // 是有效的path并且不是根目录
         return isValidPath(path) && !"/".equals(path);
     }
 
+    /**
+     * 判断文件或目录的名称是否合法（用于重命名、创建文件/目录时的名称校验）
+     */
     public static boolean isValidName(String name) {
-        if (!StringUtils.hasLength(name))
+        // 1. 判空
+        if (!StringUtils.hasLength(name)) {
             return false;
-        String trimName = name;
-        if (trimName.equals(".") || trimName.equals(".."))
+        }
+
+        // 2. ★ 致命Bug修复：名称中绝对不能包含 正斜杠 '/' 和 反斜杠 '\'
+        if (name.contains("/") || name.contains("\\")) {
             return false;
-        return !FORBIDDEN_CHARS_PATTERN.matcher(name).find();
+        }
+
+        // 3. ★ Bug修复：去除首尾空格后，不能是相对路径符号 "." 或 ".."
+        String trimmedName = name.trim();
+        if (trimmedName.equals(".") || trimmedName.equals("..")) {
+            return false;
+        }
+
+        // 4. 不能包含系统禁用的 shell 特殊字符
+        Matcher matcher = FORBIDDEN_CHARS_PATTERN.matcher(name);
+        return !matcher.find();
     }
 }

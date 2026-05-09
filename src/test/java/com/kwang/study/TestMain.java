@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 public class TestMain {
     public static void main(String[] args) throws Exception {
@@ -74,6 +75,11 @@ public class TestMain {
         for (String name : metadata.names()) {
             System.out.println(name + ": " + metadata.get(name));
         }
+    }
+
+    @Test
+    public void f1() throws Exception {
+        System.out.println(Pattern.compile("[<>&|;`$\"'*?#~!:]").matcher("/").matches());
     }
 
 }

@@ -274,23 +274,25 @@ public class WareController {
     }
 
     /**
-     * 将目录归档为 ZIP 压缩包 (教师及以上权限)
+     * 将目录归档为 ZIP 压缩包 (异步执行)
      */
     @PostMapping("/archive")
-    public ResponseEntity<R<VoidResult>> archiveDirectory(@Valid @RequestBody ArchiveRequestDTO requestDTO) throws IOException {
+    public ResponseEntity<R<VoidResult>> archiveDirectory(@Valid @RequestBody ArchiveRequestDTO requestDTO) {
         requestDTO.check();
-        VoidResult result = wareService.archiveDirectory(requestDTO.getSourceDirPath(), requestDTO.getZipFileName());
-        return build(result);
+        wareService.submitArchiveTask(requestDTO.getSourceDirPath(), requestDTO.getZipFileName());
+
+        return ResponseEntity.ok(R.success(null, "打包任务已提交后台执行，完成后将自动通知"));
     }
 
     /**
-     * 将 ZIP 压缩包解压到指定目录 (教师及以上权限)
+     * 将 ZIP 压缩包解压到指定目录 (异步执行)
      */
     @PostMapping("/unarchive")
-    public ResponseEntity<R<VoidResult>> unarchiveFile(@Valid @RequestBody UnarchiveRequestDTO requestDTO) throws IOException {
+    public ResponseEntity<R<VoidResult>> unarchiveFile(@Valid @RequestBody UnarchiveRequestDTO requestDTO) {
         requestDTO.check();
-        VoidResult result = wareService.unarchiveFile(requestDTO.getZipFilePath(), requestDTO.getTargetDirPath());
-        return build(result);
+        wareService.submitUnarchiveTask(requestDTO.getZipFilePath(), requestDTO.getTargetDirPath());
+
+        return ResponseEntity.ok(R.success(null, "解压任务已提交后台执行，完成后将自动通知"));
     }
 
 
