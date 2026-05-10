@@ -387,15 +387,15 @@ public class LLMService {
             Node node = nodeMapper.selectNodeByPath(actualPath);
             taskExecutor.execute(() -> {
                 try {
-                    log.info("开始异步提取文件摘要: {}", path);
-                    String summary = generateFileSummary(path);
+                    log.info("开始异步提取文件摘要: {}", actualPath);
+                    String summary = generateFileSummary(actualPath);
                     nodeMetadataMapper.insert(NodeMetadata.builder()
                             .nodeId(node.getId())
                             .aiSummary(summary)
                             .build());
-                    log.info("文件摘要提取完成: {}", path);
+                    log.info("文件摘要提取完成: {}", actualPath);
                 } catch (Exception e) {
-                    log.error("异步提取文件摘要失败: {}", path, e);
+                    log.error("异步提取文件摘要失败: {}", actualPath, e);
                 }
             });
         }
