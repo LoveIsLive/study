@@ -30,7 +30,7 @@ public interface NodeMetadataMapper {
     /**
      * 更新元数据（根据nodeId）
      */
-    int updateByNodeId(NodeMetadata nodeMetadata);
+    int updateOrCreateByNodeId(NodeMetadata nodeMetadata);
 
     /**
      * 根据nodeId删除元数据

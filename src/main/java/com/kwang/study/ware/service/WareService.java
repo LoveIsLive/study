@@ -241,7 +241,7 @@ public class WareService {
 
         // 这里有点越权了，应该由fsService暴露一个系统内部使用的 获取node_id的方法。
         Node node = nodeMapper.selectNodeByPath(actualPath);
-        nodeMetadataMapper.updateByNodeId(NodeMetadata.builder()
+        nodeMetadataMapper.updateOrCreateByNodeId(NodeMetadata.builder()
                 .nodeId(node.getId())
                 .aiSummary(summary)
                 .build());

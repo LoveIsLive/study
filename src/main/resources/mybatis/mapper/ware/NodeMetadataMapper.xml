@@ -50,16 +50,22 @@
     </insert>
 
     <!-- 更新（根据nodeId） -->
-    <update id="updateByNodeId" parameterType="com.kwang.study.ware.pojo.NodeMetadata">
-        UPDATE node_metadata
-        <set>
+    <insert id="updateOrCreateByNodeId" parameterType="com.kwang.study.ware.pojo.NodeMetadata">
+        INSERT INTO node_metadata (node_id, ai_summary, update_time, create_time)
+        VALUES (
+        #{nodeId,jdbcType=BIGINT},
+        #{aiSummary,jdbcType=VARCHAR},
+        NOW(),
+        NOW()
+        )
+        ON DUPLICATE KEY UPDATE
+        <trim suffixOverrides=",">
             <if test="aiSummary != null">
                 ai_summary = #{aiSummary,jdbcType=VARCHAR},
             </if>
-            update_time = NOW()
-        </set>
-        WHERE node_id = #{nodeId,jdbcType=BIGINT}
-    </update>
+            update_time = NOW(),
+        </trim>
+    </insert>
 
     <!-- 删除 -->
     <delete id="deleteByNodeId" parameterType="java.lang.Long">
