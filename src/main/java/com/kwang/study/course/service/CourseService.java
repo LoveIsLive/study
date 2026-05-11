@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -97,10 +98,12 @@ public class CourseService {
         courseMapper.update(existing);
 
         // 删除之前封面
-        try {
-            fsService.deleteFileObject(originCoverPath);
-        } catch (IOException e) {
-            log.warn(e.getMessage());
+        if (StringUtils.hasText(originCoverPath)) {
+            try {
+                fsService.deleteFileObject(originCoverPath);
+            } catch (IOException e) {
+                log.warn(e.getMessage());
+            }
         }
 
         return existing;
