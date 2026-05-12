@@ -493,6 +493,21 @@ public class HomeworkService {
         return (HomeworkSubmissionDetail) desensitization(submissionDetail);
     }
 
+    /**
+     * 学生查看某个课程内的所有本人提交
+     */
+    public List<HomeworkSubmissionDetail> getStudentAllSubmissionByCourseId(Long courseId) {
+        Assert.isTrue(userInfoUtils.currentUserInClassIsStudent(), "当前角色不是学生");
+        Long studentId = AuthenticationUserUtil.getCurrentUserId();
+        Course course = courseMapper.findById(courseId);
+        Assert.isTrue(userInfoUtils.inClassStudent(course.getClassId()), "当前角色不是目标课程的学生");
+
+        return homeworkMapper.findAllByCourseId(courseId).stream()
+                .map(homework -> submissionMapper.
+                        findByHomeworkIdAndStudentId(homework.getId(), studentId))
+                .collect(Collectors.toList());
+    }
+
 
     @Autowired
     private com.kwang.study.llm.config.LLMGlobalConfig llmGlobalConfig;

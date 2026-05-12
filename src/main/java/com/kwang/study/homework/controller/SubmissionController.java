@@ -101,6 +101,16 @@ public class SubmissionController {
         return ResponseEntity.ok(R.success(submission));
     }
 
+
+    /**
+     * 学生查看某个课程内的所有本人提交
+     */
+    @GetMapping("/student/{courseId}/all")
+    public ResponseEntity<R<List<HomeworkSubmissionDetail>>> getStudentAllSubmissionByCourseId(@PathVariable Long courseId) {
+        List<HomeworkSubmissionDetail> submission = homeworkService.getStudentAllSubmissionByCourseId(courseId);
+        return ResponseEntity.ok(R.success(submission));
+    }
+
     /**
      * 教师批改作业
      * 权限：管理员、校长、教师（与作业发布者一致）
