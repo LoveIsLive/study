@@ -143,23 +143,39 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             throw new PathAlreadyExistsException(path);
         }
 
-        int chunkSize = fsConfig.getChunkSize();
-        byte[] content = new byte[chunkSize];
-        int readSize = ChunkUtil.readChunk(fileStream, content);
-        if (readSize == -1) {
-            throw new IllegalArgumentException("上传文件大小超过：" + DataSize.ofBytes(content.length).toMegabytes());
+        // ================== ★ 核心优化区开始 ==================
+        int maxChunkSize = fsConfig.getChunkSize(); // 最大限制 (如 10MB)
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        MessageDigest sha256 = HashUtil.sha256();
+
+        byte[] buffer = new byte[8192]; // 仅开辟 8KB 的复用缓冲区
+        int bytesRead;
+        long totalRead = 0;
+
+        // 边读流、边算Hash、边存入动态扩容内存
+        while ((bytesRead = fileStream.read(buffer)) != -1) {
+            totalRead += bytesRead;
+            if (totalRead > maxChunkSize) {
+                throw new IllegalArgumentException("上传文件大小超过小文件限制：" +
+                        DataSize.ofBytes(maxChunkSize).toMegabytes() + "MB");
+            }
+            sha256.update(buffer, 0, bytesRead);
+            baos.write(buffer, 0, bytesRead);
         }
 
-        String hash = HashUtil.sha256Hash(content, 0, readSize);
-        boolean insertSuccess = true;
+        byte[] actualContent = baos.toByteArray(); // 获取精准大小的字节数组
+        String hash = HashUtil.bytesToHex(sha256.digest());
+        int finalSize = (int) totalRead;
+        // ================== ★ 核心优化区结束 ==================
 
+        boolean insertSuccess = true;
         String fileKey = UUID.randomUUID().toString();
 
         HashRefNum hashRefNum = new HashRefNum();
         hashRefNum.setHash(hash);
         hashRefNum.setRefPath(fileKey);
         hashRefNum.setRefNum(1);
-        hashRefNum.setSize((long) readSize);
+        hashRefNum.setSize((long) finalSize);
         try {
             hashRefNumMapper.insertHash(hashRefNum);
         } catch (DuplicateKeyException e) {
@@ -170,7 +186,8 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             hashRefNumMapper.incrementRefNum(hashRefNum.getId());
         }
         if (insertSuccess) {
-            fileStorage.putFile(fileKey, new ByteArrayInputStream(content));
+            // 直接传入实际大小的 actualContent，连 offset/len 都不需要截取了
+            fileStorage.putFile(fileKey, new ByteArrayInputStream(actualContent));
         }
 
         Node node = new Node();
@@ -178,7 +195,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         node.setName(resolvedPath.getName());
         node.setType(ObjectTypeEnum.FILE.getCode());
         node.setIsHidden(0);
-        node.setSize((long) readSize);
+        node.setSize((long) finalSize);
         node.setHashId(hashRefNum.getId());
         node.setMimeTypeId(mimeTypeId);
 
@@ -319,33 +336,48 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         if (fileStream != null) {
-            int chunkSize = fsConfig.getChunkSize();
-            byte[] content = new byte[chunkSize];
-            int readSize = ChunkUtil.readChunk(fileStream, content);
-            if (readSize == -1) {
-                throw new IllegalArgumentException("上传文件大小超过：" + DataSize.ofBytes(content.length).toMegabytes());
+            // ================== ★ 核心优化区 ==================
+            int maxChunkSize = fsConfig.getChunkSize();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            MessageDigest sha256 = HashUtil.sha256();
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            long totalRead = 0;
+
+            while ((bytesRead = fileStream.read(buffer)) != -1) {
+                totalRead += bytesRead;
+                if (totalRead > maxChunkSize) {
+                    throw new IllegalArgumentException("上传文件大小超过限制：" +
+                            DataSize.ofBytes(maxChunkSize).toMegabytes() + "MB");
+                }
+                sha256.update(buffer, 0, bytesRead);
+                baos.write(buffer, 0, bytesRead);
             }
 
-            String hash = HashUtil.sha256Hash(content, 0, readSize);
+            byte[] actualContent = baos.toByteArray();
+            String hash = HashUtil.bytesToHex(sha256.digest());
+            int finalSize = (int) totalRead;
+            // ==================================================
+
             HashRefNum hashRefNum = hashRefNumMapper.selectByHashForUpdate(hash);
             String fileKey;
             if (hashRefNum != null) {
-                // 文件已存在，增加引用计数
                 hashRefNumMapper.incrementRefNum(hashRefNum.getId());
             } else {
-                // 新文件，存入文件存储并创建记录
                 fileKey = UUID.randomUUID().toString();
-                fileStorage.putFile(fileKey, new ByteArrayInputStream(content));
+                // 存入精准大小的 actualContent
+                fileStorage.putFile(fileKey, new ByteArrayInputStream(actualContent));
 
                 hashRefNum = new HashRefNum();
                 hashRefNum.setHash(hash);
                 hashRefNum.setRefPath(fileKey);
                 hashRefNum.setRefNum(1);
-                hashRefNum.setSize((long) readSize);
+                hashRefNum.setSize((long) finalSize);
                 hashRefNumMapper.insertHash(hashRefNum);
             }
 
-            // 删除之前的文件
+            // 处理旧文件引用逻辑不变...
             if (originalNode.getHashId() != null) {
                 HashRefNum oldHashRefNum = hashRefNumMapper.selectByIdForUpdate(originalNode.getHashId());
                 if (oldHashRefNum != null) {
@@ -358,7 +390,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                 }
             }
             node.setHashId(hashRefNum.getId());
-            node.setSize((long) readSize);
+            node.setSize((long) finalSize);
         }
 
         nodeMapper.updateNode(node);
@@ -746,7 +778,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         return VoidResult.success();
     }
 
-    // 递归打包辅助方法
+    // 递归打包辅助方法 (修改版，免疫磁盘旧文件过大Bug)
     private void zipRecursive(Node dirNode, String basePath, ZipOutputStream zos) throws IOException {
         List<Node> children = nodeMapper.selectChildrenByParentId(dirNode.getId());
         for (Node child : children) {
@@ -761,7 +793,17 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                     HashRefNum hashRefNum = hashRefNumMapper.selectById(child.getHashId());
                     if (hashRefNum != null) {
                         try (InputStream is = fileStorage.getFile(hashRefNum.getRefPath())) {
-                            StreamUtils.copy(is, zos);
+                            // ============ ★ 核心拦截修复 ============
+                            // 绝对不能用 StreamUtils.copy(is, zos) 直接拷贝整个流
+                            // 必须严格按照数据库记录的真实大小 (child.getSize()) 读取，抛弃磁盘多余的 null 字节
+                            long bytesToRead = child.getSize();
+                            byte[] buffer = new byte[8192];
+                            int read;
+                            while (bytesToRead > 0 && (read = is.read(buffer, 0, (int) Math.min(buffer.length, bytesToRead))) != -1) {
+                                zos.write(buffer, 0, read);
+                                bytesToRead -= read;
+                            }
+                            // ========================================
                         }
                     }
                 }
@@ -785,6 +827,16 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         HashRefNum zipHashRef = hashRefNumMapper.selectById(zipNode.getHashId());
         if (zipHashRef == null) return VoidResult.fail("压缩包底层文件丢失");
 
+        // ================= ★ 核心改动 1：计算解压专属子目录 =================
+        String zipName = zipNode.getName();
+        // 如果是 测试.zip，提取出 "测试" 作为文件夹名
+        String folderName = zipName.toLowerCase().endsWith(".zip") ?
+                zipName.substring(0, zipName.length() - 4) : zipName + "_解压";
+
+        // 生成目标根目录：destDirPath/测试
+        String baseDestPath = destDirPath + (destDirPath.endsWith("/") ? "" : "/") + folderName;
+        // =================================================================
+
         try (ZipInputStream zis = new ZipInputStream(fileStorage.getFile(zipHashRef.getRefPath()))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
@@ -793,19 +845,23 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                 // 【安全校验】防御 Zip Slip 目录穿越漏洞
                 if (entryName.contains("..")) continue;
 
-                String fullTargetPath = destDirPath + (destDirPath.endsWith("/") ? "" : "/") + entryName;
+                // ================= ★ 核心改动 2：将路径拼接到子目录下 =================
+                String fullTargetPath = baseDestPath + "/" + entryName;
+                // =================================================================
+
                 ResolvedPath targetRes = parsePath(fullTargetPath);
 
                 if (entry.isDirectory()) {
                     ensureDirExistsInternal(fullTargetPath);
                 } else {
-                    // 确保文件的父目录存在 (ZIP 压缩包中可能不显式包含目录结构)
+                    // 确保文件的父目录存在
                     Node parentNode = ensureDirExistsInternal(targetRes.getParentPath());
 
                     // 遇到文件，借用临时文件处理
                     File tempFile = File.createTempFile("unzip-", ".tmp");
                     try {
                         try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                            // 这里只会读取当前ZIP Entry的数据，绝不会多读
                             StreamUtils.copy(zis, fos);
                         }
 
@@ -903,24 +959,38 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         if (node == null || !Objects.equals(ObjectTypeEnum.CHUNK_INTERM.getCode(), node.getType())) {
             throw new IllegalArgumentException("Invalid fileId or the file is not in chunk uploading state.");
         }
-        int chunkSize = fsConfig.getChunkSize();
-        if ((long) chunkIndex * chunkSize > DataSize.ofGigabytes(1).toBytes())
+        int maxChunkSize = fsConfig.getChunkSize();
+        if ((long) chunkIndex * maxChunkSize > DataSize.ofGigabytes(1).toBytes())
             throw new IllegalArgumentException("文件过大超过1GB");
-        byte[] content = new byte[chunkSize];
-        int readSize = ChunkUtil.readChunk(chunkStream, content);
-        if (readSize == -1) {
-            throw new IllegalArgumentException("上传文件大小超过：" + DataSize.ofBytes(content.length).toMegabytes());
-        }
 
         String chunkKey = fileId + "-" + chunkIndex;
-        chunkStorage.putFile(chunkKey, new ByteArrayInputStream(content, 0, readSize));
+        int actualReadSize = 0;
+
+        // ================== ★ 极低内存流式直写 ==================
+        // 不再 new byte[10MB]，而是直接打开目标文件的写入流
+        try (OutputStream os = chunkStorage.openFile(chunkKey)) {
+            byte[] buffer = new byte[8192]; // 仅 8KB 内存
+            int bytesRead;
+            while ((bytesRead = chunkStream.read(buffer)) != -1) {
+                actualReadSize += bytesRead;
+                if (actualReadSize > maxChunkSize) {
+                    // 超限，立刻关闭流并清理坏文件
+                    os.close();
+                    chunkStorage.deleteFile(chunkKey);
+                    throw new IllegalArgumentException("上传分片大小超过限制：" +
+                            DataSize.ofBytes(maxChunkSize).toMegabytes() + "MB");
+                }
+                os.write(buffer, 0, bytesRead);
+            }
+        }
+        // =========================================================
 
         FileChunk chunk = new FileChunk();
         chunk.setFileId(fileId);
         chunk.setChunkIndex(chunkIndex);
         chunk.setKey(chunkKey);
         chunk.setStatus(FileChunkStatus.INIT.getCode());
-        chunk.setSize(readSize);
+        chunk.setSize(actualReadSize); // 填入实际读取的尺寸
 
         fileChunkMapper.insertChunk(chunk);
     }

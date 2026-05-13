@@ -32,6 +32,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -82,7 +83,24 @@ public class WareService {
         validateWritePermission();
 
         String actualPath = buildActualPath(path);
-        return fsService.deleteDirObject(actualPath);
+
+// 1. 在底层删除之前，先查询出该目录节点及其所有子孙节点的ID
+        Node dirNode = nodeMapper.selectNodeByPath(actualPath);
+        if (dirNode == null) {
+            throw new IllegalArgumentException("目录不存在");
+        }
+
+        // 获取所有子孙节点ID
+        List<Long> descendantIds = new ArrayList<>(nodeMapper.selectAllDescendantIds(dirNode.getId()));
+        // 不要忘记把当前目录本身的ID也加进去
+        descendantIds.add(dirNode.getId());
+
+        // 2. 调用底层文件系统删除节点和物理文件
+        VoidResult result = fsService.deleteDirObject(actualPath);
+
+        // 3. 批量删除相关的 AI metadata 元数据
+        nodeMetadataMapper.deleteByNodeIds(descendantIds);
+        return result;
     }
 
 
@@ -94,7 +112,11 @@ public class WareService {
         validateWritePermission();
 
         String actualPath = buildActualPath(path);
-        return fsService.deleteFileObject(actualPath);
+        Node node = nodeMapper.selectNodeByPath(actualPath);
+
+        VoidResult result = fsService.deleteFileObject(actualPath);
+        nodeMetadataMapper.deleteByNodeId(node.getId());
+        return result;
     }
 
     /**

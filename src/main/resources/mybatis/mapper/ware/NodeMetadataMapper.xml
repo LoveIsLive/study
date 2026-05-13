@@ -73,4 +73,11 @@
         WHERE node_id = #{nodeId,jdbcType=BIGINT}
     </delete>
 
+    <delete id="deleteByNodeIds">
+        DELETE FROM node_metadata WHERE node_id IN
+        <foreach collection="nodeIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
 </mapper>

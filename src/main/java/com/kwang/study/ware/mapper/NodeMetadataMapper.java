@@ -36,4 +36,7 @@ public interface NodeMetadataMapper {
      * 根据nodeId删除元数据
      */
     int deleteByNodeId(@Param("nodeId") Long nodeId);
+
+    // 新增：批量删除节点元数据
+    int deleteByNodeIds(@Param("nodeIds") List<Long> nodeIds);
 }
