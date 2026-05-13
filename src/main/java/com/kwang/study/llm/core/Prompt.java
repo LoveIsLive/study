@@ -15,6 +15,7 @@ import com.kwang.study.utils.StreamUtil;
 import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.*;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 import static com.kwang.study.constant.ApiPrefixConstant.LLM_BASE_PREFIX;
 
 // 负责 user, ai, tool的消息
+@Slf4j
 public class Prompt {
 
     // Getter 供 LLM 调用时获取底层 Message 列表
@@ -146,7 +148,10 @@ public class Prompt {
                                     .text(new String(bytes))
                                     .build());
                         } catch (IOException e) {
-                            throw new RuntimeException("读取文件失败: " + file.getFileName(), e);
+                            log.warn("读取文件失败: {}, 异常信息", file.getFileName(), e);
+                            return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
+                                    .text("未找到文件：" + file.getFileName())
+                                    .build());
                         }
                     } else if (file.getMimeTypeName().startsWith("video/")) {
                         // 视频处理
