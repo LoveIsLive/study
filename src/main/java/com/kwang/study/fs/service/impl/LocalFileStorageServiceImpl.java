@@ -734,6 +734,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
             node.setParentId(destParentNode.getId());
             node.setName(destPath.getName());
             node.setType(ObjectTypeEnum.FILE.getCode());
+            node.setIsHidden(0);
             node.setSize(fileSize);
             node.setHashId(hashRefNum.getId());
             node.setMimeTypeId(mimeTypeId == null ? 1 : mimeTypeId); // 兜底
@@ -854,6 +855,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
                             node.setParentId(parentNode.getId());
                             node.setName(targetRes.getName());
                             node.setType(ObjectTypeEnum.FILE.getCode());
+                            node.setIsHidden(0);
                             node.setSize(fileSize);
                             node.setHashId(hashRefNum.getId());
                             node.setMimeTypeId(mimeTypeId == null ? 1 : mimeTypeId);
@@ -882,6 +884,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         newNode.setParentId(parentNode == null ? null : parentNode.getId());
         newNode.setName(res.getName());
         newNode.setType(ObjectTypeEnum.DIR.getCode());
+        newNode.setIsHidden(0);
         newNode.setSize(0L);
         nodeMapper.insertNode(newNode);
         return newNode;
