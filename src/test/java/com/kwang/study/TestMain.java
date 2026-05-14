@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import static com.kwang.study.llm.service.RAG.MIND_BLOCK_GEN_SYSTEM_PROMPT;
+
 public class TestMain {
     public static void main(String[] args) throws Exception {
         // 1. 定义模版 (Java 11 只能用 + 号拼接换行，虽然丑但在 Java 11 没办法)
@@ -79,7 +81,7 @@ public class TestMain {
 
     @Test
     public void f1() throws Exception {
-        System.out.println(Pattern.compile("[<>&|;`$\"'*?#~!:]").matcher("/").matches());
+        System.out.println(MIND_BLOCK_GEN_SYSTEM_PROMPT);
     }
 
 }

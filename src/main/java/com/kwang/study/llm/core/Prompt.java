@@ -171,6 +171,9 @@ public class Prompt {
                                 .build();
                         return ChatCompletionContentPart.ofText(videoPart);
                     } else {
+                        if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
+                            throw new IllegalArgumentException("文件太大，超过7MB");
+                        }
                         // taki兜底
                         String extractedText = DocumentParserUtil.extractText(file.getStream(), file.getFileName());
                         return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
