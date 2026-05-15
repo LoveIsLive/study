@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kwang.study.home.mapper.ClassHomeMapper">
+
+    <select id="selectByClassId" resultType="com.kwang.study.home.pojo.ClassHome">
+        SELECT class_id as classId, cover_image as coverImage, description, create_time as createTime, update_time as updateTime
+        FROM class_home
+        WHERE class_id = #{classId}
+    </select>
+
+    <insert id="insert" parameterType="com.kwang.study.home.pojo.ClassHome">
+        INSERT INTO class_home (class_id, cover_image, description, create_time, update_time)
+        VALUES (#{classId}, #{coverImage}, #{description}, NOW(), NOW())
+    </insert>
+
+    <update id="update" parameterType="com.kwang.study.home.pojo.ClassHome">
+        UPDATE class_home
+        <set>
+            <if test="coverImage != null">
+                cover_image = #{coverImage},
+            </if>
+            <if test="description != null">
+                description = #{description},
+            </if>
+            update_time = NOW()
+        </set>
+        WHERE class_id = #{classId}
+    </update>
+
+</mapper>

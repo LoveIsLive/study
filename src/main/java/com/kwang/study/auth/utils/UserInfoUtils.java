@@ -226,4 +226,20 @@ public class UserInfoUtils {
         if (inClassOfSchoolPrincipal(classId)) return true;
         return inClassTeacher(classId);
     }
+
+    /**
+     * 当前身份，在该班级拥有教师及以上权限
+     */
+    public boolean classTeacherUp(Long classId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return true;
+        if (inClassOfSchoolPrincipal(classId)) return true;
+        return inClassTeacher(classId);
+    }
+
+    public boolean classCommonRole(Long classId) {
+        if (AuthenticationUserUtil.currentUserIsAdmin()) return true;
+        if (inClassOfSchoolPrincipal(classId)) return true;
+        return inClass(classId);
+    }
+
 }
