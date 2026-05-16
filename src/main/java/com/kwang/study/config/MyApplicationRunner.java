@@ -1,7 +1,6 @@
 package com.kwang.study.config;
 
 import com.kwang.study.auth.config.JWTConfig;
-import com.kwang.study.index.config.TimeLineConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -21,9 +20,6 @@ public class MyApplicationRunner implements ApplicationRunner {
 
     @Autowired
     private JWTConfig jwtConfig;
-
-    @Autowired(required = false)
-    private TimeLineConfig timeLineConfig;
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
