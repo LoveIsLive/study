@@ -10,8 +10,10 @@ import com.kwang.study.organization.service.ClassMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 import java.util.List;
@@ -33,6 +35,28 @@ public class ClassMemberController {
     @PostMapping("/add")
     public ResponseEntity<R<List<String>>> addMembers(@PathVariable Long classId, @Valid @RequestBody ClassMemberAddDTO dto) {
         return ResponseEntity.ok(R.success(classMemberService.addMembers(classId, dto)));
+    }
+
+    /**
+     * 通过 Excel 批量导入班级成员
+     * @param classId 班级ID
+     * @param file Excel文件
+     * @return 操作结果反馈
+     */
+    @PostMapping("/import")
+    public ResponseEntity<R<List<String>>> importMembersFromExcel(
+            @PathVariable Long classId,
+            @RequestParam("file") MultipartFile file) {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(R.error("上传的文件不能为空"));
+        }
+        if (file.getSize() > DataSize.parse("1MB").toBytes()) {
+            return ResponseEntity.badRequest().body(R.error("上传的文件超过1MB"));
+        }
+
+        List<String> result = classMemberService.importMembersFromExcel(classId, file);
+        return ResponseEntity.ok(R.success(result, "Excel处理完成"));
     }
 
     /**

@@ -1,11 +1,13 @@
 package com.kwang.study.organization.service;
 
+import com.alibaba.excel.EasyExcel;
 import com.kwang.study.auth.constant.AuthConstant;
 import com.kwang.study.auth.mapper.UserMapper;
 import com.kwang.study.auth.pojo.User;
 import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.auth.utils.UserInfoUtils;
 import com.kwang.study.organization.dto.request.ClassMemberAddDTO;
+import com.kwang.study.organization.dto.request.ClassMemberExcelDTO;
 import com.kwang.study.organization.dto.request.GuestCourseUpdateDTO;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
 import com.kwang.study.organization.mapper.ClassMemberMapper;
@@ -20,9 +22,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.kwang.study.auth.constant.AuthConstant.DEFAULT_PASSWORD;
 
 @Service
 @Slf4j
@@ -65,7 +72,7 @@ public class ClassMemberService {
                 // 3. 创建用户
                 User user = new User();
                 user.setUsername(rawUserName);
-                user.setPassword(passwordEncoder.encode(AuthConstant.DEFAULT_PASSWORD));
+                user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
                 user.setEnabled(true);
                 userMapper.insertUser(user);
                 existingUser = user;
@@ -77,10 +84,12 @@ public class ClassMemberService {
             member.setUserId(existingUser.getId());
             member.setRole(dto.getRole());
             newMembers.add(member);
-            userInfoUtils.deleteUserCache(existingUser.getId());
         }
 
         if (!newMembers.isEmpty()) {
+            userInfoUtils.deleteUsersCache(newMembers.stream()
+                    .map(ClassMember::getUserId)
+                    .collect(Collectors.toList()));
             classMemberMapper.batchInsert(newMembers);
 
             // === 新增：如果是访客角色，需要向 course_guests 表插入授权数据 ===
@@ -104,6 +113,98 @@ public class ClassMemberService {
             }
         }
         return feedbackMessages; // 返回反馈信息
+    }
+
+    /**
+     * 通过 Excel 导入班级成员
+     */
+    @Transactional
+    public List<String> importMembersFromExcel(Long classId, MultipartFile file) {
+        // 1. 校验班级与权限
+        Classes classes = classesMapper.findById(classId);
+        Assert.notNull(classes, "班级不存在");
+        checkWritePermission(classes);
+
+        // 2. 解析 Excel 数据
+        List<ClassMemberExcelDTO> dtoList;
+        try {
+            dtoList = EasyExcel.read(file.getInputStream())
+                    .head(ClassMemberExcelDTO.class)
+                    .sheet()
+                    .doReadSync(); // 同步读取（因为单班级数据量一般不大，直接读入内存）
+        } catch (Exception e) {
+            log.error("解析Excel失败", e);
+            throw new IllegalArgumentException("Excel文件解析失败，请检查文件格式");
+        }
+
+        List<String> feedbackMessages = new ArrayList<>();
+        List<ClassMember> newMembers = new ArrayList<>();
+
+        // 3. 遍历处理数据
+        for (ClassMemberExcelDTO row : dtoList) {
+            String rawUsername = row.getUsername();
+            // 忽略用户名为空的行
+            if (!StringUtils.hasText(rawUsername)) {
+                continue;
+            }
+            rawUsername = rawUsername.trim();
+
+            // 解析密码（为空默认为 123456）
+            String rawPassword = StringUtils.hasText(row.getPassword()) ? row.getPassword().trim() : DEFAULT_PASSWORD;
+
+            // 解析角色（为空或不匹配默认为 学生）
+            String roleStr = row.getRole();
+            String roleEnum = ClassesRoleEnum.STUDENT.getRole();
+            if (StringUtils.hasText(roleStr)) {
+                roleStr = roleStr.trim();
+                if ("教师".equals(roleStr)) {
+                    roleEnum = ClassesRoleEnum.TEACHER.getRole();
+                } else if ("访客".equals(roleStr)) {
+                    roleEnum = ClassesRoleEnum.GUEST.getRole();
+                }
+            }
+
+            // 4. 检查用户是否存在
+            User existingUser = userMapper.findByUsername(rawUsername);
+            if (existingUser != null) {
+                ClassMember cm = classMemberMapper.findByClassIdAndUserId(classId, existingUser.getId());
+                if (cm != null) {
+                    feedbackMessages.add("用户 " + rawUsername + " 已在班级中，跳过");
+                    continue;
+                }
+            } else {
+                // 创建新用户
+                User user = new User();
+                user.setUsername(rawUsername);
+                user.setPassword(passwordEncoder.encode(rawPassword));
+                user.setEnabled(true);
+                userMapper.insertUser(user);
+                existingUser = user;
+            }
+
+            // 5. 建立班级关联
+            ClassMember member = new ClassMember();
+            member.setClassId(classId);
+            member.setUserId(existingUser.getId());
+            member.setRole(roleEnum);
+            newMembers.add(member);
+        }
+
+        // 6. 批量插入关联表
+        if (!newMembers.isEmpty()) {
+            userInfoUtils.deleteUsersCache(newMembers.stream()
+                    .map(ClassMember::getUserId)
+                    .collect(Collectors.toList()));
+
+            classMemberMapper.batchInsert(newMembers);
+            feedbackMessages.add(0, "成功导入 " + newMembers.size() + " 名新成员");
+
+            // 注意：Excel导入的"访客"默认没有分配课程。如有需求，前端需通过 /guest/{userId}/courses 接口后续分配。
+        } else {
+            feedbackMessages.add(0, "没有解析到有效的待导入数据");
+        }
+
+        return feedbackMessages;
     }
 
     /**

@@ -179,6 +179,14 @@
             <version>2.9.4</version>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/com.alibaba/easyexcel -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+            <version>4.0.3</version>
+            <scope>compile</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
