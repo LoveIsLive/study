@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 班级管理服务层
@@ -300,7 +301,9 @@ public class ClassesService {
      * 初始化班级文件目录
      */
     private void initializeClassDirectories(Long schoolId, Long classId) {
-        List<String> dirs = Arrays.stream(FileStorageModuleNameEnum.values())
+        List<String> dirs = Stream.of(FileStorageModuleNameEnum.WARE_NAME,
+                FileStorageModuleNameEnum.HOMEWORK_NAME,
+                FileStorageModuleNameEnum.LLMCHAT_NAME)
                 .map(m -> m.getModuleName() + "/" + schoolId + "/" + classId)
                 .collect(Collectors.toList());
 
