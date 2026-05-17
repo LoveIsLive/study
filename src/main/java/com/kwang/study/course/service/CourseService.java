@@ -11,8 +11,11 @@ import com.kwang.study.fs.dto.result.VoidResult;
 import com.kwang.study.fs.exception.PathAlreadyExistsException;
 import com.kwang.study.fs.service.FileStorageService;
 import com.kwang.study.organization.enums.ClassesRoleEnum;
+import com.kwang.study.organization.mapper.ClassesMapper;
 import com.kwang.study.organization.mapper.CourseGuestMapper;
 import com.kwang.study.organization.pojo.ClassMember;
+import com.kwang.study.organization.pojo.Classes;
+import com.kwang.study.organization.service.ClassesService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,12 +43,11 @@ public class CourseService {
     private final UserInfoUtils userInfoUtils;
     private final FileStorageService fsService;
     private final CourseGuestMapper courseGuestMapper; // 新增注入
+    private final ClassesMapper classesMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public Course createCourse(CourseDTO dto, MultipartFile coverImage) {
-        // 1. 强校验：仅当前班级的激活教师可创建课程
-        ClassMember activeCM = userInfoUtils.getCurrentActiveClassMember();
-        Assert.isTrue(activeCM != null && ClassesRoleEnum.TEACHER.getRole().equals(activeCM.getRole()), "请先切换到教师身份再创建课程");
+        Assert.isTrue(userInfoUtils.classTeacherUp(dto.getClassId()), "无权操作");
 
         // 存储图片
         String coverPath = "";
@@ -58,9 +60,11 @@ public class CourseService {
             }
         }
 
+        Classes classes = classesMapper.findById(dto.getClassId());
+
         // 2. 插入课程记录
         Course course = new Course();
-        course.setClassId(activeCM.getClassId());
+        course.setClassId(dto.getClassId());
         course.setTeacherId(AuthenticationUserUtil.getCurrentUserId());
         course.setName(dto.getName());
         course.setDescription(dto.getDescription());
@@ -69,7 +73,7 @@ public class CourseService {
 
         // 3. 自动在 VFS (虚拟文件系统) 中创建课程隔离目录
         // 路径为: /ware/{schoolId}/{classId}/{courseId}
-        initCourseWareDirectory(activeCM.getClasses().getSchoolId(), activeCM.getClassId(), course.getId());
+        initCourseWareDirectory(classes.getSchoolId(), dto.getClassId(), course.getId());
 
         return course;
     }
