@@ -302,8 +302,7 @@ public class ClassesService {
      */
     private void initializeClassDirectories(Long schoolId, Long classId) {
         List<String> dirs = Stream.of(FileStorageModuleNameEnum.WARE_NAME,
-                FileStorageModuleNameEnum.HOMEWORK_NAME,
-                FileStorageModuleNameEnum.LLMCHAT_NAME)
+                FileStorageModuleNameEnum.HOMEWORK_NAME)
                 .map(m -> m.getModuleName() + "/" + schoolId + "/" + classId)
                 .collect(Collectors.toList());
 
