@@ -126,58 +126,58 @@ public class Prompt {
 
         files.stream()
                 .map(file -> {
-                    if (file.getMimeTypeName().startsWith("image/")) {
-                        String imageUrl = null;
-                        if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
-                            imageUrl = OCR.base64Encoder(file);
-                        } else {
-                            int port = SpringContextUtil.getPort();
-                            imageUrl = "http://47.121.116.149:" + port + file.getPath();
-                        }
-                        return ChatCompletionContentPart.ofImageUrl(ChatCompletionContentPartImage.builder()
-                                .imageUrl(ChatCompletionContentPartImage.ImageUrl.builder()
-                                        .url(imageUrl)
-                                        .build())
-                                .build());
-                    } else if (file.getMimeTypeName().startsWith("text/")) {
-                        if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
-                            throw new IllegalArgumentException("文本文件太大，超过7MB");
-                        }
-                        try {
+                    try {
+                        if (file.getMimeTypeName().startsWith("image/")) {
+                            String imageUrl = null;
+                            if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
+                                imageUrl = OCR.base64Encoder(file);
+                            } else {
+                                int port = SpringContextUtil.getPort();
+                                imageUrl = "http://47.121.116.149:" + port + file.getPath();
+                            }
+                            return ChatCompletionContentPart.ofImageUrl(ChatCompletionContentPartImage.builder()
+                                    .imageUrl(ChatCompletionContentPartImage.ImageUrl.builder()
+                                            .url(imageUrl)
+                                            .build())
+                                    .build());
+                        } else if (file.getMimeTypeName().startsWith("text/")) {
+                            if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
+                                throw new IllegalArgumentException("文本文件太大，超过7MB");
+                            }
                             byte[] bytes = StreamUtil.readExactly(file.getStream(), Math.toIntExact(file.getFileSize()));
                             return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
                                     .text(new String(bytes))
                                     .build());
-                        } catch (IOException e) {
-                            log.warn("读取文件失败: {}, 异常信息", file.getFileName(), e);
+                        } else if (file.getMimeTypeName().startsWith("video/")) {
+                            // 视频处理
+                            String videoUrl = null;
+                            if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
+                                videoUrl = OCR.base64Encoder(file);
+                            } else {
+                                int port = SpringContextUtil.getPort();
+                                videoUrl = "http://47.121.116.149:" + port +
+                                        LLM_BASE_PREFIX + "/getFile?path=" + file.getPath();
+                            }
+                            ChatCompletionContentPartText videoPart = ChatCompletionContentPartText.builder()
+                                    .text("") // 填入空字符串绕过 SDK 原生非空校验，模型会忽略这个空文本
+                                    .putAdditionalProperty("type", JsonValue.from("video_url")) // 强行注入 type
+                                    .putAdditionalProperty("video_url", JsonValue.from(Map.of("url", videoUrl))) // 注入 video_url 节点
+                                    .build();
+                            return ChatCompletionContentPart.ofText(videoPart);
+                        } else {
+                            if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
+                                throw new IllegalArgumentException("文件太大，超过7MB");
+                            }
+                            // taki兜底
+                            String extractedText = DocumentParserUtil.extractText(file.getStream(), file.getFileName());
                             return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
-                                    .text("未找到文件：" + file.getFileName())
+                                    .text(extractedText)
                                     .build());
                         }
-                    } else if (file.getMimeTypeName().startsWith("video/")) {
-                        // 视频处理
-                        String videoUrl = null;
-                        if (file.getFileSize() < DataSizeUtil.parse("7MB")) {
-                            videoUrl = OCR.base64Encoder(file);
-                        } else {
-                            int port = SpringContextUtil.getPort();
-                            videoUrl = "http://47.121.116.149:" + port +
-                                    LLM_BASE_PREFIX + "/getFile?path=" + file.getPath();
-                        }
-                        ChatCompletionContentPartText videoPart = ChatCompletionContentPartText.builder()
-                                .text("") // 填入空字符串绕过 SDK 原生非空校验，模型会忽略这个空文本
-                                .putAdditionalProperty("type", JsonValue.from("video_url")) // 强行注入 type
-                                .putAdditionalProperty("video_url", JsonValue.from(Map.of("url", videoUrl))) // 注入 video_url 节点
-                                .build();
-                        return ChatCompletionContentPart.ofText(videoPart);
-                    } else {
-                        if (file.getFileSize() > DataSizeUtil.parse("7MB")) {
-                            throw new IllegalArgumentException("文件太大，超过7MB");
-                        }
-                        // taki兜底
-                        String extractedText = DocumentParserUtil.extractText(file.getStream(), file.getFileName());
+                    } catch (IOException e) {
+                        log.warn("读取文件失败: {}, 异常信息", file.getFileName(), e);
                         return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
-                                .text(extractedText)
+                                .text("读取文件失败：" + file.getFileName())
                                 .build());
                     }
                 }).forEach(parts::add);
