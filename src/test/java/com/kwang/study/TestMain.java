@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import static com.kwang.study.llm.service.RAG.DEFAULT_SYSTEM_PROMPT;
 import static com.kwang.study.llm.service.RAG.MIND_BLOCK_GEN_SYSTEM_PROMPT;
 
 public class TestMain {
@@ -81,7 +82,7 @@ public class TestMain {
 
     @Test
     public void f1() throws Exception {
-        System.out.println(MIND_BLOCK_GEN_SYSTEM_PROMPT);
+        System.out.println(DEFAULT_SYSTEM_PROMPT);
     }
 
 }

@@ -109,6 +109,20 @@ public class RAG {
 
         StringBuilder userString = new StringBuilder();
         userString.append("姓名：").append(user.getUsername()).append('；');
+        userString.append("角色：");
+        if (AuthenticationUserUtil.currentUserIsAdmin()) {
+            userString.append("管理员").append('；');
+        } else if (userInfoUtils.currentUserInSchoolIsPrincipal()) {
+            userString.append("校长").append('；');
+        } else if (userInfoUtils.currentUserInClassIsTeacher()) {
+            userString.append("教师").append('；');
+        } else if (userInfoUtils.currentUserInClassIsStudent()) {
+            userString.append("学生").append('；');
+        } else if (userInfoUtils.currentUserInClassIsGuest()) {
+            userString.append("访客").append('；');
+        } else {
+            userString.append("未知").append('；');
+        }
 
         String scene = request.getScene();
         map.putAll(Map.of("current_scene", scene,
@@ -140,10 +154,7 @@ public class RAG {
             "3. 拒绝回答: 如果问题超出教育教学范畴或违反法律法规，请礼貌拒绝。\n" +
             "\n" +
             "## 目标\n" +
-            "- 在不违反`约束与准则`的情况下尽可能的帮助用户。\n" +
-            "\n" +
-            "## 输出\n" +
-            "- 如果要求选择Tool，请选择最适合的Tool，比如图表比单纯的文字更好。";
+            "- 在不违反`约束与准则`的情况下尽可能的帮助用户。";
 
     public static final String HOMEWORK_GEN_SYSTEM_PROMPT = "## 系统背景\n" +
             "你正在运行于一个深度集成大模型的Web端智能教学系统中。该系统专为教育场景设计，旨在通过 AI 技术减轻教师重复性工作负担并支持学生个性化学习。\n" +
