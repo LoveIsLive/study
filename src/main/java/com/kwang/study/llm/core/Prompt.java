@@ -174,7 +174,7 @@ public class Prompt {
                                     .text(extractedText)
                                     .build());
                         }
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         log.warn("读取文件失败: {}, 异常信息", file.getFileName(), e);
                         return ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
                                 .text("读取文件失败：" + file.getFileName())
