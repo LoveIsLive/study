@@ -12,4 +12,5 @@ public class TrendItemDTO {
     private Integer classAverage;   // 班级平均分
     private Integer highestScore;   // 最高分
     private Integer submissionCount;// 提交人数 (教师视图)
+    private Integer fullScore;      // 满分分值
 }
