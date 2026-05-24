@@ -75,15 +75,17 @@ public class AnalysisService {
         Long studentId = AuthenticationUserUtil.getCurrentUserId();
         int totalHomeworks = homeworks.size();
         int submittedCount = 0;
-        int myTotalScore = 0;
-        int classTotalScore = 0;
+
+        // 改用 double 累加百分制折算后的得分
+        double myNormalizedScoreSum = 0.0;
+        double classNormalizedScoreSum = 0.0;
         int gradedHomeworkCount = 0;
 
         List<TrendItemDTO> trends = new ArrayList<>();
 
         // --- 雷达图能力聚合池 ---
-        Map<String, Integer> typeEarnedScore = new HashMap<>(); // 某个维度的实际得分
-        Map<String, Integer> typeTotalScore = new HashMap<>();  // 某个维度的总应得分
+        Map<String, Integer> typeEarnedScore = new HashMap<>();
+        Map<String, Integer> typeTotalScore = new HashMap<>();
 
         for (HomeworkDetail hw : homeworks) {
             List<HomeworkSubmissionDetail> subs = submissionMapper.findAllByHomeworkId(hw.getId());
@@ -95,7 +97,6 @@ public class AnalysisService {
                 submittedCount++;
             }
 
-            // 仅统计已批改的作业作为成绩趋势
             int classAvg = subs.isEmpty() ? 0 : (int) subs.stream()
                     .filter(s -> s.getScore() != null)
                     .mapToInt(HomeworkSubmissionDetail::getScore)
@@ -103,28 +104,29 @@ public class AnalysisService {
                     .orElse(0);
 
             Integer myScore = mySub.map(HomeworkSubmissionDetail::getScore).orElse(null);
+            int hwFullScore = getHomeworkTotalScore(hw);
 
             trends.add(TrendItemDTO.builder()
                     .homeworkId(hw.getId())
                     .homeworkTitle(hw.getTitle())
                     .myScore(myScore)
                     .classAverage(classAvg)
-                    .fullScore(getHomeworkTotalScore(hw))
+                    .fullScore(hwFullScore)
                     .build());
 
-            if (myScore != null) {
-                myTotalScore += myScore;
-                classTotalScore += classAvg;
+            if (myScore != null && hwFullScore > 0) {
+                // 将本次作业的个人得分与班级均分分别折算为百分制，并进行累加
+                myNormalizedScoreSum += (double) myScore / hwFullScore * 100.0;
+                classNormalizedScoreSum += (double) classAvg / hwFullScore * 100.0;
                 gradedHomeworkCount++;
 
-                // 解析雷达图数据
+                // 解析雷达图数据 (保持原样)
                 if ("STRUCTURED".equals(hw.getType()) && StringUtils.hasText(hw.getMetaData())
                         && StringUtils.hasText(mySub.get().getGradingData())) {
                     try {
                         HomeworkMetaDTO meta = objectMapper.readValue(hw.getMetaData(), HomeworkMetaDTO.class);
                         SubmissionGradingDTO grading = objectMapper.readValue(mySub.get().getGradingData(), SubmissionGradingDTO.class);
 
-                        // 构建题目元数据索引
                         Map<String, QuestionItemDTO> qMap = meta.getQuestions().stream()
                                 .collect(Collectors.toMap(QuestionItemDTO::getId, q -> q));
 
@@ -135,7 +137,6 @@ public class AnalysisService {
                                 QuestionItemDTO qMeta = qMap.get(qId);
 
                                 if (qMeta != null && earned != null && qMeta.getScore() != null) {
-                                    // 将底层题型转化为能力维度
                                     String abilityDimension = translateTypeToAbility(qMeta.getType());
                                     typeEarnedScore.put(abilityDimension, typeEarnedScore.getOrDefault(abilityDimension, 0) + earned);
                                     typeTotalScore.put(abilityDimension, typeTotalScore.getOrDefault(abilityDimension, 0) + qMeta.getScore());
@@ -149,7 +150,6 @@ public class AnalysisService {
             }
         }
 
-        // 计算各维度最终胜率 (%) 用于雷达图渲染
         Map<String, Integer> radarData = new HashMap<>();
         for (Map.Entry<String, Integer> entry : typeTotalScore.entrySet()) {
             String dimension = entry.getKey();
@@ -158,8 +158,9 @@ public class AnalysisService {
             radarData.put(dimension, total == 0 ? 0 : (int) Math.round((earned * 100.0) / total));
         }
 
-        int myAvg = gradedHomeworkCount == 0 ? 0 : myTotalScore / gradedHomeworkCount;
-        int classAvgTotal = gradedHomeworkCount == 0 ? 0 : classTotalScore / gradedHomeworkCount;
+        // 计算最终百分制均分并四舍五入
+        int myAvg = gradedHomeworkCount == 0 ? 0 : (int) Math.round(myNormalizedScoreSum / gradedHomeworkCount);
+        int classAvgTotal = gradedHomeworkCount == 0 ? 0 : (int) Math.round(classNormalizedScoreSum / gradedHomeworkCount);
 
         return CourseAnalyticsDTO.builder()
                 .role("STUDENT")
@@ -174,10 +175,11 @@ public class AnalysisService {
     // ================== 私有构建方法 (教师-课程) ==================
     private CourseAnalyticsDTO buildTeacherCourseAnalytics(Long courseId, Long classId, List<HomeworkDetail> homeworks) {
         List<TrendItemDTO> trends = new ArrayList<>();
-        int totalScoreAccumulator = 0;
+
+        // 改用 double 累加百分制折算后的班级均分
+        double classNormalizedScoreSum = 0.0;
         int validHomeworks = 0;
 
-        // 获取该班级下的所有学生名册
         List<ClassMember> students = new ArrayList<>();
         try {
             students = classMemberMapper.findUsersByClassIdAndRole(classId, ClassesRoleEnum.STUDENT.getRole());
@@ -188,7 +190,6 @@ public class AnalysisService {
         int totalExpectedSubmissions = homeworks.size() * students.size();
         int totalActualSubmissions = 0;
 
-        // 初始化学生提交映射，用于后续分析异动预警
         Map<Long, List<HomeworkSubmissionDetail>> studentSubmissionsMap = new HashMap<>();
         for (ClassMember student : students) {
             studentSubmissionsMap.put(student.getUserId(), new ArrayList<>());
@@ -209,21 +210,23 @@ public class AnalysisService {
                     .max()
                     .orElse(0);
 
+            int hwFullScore = getHomeworkTotalScore(hw);
+
             trends.add(TrendItemDTO.builder()
                     .homeworkId(hw.getId())
                     .homeworkTitle(hw.getTitle())
                     .classAverage(classAvg)
                     .highestScore(highest)
                     .submissionCount(subs.size())
-                    .fullScore(getHomeworkTotalScore(hw))
+                    .fullScore(hwFullScore)
                     .build());
 
-            if (classAvg > 0) {
-                totalScoreAccumulator += classAvg;
+            // 如果该作业有班级均分，将其折算为百分制得分率后累加
+            if (classAvg > 0 && hwFullScore > 0) {
+                classNormalizedScoreSum += (double) classAvg / hwFullScore * 100.0;
                 validHomeworks++;
             }
 
-            // 按学生归集本次作业的提交记录
             for (HomeworkSubmissionDetail sub : subs) {
                 if (studentSubmissionsMap.containsKey(sub.getStudentId())) {
                     studentSubmissionsMap.get(sub.getStudentId()).add(sub);
@@ -231,13 +234,12 @@ public class AnalysisService {
             }
         }
 
-        // 1. 计算全班平均提交率
         String submissionRate = "0%";
         if (totalExpectedSubmissions > 0) {
             submissionRate = Math.round((totalActualSubmissions * 100.0) / totalExpectedSubmissions) + "%";
         }
 
-        // 2. 分析异动预警名单 (学生姓名 -> 预警原因)
+        // 分析预警名单 (保持原样)
         Map<String, String> warningStudents = new LinkedHashMap<>();
         int totalHomeworkCount = homeworks.size();
 
@@ -257,7 +259,6 @@ public class AnalysisService {
                 } else if (subRate < 0.5) {
                     warningStudents.put(displayName, "作业缺交严重 (提交率 " + Math.round(subRate * 100) + "%)");
                 } else {
-                    // 分析已批改作业的平均得分比例
                     List<HomeworkSubmissionDetail> gradedSubs = studentSubs.stream()
                             .filter(s -> s.getScore() != null)
                             .collect(Collectors.toList());
@@ -291,7 +292,8 @@ public class AnalysisService {
                 .role("TEACHER")
                 .submissionRate(submissionRate)
                 .warningStudents(warningStudents)
-                .averageScore(validHomeworks == 0 ? 0 : totalScoreAccumulator / validHomeworks)
+                // 计算百分制下的班级整体得分均率并四舍五入
+                .averageScore(validHomeworks == 0 ? 0 : (int) Math.round(classNormalizedScoreSum / validHomeworks))
                 .trends(trends)
                 .build();
     }
