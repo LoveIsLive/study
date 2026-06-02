@@ -10,6 +10,7 @@
         <result property="username" column="username"/>
         <result property="password" column="password"/>
         <result property="enabled" column="enabled" />
+        <result property="passwordExpired" column="password_expired" />
         <!-- 其他User实体属性映射 -->
         <collection property="roles" ofType="com.kwang.study.auth.pojo.Role"
                     select="findRolesByUserId" column="id"/>
@@ -43,6 +44,7 @@
         <result property="username" column="username"/>
         <result property="password" column="password"/>
         <result property="enabled" column="enabled"/>
+        <result property="passwordExpired" column="password_expired" />
 
         <!-- 班级成员列表：注意 cm_id 的映射 -->
         <collection property="classMembers" ofType="com.kwang.study.organization.pojo.ClassMember">
@@ -92,6 +94,7 @@
             u.username,
             u.password,
             u.enabled,
+            u.password_expired,
             cm.id AS cm_id,
             cm.user_id AS cm_user_id,
             cm.role AS cm_role,
@@ -137,6 +140,7 @@
             u.username,
             u.password,
             u.enabled,
+            password_expired,
             cm.id AS cm_id,
             cm.user_id AS cm_user_id,
             cm.role AS cm_role,
@@ -175,18 +179,19 @@
 
     <!-- 1. 添加用户 -->
     <insert id="insertUser" parameterType="com.kwang.study.auth.pojo.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (username, password, enabled)
-        VALUES (#{username}, #{password}, #{enabled})
+        INSERT INTO users (username, password, enabled, password_expired)
+        VALUES (#{username}, #{password}, #{enabled}, COALESCE(#{passwordExpired}, 1))
     </insert>
 
     <insert id="insertUserBatch" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (username, password, enabled)
+        INSERT INTO users (username, password, enabled, password_expired)
         VALUES
         <foreach collection="userList" item="user" separator=",">
             (
             #{user.username},
             #{user.password},
-            #{user.enabled}
+            #{user.enabled},
+            COALESCE(#{user.passwordExpired}, 1)
             )
         </foreach>
     </insert>
@@ -203,6 +208,9 @@
             </if>
             <if test="enabled != null">
                 enabled = #{enabled},
+            </if>
+            <if test="passwordExpired != null">
+                password_expired = #{passwordExpired},
             </if>
         </set>
         WHERE id = #{id}

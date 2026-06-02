@@ -23,6 +23,8 @@ public class CustomUserDetails implements UserDetails {
     private String username;
     private String password;
     private boolean enabled;
+    private boolean passwordExpired;
+
     private Collection<? extends GrantedAuthority> authorities;
 
     // 关键：保存原始的身份列表，供 Filter 动态计算权限
@@ -62,6 +64,10 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public boolean isPasswordExpired() {
+        return passwordExpired;
     }
 }
 

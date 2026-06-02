@@ -62,6 +62,7 @@ public class SchoolMemberService {
                 newUser.setUsername(rawUsername);
                 newUser.setPassword(passwordEncoder.encode(AuthConstant.DEFAULT_PASSWORD));
                 newUser.setEnabled(true);
+                newUser.setPasswordExpired(true);
                 userMapper.insertUser(newUser);
                 existUser = newUser;
             }

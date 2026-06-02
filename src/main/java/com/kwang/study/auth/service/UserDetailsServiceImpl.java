@@ -39,6 +39,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .username(username)
                 .password(user.getPassword())
                 .enabled(user.getEnabled())
+                .passwordExpired(user.getPasswordExpired() != null && user.getPasswordExpired())
                 .classMembers(user.getClassMembers())   // 存储所有班级身份
                 .schoolMembers(user.getSchoolMembers()) // 存储所有学校身份
                 .authorities(baseAuthorities)           // 初始权限

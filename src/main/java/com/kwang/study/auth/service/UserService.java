@@ -32,7 +32,6 @@ public class UserService {
     @Transactional
     public PasswordUpdateResultDTO updateUserPassword(PasswordUpdateDTO dto) {
         PasswordUpdateResultDTO resultDTO = new PasswordUpdateResultDTO();
-        // 1. 获取当前登录用户的 ID
         Long currentUserId = AuthenticationUserUtil.getCurrentUserId();
         if (currentUserId == null) {
             resultDTO.setSuccess(Boolean.FALSE);
@@ -40,7 +39,6 @@ public class UserService {
             return resultDTO;
         }
 
-        // 2. 从数据库中获取完整的用户信息
         User currentUser = userMapper.findById(currentUserId);
         if (currentUser == null) {
             resultDTO.setSuccess(Boolean.FALSE);
@@ -48,8 +46,6 @@ public class UserService {
             return resultDTO;
         }
 
-        // 3. 验证旧密码是否匹配
-        //    passwordEncoder.matches(原始密码, 加密后的密码)
         boolean isOldPasswordMatch = passwordEncoder.matches(dto.getOldPassword(), currentUser.getPassword());
         if (!isOldPasswordMatch) {
             resultDTO.setSuccess(Boolean.FALSE);
@@ -57,15 +53,14 @@ public class UserService {
             return resultDTO;
         }
 
-        // 5. 将新密码加密
         String encodedNewPassword = passwordEncoder.encode(dto.getNewPassword());
 
-        // 6. 更新用户信息
+        // 更新密码，同时将 passwordExpired 标记置为 false
         User userToUpdate = new User();
         userToUpdate.setId(currentUserId);
         userToUpdate.setPassword(encodedNewPassword);
+        userToUpdate.setPasswordExpired(false); // 重置标记
 
-        // 7. 调用 Mapper 更新数据库
         int updatedRows = userMapper.updateUser(userToUpdate);
 
         if (updatedRows <= 0) {
@@ -73,7 +68,7 @@ public class UserService {
             resultDTO.setErrorMessage("修改密码失败");
             return resultDTO;
         }
-        // 清除用户数据
+
         redisTemplate.delete(USERINFO_PREFIX + currentUserId);
         return new PasswordUpdateResultDTO(true, "密码修改成功，请重新登录");
     }

@@ -74,6 +74,7 @@ public class ClassMemberService {
                 user.setUsername(rawUserName);
                 user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
                 user.setEnabled(true);
+                user.setPasswordExpired(true);
                 userMapper.insertUser(user);
                 existingUser = user;
             }
@@ -178,6 +179,7 @@ public class ClassMemberService {
                 user.setUsername(rawUsername);
                 user.setPassword(passwordEncoder.encode(rawPassword));
                 user.setEnabled(true);
+                user.setPasswordExpired(true);
                 userMapper.insertUser(user);
                 existingUser = user;
             }

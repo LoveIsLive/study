@@ -35,7 +35,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. 提取并验证 Token
         final String jwt = resolveToken(request);
         String username = null;
 
@@ -43,18 +42,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             username = jwtUtil.getUsernameFromToken(jwt);
         }
 
-        // 2. 如果获取到了用户名，且当前安全上下文未认证
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // 从 UserDetailsService 加载包含所有身份列表的 CustomUserDetails
             CustomUserDetails userDetails = (CustomUserDetails) this.userDetailsService.loadUserByUsername(username);
 
-            // 3. 【核心适配：动态计算权限】
-            List<GrantedAuthority> currentAuthorities = calculateCurrentAuthorities(request, userDetails);
+            // 【核心安全策略】：如果用户需要强制改密，且当前请求不是“修改密码”接口，也不是公开资源，则予以拦截
+            if (userDetails.isPasswordExpired() && !isAllowedPathForExpiredUser(request)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json;charset=UTF-8");
+                // 返回自定义 code（例如 40301），方便前端拦截器识别
+                response.getWriter().write("{\"code\":40301,\"message\":\"Password expired, please update your password first.\"}");
+                return;
+            }
 
-            // 4. 将计算后的权限注入 UserDetails 对象（以便后续代码能通过 getAuthorities 获取正确值）
+            List<GrantedAuthority> currentAuthorities = calculateCurrentAuthorities(request, userDetails);
             userDetails.setAuthorities(currentAuthorities);
 
-            // 5. 构建并设置 Spring Security 认证对象
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                     userDetails, null, currentAuthorities);
 
@@ -63,6 +65,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 判断是否是处于强制改密期的用户允许访问的路径
+     */
+    private boolean isAllowedPathForExpiredUser(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String method = request.getMethod();
+
+        // 允许调用修改密码接口 (例如：PUT /api/v1/user/password)
+        // 请根据 com.kwang.study.constant.ApiPrefixConstant.USER_BASE_PREFIX 的具体值进行匹配
+        return uri.endsWith("/user/password") && "PUT".equalsIgnoreCase(method);
     }
 
     /**

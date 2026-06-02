@@ -1,6 +1,8 @@
 package com.kwang.study.auth.controller;
 
+import com.kwang.study.auth.custom.CustomUserDetails;
 import com.kwang.study.auth.dto.request.LoginRequestDTO;
+import com.kwang.study.auth.dto.result.LoginResultDTO;
 import com.kwang.study.common.R;
 import com.kwang.study.auth.component.JwtUtil;
 import com.kwang.study.auth.service.LoginAttemptService;
@@ -43,11 +45,10 @@ public class AuthController {
     private final ClassesMapper classesMapper;
 
     @PostMapping("/login")
-    public ResponseEntity<R<String>> login(@Valid @RequestBody LoginRequestDTO request) {
+    public ResponseEntity<R<LoginResultDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
         String username = request.getUsername();
 
         if (loginAttemptService.isBlocked(username)) {
-            // 返回 429 Too Many Requests 状态码，或者自定义的错误体
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(R.error("登录尝试次数过多，请明天再试。"));
         }
@@ -56,13 +57,18 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, request.getPassword()));
             loginAttemptService.loginSucceeded(username);
-            // 如果认证成功，生成JWT
+
+            // 生成JWT
             String token = jwtUtil.generateToken(authentication);
-            return ResponseEntity.ok(R.success(token));
+
+            // 获取用户凭证并检查是否需要修改密码
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+            boolean needPasswordChange = userDetails.isPasswordExpired();
+
+            LoginResultDTO responseData = new LoginResultDTO(token, needPasswordChange);
+            return ResponseEntity.ok(R.success(responseData));
         } catch (BadCredentialsException e) {
-            // 3. 如果认证失败（密码错误），记录失败次数
             loginAttemptService.loginFailed(username);
-            // 返回标准的认证失败信息
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(R.error("用户名或密码错误！"));
         }
     }
