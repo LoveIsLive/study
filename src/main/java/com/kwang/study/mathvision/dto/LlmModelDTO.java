@@ -17,6 +17,4 @@ public class LlmModelDTO {
     private Boolean supportThinking;
     private Integer contextWindow;
     private Integer maxOutputTokens;
-    /** remote / cache */
-    private String source;
 }

@@ -1,7 +1,12 @@
 package com.kwang.study.mathvision.service;
 
+import com.kwang.study.mathvision.config.MathVisionModelCatalog;
+import com.kwang.study.mathvision.config.MathVisionModelCatalog.ModelCatalog;
+import com.kwang.study.mathvision.config.MathVisionModelCatalog.ProviderCatalog;
 import com.kwang.study.mathvision.dto.CredentialTestResultVO;
+import com.kwang.study.mathvision.dto.LlmModelDTO;
 import com.kwang.study.mathvision.dto.ProviderInfoVO;
+import com.kwang.study.mathvision.dto.ProviderModelsVO;
 import com.kwang.study.mathvision.enums.ProviderEnum;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
 import com.kwang.study.mathvision.pojo.LlmModelConfig;
@@ -18,6 +23,7 @@ import java.util.List;
 
 /**
  * LLM 模型 / API Key 配置服务。
+ * 供应商与模型目录来自 Nacos (MathVisionModelCatalog); 用户 API Key 存 DB。
  */
 @Service
 public class LlmModelConfigService {
@@ -27,28 +33,46 @@ public class LlmModelConfigService {
     private final LlmModelConfigMapper configMapper;
     private final ApiKeyCipher cipher;
     private final ProviderAdapterRegistry adapterRegistry;
+    private final MathVisionModelCatalog catalog;
 
     public LlmModelConfigService(LlmModelConfigMapper configMapper,
                                  ApiKeyCipher cipher,
-                                 ProviderAdapterRegistry adapterRegistry) {
+                                 ProviderAdapterRegistry adapterRegistry,
+                                 MathVisionModelCatalog catalog) {
         this.configMapper = configMapper;
         this.cipher = cipher;
         this.adapterRegistry = adapterRegistry;
+        this.catalog = catalog;
     }
 
-    /** 列出全部固定厂家 + 当前用户配置状态。 */
+    /** 列出目录中启用的供应商 + 当前用户的配置状态。 */
     public List<ProviderInfoVO> listProviders(Long userId) {
         List<ProviderInfoVO> result = new ArrayList<>();
-        for (ProviderEnum provider : ProviderEnum.values()) {
+        for (ProviderCatalog provider : catalog.enabledProviders()) {
             LlmModelConfig cfg = configMapper.findByOwnerAndProvider(userId, provider.getCode());
             result.add(toInfoVO(provider, cfg));
         }
         return result;
     }
 
+    /** 返回某供应商目录中的可用模型列表 (含能力声明)。 */
+    public ProviderModelsVO listModels(String providerCode) {
+        ProviderCatalog provider = requireCatalogProvider(providerCode);
+        List<LlmModelDTO> models = new ArrayList<>();
+        if (provider.getModels() != null) {
+            for (ModelCatalog m : provider.getModels()) {
+                models.add(toModelDTO(provider.getCode(), m));
+            }
+        }
+        return ProviderModelsVO.builder()
+                .providerCode(provider.getCode())
+                .models(models)
+                .build();
+    }
+
     /** 设置 / 更新厂家 API Key。 */
     public ProviderInfoVO upsertCredential(Long userId, String providerCode, String apiKey) {
-        ProviderEnum provider = requireProvider(providerCode);
+        ProviderCatalog provider = requireCatalogProvider(providerCode);
         String encrypted = cipher.encrypt(apiKey.trim());
         String masked = cipher.mask(apiKey.trim());
 
@@ -73,13 +97,13 @@ public class LlmModelConfigService {
 
     /** 删除厂家 API Key; 只删当前用户自己的, 历史任务不受影响。 */
     public void deleteCredential(Long userId, String providerCode) {
-        ProviderEnum provider = requireProvider(providerCode);
+        ProviderCatalog provider = requireCatalogProvider(providerCode);
         configMapper.deleteByOwnerAndProvider(userId, provider.getCode());
     }
 
-    /** 测试厂家 API Key。 */
+    /** 测试厂家 API Key; baseUrl 取自目录, adapter 按 provider 分派。 */
     public CredentialTestResultVO testCredential(Long userId, String providerCode) {
-        ProviderEnum provider = requireProvider(providerCode);
+        ProviderCatalog provider = requireCatalogProvider(providerCode);
         LlmModelConfig cfg = configMapper.findByOwnerAndProvider(userId, provider.getCode());
         if (cfg == null || cfg.getApiKeyEncrypted() == null) {
             return CredentialTestResultVO.builder()
@@ -90,7 +114,8 @@ public class LlmModelConfigService {
                     .build();
         }
 
-        LlmProviderAdapter adapter = adapterRegistry.get(provider);
+        ProviderEnum providerEnum = ProviderEnum.fromCode(provider.getCode());
+        LlmProviderAdapter adapter = adapterRegistry.get(providerEnum);
         if (adapter == null) {
             return CredentialTestResultVO.builder()
                     .providerCode(provider.getCode())
@@ -101,7 +126,7 @@ public class LlmModelConfigService {
         }
 
         String apiKey = cipher.decrypt(cfg.getApiKeyEncrypted());
-        ProviderProbeResult probe = adapter.testCredential(apiKey, cfg.getBaseUrl());
+        ProviderProbeResult probe = adapter.testCredential(apiKey, provider.getBaseUrl());
 
         String status = probe.isSuccess() ? "enabled" : "invalid";
         cfg.setStatus(status);
@@ -117,11 +142,24 @@ public class LlmModelConfigService {
                 .build();
     }
 
-    private ProviderInfoVO toInfoVO(ProviderEnum provider, LlmModelConfig cfg) {
+    private LlmModelDTO toModelDTO(String providerCode, ModelCatalog m) {
+        return LlmModelDTO.builder()
+                .providerCode(providerCode)
+                .modelName(m.getModelName())
+                .displayName(m.getDisplayName() != null ? m.getDisplayName() : m.getModelName())
+                .supportVision(m.getSupportVision())
+                .supportJsonOutput(m.getSupportJsonOutput())
+                .supportThinking(m.getSupportThinking())
+                .contextWindow(m.getContextWindow())
+                .maxOutputTokens(m.getMaxOutputTokens())
+                .build();
+    }
+
+    private ProviderInfoVO toInfoVO(ProviderCatalog provider, LlmModelConfig cfg) {
         boolean configured = cfg != null && cfg.getApiKeyEncrypted() != null;
         return ProviderInfoVO.builder()
                 .providerCode(provider.getCode())
-                .providerName(provider.getDisplayName())
+                .providerName(provider.getName())
                 .configured(configured)
                 .status(configured ? (cfg.getStatus() == null ? "enabled" : cfg.getStatus()) : "not_configured")
                 .apiKeyMasked(configured ? cfg.getApiKeyMasked() : null)
@@ -129,10 +167,10 @@ public class LlmModelConfigService {
                 .build();
     }
 
-    private ProviderEnum requireProvider(String providerCode) {
-        ProviderEnum provider = ProviderEnum.fromCode(providerCode);
+    private ProviderCatalog requireCatalogProvider(String providerCode) {
+        ProviderCatalog provider = catalog.findEnabled(providerCode);
         if (provider == null) {
-            throw new IllegalArgumentException("不支持的模型厂家: " + providerCode);
+            throw new IllegalArgumentException("不支持或未启用的模型厂家: " + providerCode);
         }
         return provider;
     }

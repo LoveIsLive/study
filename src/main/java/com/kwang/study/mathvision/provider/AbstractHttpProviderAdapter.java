@@ -57,7 +57,11 @@ public abstract class AbstractHttpProviderAdapter implements LlmProviderAdapter 
         return HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    /** 解析 OpenAI 风格 { "data": [ { "id": "..." } ] } 模型列表。 */
+    /**
+     * 解析 OpenAI 风格 { "data": [ { "id": "..." } ] } 模型列表。
+     * 官方 OpenAI 返回体只有 id, 但部分兼容厂家 (Moonshot/Zhipu 等) 会附带
+     * context_length / max_tokens 等字段, 这里防御性解析, 拿到真值就填入。
+     */
     protected List<ProviderProbeResult.ProviderModel> parseOpenAiStyleModels(String body) throws Exception {
         List<ProviderProbeResult.ProviderModel> models = new ArrayList<>();
         JsonNode root = MAPPER.readTree(body);
@@ -65,12 +69,27 @@ public abstract class AbstractHttpProviderAdapter implements LlmProviderAdapter 
         if (data != null && data.isArray()) {
             for (JsonNode m : data) {
                 String id = m.path("id").asText("");
-                if (!id.isBlank()) {
-                    models.add(new ProviderProbeResult.ProviderModel(id, id));
+                if (id.isBlank()) {
+                    continue;
                 }
+                ProviderProbeResult.ProviderModel model = new ProviderProbeResult.ProviderModel(id, id);
+                model.setContextWindow(firstInt(m, "context_length", "context_window", "max_context_length"));
+                model.setMaxOutputTokens(firstInt(m, "max_output_tokens", "max_tokens", "max_completion_tokens"));
+                models.add(model);
             }
         }
         return models;
+    }
+
+    /** 依次尝试若干字段名, 返回首个存在且为正整数的值, 都没有则 null。 */
+    protected static Integer firstInt(JsonNode node, String... fields) {
+        for (String f : fields) {
+            JsonNode v = node.get(f);
+            if (v != null && v.canConvertToInt() && v.asInt() > 0) {
+                return v.asInt();
+            }
+        }
+        return null;
     }
 
     /** 截断厂商错误体, 避免过长日志/返回。 */

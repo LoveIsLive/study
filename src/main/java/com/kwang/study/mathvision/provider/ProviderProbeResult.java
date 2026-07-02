@@ -41,10 +41,18 @@ public class ProviderProbeResult {
         return models;
     }
 
-    /** adapter 返回的原始模型条目, 由 service 二次加工成 LlmModelDTO。 */
+    /**
+     * adapter 从厂家 /models 返回体解析出的模型条目。
+     * 能力 / 窗口字段可空: 非空表示厂家接口给了真值, 为空则由 service 侧启发式兜底。
+     */
     public static class ProviderModel {
         private final String modelName;
         private final String displayName;
+        private Integer contextWindow;
+        private Integer maxOutputTokens;
+        private Boolean supportVision;
+        private Boolean supportJsonOutput;
+        private Boolean supportThinking;
 
         public ProviderModel(String modelName, String displayName) {
             this.modelName = modelName;
@@ -57,6 +65,51 @@ public class ProviderProbeResult {
 
         public String getDisplayName() {
             return displayName;
+        }
+
+        public Integer getContextWindow() {
+            return contextWindow;
+        }
+
+        public ProviderModel setContextWindow(Integer contextWindow) {
+            this.contextWindow = contextWindow;
+            return this;
+        }
+
+        public Integer getMaxOutputTokens() {
+            return maxOutputTokens;
+        }
+
+        public ProviderModel setMaxOutputTokens(Integer maxOutputTokens) {
+            this.maxOutputTokens = maxOutputTokens;
+            return this;
+        }
+
+        public Boolean getSupportVision() {
+            return supportVision;
+        }
+
+        public ProviderModel setSupportVision(Boolean supportVision) {
+            this.supportVision = supportVision;
+            return this;
+        }
+
+        public Boolean getSupportJsonOutput() {
+            return supportJsonOutput;
+        }
+
+        public ProviderModel setSupportJsonOutput(Boolean supportJsonOutput) {
+            this.supportJsonOutput = supportJsonOutput;
+            return this;
+        }
+
+        public Boolean getSupportThinking() {
+            return supportThinking;
+        }
+
+        public ProviderModel setSupportThinking(Boolean supportThinking) {
+            this.supportThinking = supportThinking;
+            return this;
         }
     }
 }

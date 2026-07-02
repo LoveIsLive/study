@@ -17,8 +17,6 @@ public class LlmModelConfig {
     private Long ownerUserId;
     /** openai/anthropic/google/moonshot/zhipu */
     private String provider;
-    /** 系统固定, 用户不可改; 一般留空走默认 */
-    private String baseUrl;
     /** 应用层加密后的 API Key */
     private String apiKeyEncrypted;
     /** 脱敏展示值, 如 sk-****abcd */
@@ -34,10 +32,6 @@ public class LlmModelConfig {
     private Double topP;
     /** 供应商要求的额外 Header (JSON 文本) */
     private String extraHeadersJson;
-    /** 可用模型列表缓存 (JSON 文本, 含能力标记 vision/json/thinking/ctx) */
-    private String modelsCacheJson;
-    /** 模型列表最近同步时间 */
-    private LocalDateTime lastSyncTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

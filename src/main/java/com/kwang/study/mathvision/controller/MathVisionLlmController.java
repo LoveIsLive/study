@@ -6,6 +6,7 @@ import com.kwang.study.constant.ApiPrefixConstant;
 import com.kwang.study.mathvision.dto.CredentialTestResultVO;
 import com.kwang.study.mathvision.dto.ProviderCredentialDTO;
 import com.kwang.study.mathvision.dto.ProviderInfoVO;
+import com.kwang.study.mathvision.dto.ProviderModelsVO;
 import com.kwang.study.mathvision.service.LlmModelConfigService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -29,14 +30,14 @@ public class MathVisionLlmController {
         this.service = service;
     }
 
-    /** 5.1 获取系统支持的模型厂家 + 当前用户配置状态 */
+    /** 获取系统支持的模型厂家 + 当前用户配置状态 */
     @GetMapping("/providers")
     public ResponseEntity<R<List<ProviderInfoVO>>> listProviders() {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         return ResponseEntity.ok(R.success(service.listProviders(userId)));
     }
 
-    /** 5.2 设置 / 更新厂家 API Key */
+    /** 设置 / 更新厂家 API Key */
     @PutMapping("/providers/{providerCode}/credential")
     public ResponseEntity<R<ProviderInfoVO>> upsertCredential(
             @PathVariable String providerCode,
@@ -46,7 +47,7 @@ public class MathVisionLlmController {
         return ResponseEntity.ok(R.success(vo));
     }
 
-    /** 5.3 删除厂家 API Key */
+    /** 删除厂家 API Key */
     @DeleteMapping("/providers/{providerCode}/credential")
     public ResponseEntity<R<Void>> deleteCredential(@PathVariable String providerCode) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
@@ -54,10 +55,16 @@ public class MathVisionLlmController {
         return ResponseEntity.ok(R.success(null));
     }
 
-    /** 5.4 测试厂家 API Key */
+    /** 测试厂家 API Key */
     @PostMapping("/providers/{providerCode}/credential/test")
     public ResponseEntity<R<CredentialTestResultVO>> testCredential(@PathVariable String providerCode) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         return ResponseEntity.ok(R.success(service.testCredential(userId, providerCode)));
+    }
+
+    /** 获取某厂家在目录中的可用模型列表 (含能力声明) */
+    @GetMapping("/providers/{providerCode}/models")
+    public ResponseEntity<R<ProviderModelsVO>> listModels(@PathVariable String providerCode) {
+        return ResponseEntity.ok(R.success(service.listModels(providerCode)));
     }
 }

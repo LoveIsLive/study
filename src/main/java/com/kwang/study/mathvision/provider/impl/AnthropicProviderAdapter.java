@@ -46,7 +46,8 @@ public class AnthropicProviderAdapter extends AbstractHttpProviderAdapter {
         }
     }
 
-    /** Anthropic 返回 { "data": [ { "id": "...", "display_name": "..." } ] }。 */
+    /** Anthropic 返回 { "data": [ { "id": "...", "display_name": "..." } ] };
+     *  官方仅 id/display_name, 部分兼容代理附带 max_input_tokens/max_tokens, 存在则解析。 */
     private List<ProviderProbeResult.ProviderModel> parseModels(String body) throws Exception {
         List<ProviderProbeResult.ProviderModel> models = new ArrayList<>();
         JsonNode root = MAPPER.readTree(body);
@@ -56,7 +57,10 @@ public class AnthropicProviderAdapter extends AbstractHttpProviderAdapter {
                 String id = m.path("id").asText("");
                 if (!id.isBlank()) {
                     String display = m.path("display_name").asText(id);
-                    models.add(new ProviderProbeResult.ProviderModel(id, display));
+                    ProviderProbeResult.ProviderModel model = new ProviderProbeResult.ProviderModel(id, display);
+                    model.setContextWindow(firstInt(m, "max_input_tokens", "context_window", "context_length"));
+                    model.setMaxOutputTokens(firstInt(m, "max_output_tokens", "max_tokens"));
+                    models.add(model);
                 }
             }
         }

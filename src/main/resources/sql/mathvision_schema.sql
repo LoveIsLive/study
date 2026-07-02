@@ -14,11 +14,11 @@
 -- -------------------------------------------------------------
 -- 1) LLM 模型 / API Key 配置
 -- -------------------------------------------------------------
+-- 供应商与模型目录改由 Nacos (dataId: math-vision) 声明, 本表只存每用户每厂家的 API Key 凭据。
 CREATE TABLE `llm_model_configs` (
   `id`                 BIGINT       NOT NULL AUTO_INCREMENT,
-  `owner_user_id`      BIGINT       NOT NULL                COMMENT '配置所属用户ID (系统级 provider 基础信息走代码/Nacos)',
+  `owner_user_id`      BIGINT       NOT NULL                COMMENT '配置所属用户ID',
   `provider`           VARCHAR(32)  NOT NULL                COMMENT 'openai/anthropic/google/moonshot/zhipu',
-  `base_url`           VARCHAR(255) NULL                    COMMENT '系统固定, 用户不可改; 一般留空走默认',
   `api_key_encrypted`  TEXT         NULL                    COMMENT '应用层加密后的 API Key',
   `api_key_masked`     VARCHAR(64)  NULL                    COMMENT '脱敏展示值, 如 sk-****abcd',
   `status`             VARCHAR(16)  NOT NULL DEFAULT 'enabled' COMMENT 'enabled/disabled/invalid/not_configured',
@@ -28,13 +28,11 @@ CREATE TABLE `llm_model_configs` (
   `enable_thinking`    TINYINT(1)   NULL DEFAULT 0          COMMENT '是否启用 thinking',
   `top_p`              DOUBLE       NULL                    COMMENT '默认 top_p 参数',
   `extra_headers_json` JSON         NULL                    COMMENT '供应商要求的额外 Header',
-  `models_cache_json`  JSON         NULL                    COMMENT '可用模型列表缓存 (含能力标记 vision/json/thinking/ctx)',
-  `last_sync_time`     DATETIME     NULL                    COMMENT '模型列表最近同步时间',
   `create_time`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_owner_provider` (`owner_user_id`, `provider`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM 模型/API Key 配置';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM API Key 配置 (每用户每厂家)';
 
 
 -- -------------------------------------------------------------
