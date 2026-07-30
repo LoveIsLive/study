@@ -51,7 +51,8 @@ public class SecurityConfig {
                                 WARE_BASE_PREFIX + "/home/download",
                                 ATTACHE_DOWNLOAD_BASE_PREFIX + "/download",
                                 LLM_BASE_PREFIX + "/download",
-                                LLM_BASE_PREFIX + "/getFile"
+                                LLM_BASE_PREFIX + "/getFile",
+                                MATHVISION_BASE_PREFIX + "/download/download"
                         ).permitAll()
                         // 允许websocket握手请求
                         .antMatchers("/ws/search/**").permitAll()
@@ -59,6 +60,21 @@ public class SecurityConfig {
                         .antMatchers("/api/**").authenticated()
                         // 非API请求
                         .anyRequest().permitAll()
+                )
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.disable())
+                        .addHeaderWriter((request, response) -> {
+                            boolean mathVisionInlinePreview =
+                                    (request.getContextPath()
+                                            + MATHVISION_BASE_PREFIX
+                                            + "/download/download")
+                                            .equals(request.getRequestURI())
+                                            && "inline".equalsIgnoreCase(request.getParameter("mode"));
+                            response.setHeader(
+                                    "X-Frame-Options",
+                                    mathVisionInlinePreview ? "SAMEORIGIN" : "DENY"
+                            );
+                        })
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态session
                 .authenticationProvider(authenticationProvider())

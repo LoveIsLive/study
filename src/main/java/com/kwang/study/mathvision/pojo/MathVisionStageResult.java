@@ -2,6 +2,8 @@ package com.kwang.study.mathvision.pojo;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +19,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MathVisionStageResult {
     private Long id;
     private Long taskId;

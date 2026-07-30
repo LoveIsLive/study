@@ -2,6 +2,8 @@ package com.kwang.study.mathvision.pojo;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +13,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LlmModelConfig {
     private Long id;
     /** 配置所属用户 ID */

@@ -1,0 +1,347 @@
+# Canonical Nacos dataId: math-vision
+# Mirrors the active dev catalog. Runtime credentials remain user-owned in MySQL;
+# all non-secret model and workflow behavior is controlled by this Nacos document.
+workflow:
+  visualDesignSceneMaxRetries: 3
+  storyboardValidationMaxRetries: 5
+  placementEnrichmentMaxRetries: 3
+  storyboardCleanupConversationRounds: 8
+  placementEnrichmentConversationRounds: 4
+  codeGenerationMaxRetries: 2
+  codeGenerationRetryDelayMillis: 2000
+  codeEvaluationMaxRetries: 3
+  codeFixConversationRounds: 4
+  renderQuality: low
+  renderMaxRetries: 10
+  sceneEvaluationMaxRetries: 5
+  renderFixConversationRounds: 10
+  aiTraceEnabled: true
+  aiTraceMaxChars: 200000
+
+modelDefaults:
+  reasoningContentFallback: false
+  temperature: 0.6
+  requestTimeoutSeconds: 300
+  timeoutRetryAttempts: 1
+  timeoutRetryMultiplier: 2.0
+  maxRequestTimeoutSeconds: 900
+  emptyResponseRetries: 2
+  transientFailureRetries: 2
+  transientRetryBaseDelayMillis: 1000
+  transientRetryMaxDelayMillis: 4000
+  rateLimitRetries: 12
+  rateLimitBaseDelayMillis: 5000
+  rateLimitMaxDelayMillis: 300000
+  rateLimitJitterRatio: 0.25
+
+model-providers:
+  # ----------------------------- OpenAI -----------------------------
+  - code: openai
+    name: OpenAI
+    baseUrl: https://api.openai.com/v1
+    enabled: true
+    temperature: 0.6
+    models:
+      - modelName: gpt-5.5
+        displayName: GPT-5.5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1050000
+        maxOutputTokens: 128000
+      - modelName: gpt-5.5-pro
+        displayName: GPT-5.5 Pro
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1050000
+        maxOutputTokens: 128000
+      - modelName: gpt-5.4
+        displayName: GPT-5.4
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1050000
+        maxOutputTokens: 128000
+      - modelName: gpt-5.4-mini
+        displayName: GPT-5.4 mini
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+      - modelName: gpt-5.4-nano
+        displayName: GPT-5.4 nano
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+      - modelName: gpt-5.2
+        displayName: GPT-5.2
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+      - modelName: gpt-5
+        displayName: GPT-5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+      - modelName: gpt-5-mini
+        displayName: GPT-5 mini
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+      - modelName: gpt-5-nano
+        displayName: GPT-5 nano
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 400000
+        maxOutputTokens: 128000
+
+  # ----------------------------- Anthropic -----------------------------
+  - code: anthropic
+    name: Anthropic
+    baseUrl: https://api.anthropic.com/v1
+    enabled: true
+    adaptiveThinking: true
+    effort: high
+    models:
+      - modelName: claude-fable-5
+        displayName: Claude Fable 5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-opus-4-8
+        displayName: Claude Opus 4.8
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-sonnet-5
+        displayName: Claude Sonnet 5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-haiku-4-5-20251001
+        displayName: Claude Haiku 4.5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 64000
+      - modelName: claude-opus-4-7
+        displayName: Claude Opus 4.7
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-opus-4-6
+        displayName: Claude Opus 4.6
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-sonnet-4-6
+        displayName: Claude Sonnet 4.6
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 128000
+      - modelName: claude-sonnet-4-5-20250929
+        displayName: Claude Sonnet 4.5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 64000
+  # ----------------------------- Google Gemini -----------------------------
+  - code: google
+    name: Google Gemini
+    baseUrl: https://generativelanguage.googleapis.com/v1beta
+    enabled: true
+    temperature: 0.6
+    models:
+      - modelName: gemini-3.1-pro-preview
+        displayName: Gemini 3.1 Pro Preview
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-3.5-flash
+        displayName: Gemini 3.5 Flash
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-3.1-flash-lite
+        displayName: Gemini 3.1 Flash-Lite
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-3-pro-preview
+        displayName: Gemini 3 Pro Preview
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-3-flash-preview
+        displayName: Gemini 3 Flash Preview
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-2.5-pro
+        displayName: Gemini 2.5 Pro
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+      - modelName: gemini-2.5-flash
+        displayName: Gemini 2.5 Flash
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1048576
+        maxOutputTokens: 65536
+
+  # ----------------------------- 月之暗面 Moonshot -----------------------------
+  - code: moonshot
+    name: 月之暗面
+    baseUrl: https://api.moonshot.cn/v1
+    enabled: true
+    temperature: 0.6
+    reasoningContentFallback: true
+    timeoutRetryAttempts: 3
+    models:
+      - modelName: kimi-k2.7-code
+        displayName: Kimi K2.7 Code
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 262144
+        maxOutputTokens: 262144
+      - modelName: kimi-k2.7-code-highspeed
+        displayName: Kimi K2.7 Code Highspeed
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 262144
+        maxOutputTokens: 262144
+      - modelName: kimi-k2.6
+        displayName: Kimi K2.6
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        thinking: disabled
+        contextWindow: 262144
+        maxOutputTokens: 32768
+      - modelName: kimi-k2.5
+        displayName: Kimi K2.5
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        temperature: 1.0
+        contextWindow: 262144
+        maxOutputTokens: 32768
+      - modelName: kimi-k2-0905-preview
+        displayName: Kimi K2 0905 Preview
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 262144
+        maxOutputTokens: 262144
+      - modelName: kimi-k2-turbo-preview
+        displayName: Kimi K2 Turbo Preview
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 262144
+        maxOutputTokens: 262144
+      - modelName: moonshot-v1-128k-vision-preview
+        displayName: Moonshot v1 128k Vision
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: false
+        contextWindow: 131072
+        maxOutputTokens: 131072
+
+  # ----------------------------- 智谱 Zhipu -----------------------------
+  - code: zhipu
+    name: 智谱
+    baseUrl: https://open.bigmodel.cn/api/paas/v4
+    enabled: true
+    temperature: 0.4
+    reasoningContentFallback: true
+    models:
+      - modelName: glm-5.2
+        displayName: GLM-5.2
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 1000000
+        maxOutputTokens: 131072
+      - modelName: glm-5.1
+        displayName: GLM-5.1
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 131072
+      - modelName: glm-5-turbo
+        displayName: GLM-5-Turbo
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 131072
+      - modelName: glm-5v-turbo
+        displayName: GLM-5V-Turbo
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 131072
+      - modelName: glm-4.7
+        displayName: GLM-4.7
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 131072
+      - modelName: glm-4.6
+        displayName: GLM-4.6
+        supportVision: false
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 200000
+        maxOutputTokens: 131072
+      - modelName: glm-4.6v
+        displayName: GLM-4.6V
+        supportVision: true
+        supportJsonOutput: true
+        supportThinking: true
+        contextWindow: 131072
+        maxOutputTokens: 32768

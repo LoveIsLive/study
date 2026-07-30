@@ -29,6 +29,10 @@ public class MathVisionTaskDetailVO {
     private String modelName;
     private Integer currentVersion;
     private String lastConfirmedStage;
+    private Boolean cancelRequested;
+    private Integer currentArtifactVersion;
+    private String currentArtifactJson;
+    private String currentResultJson;
     private String finalArtifactPath;
     private String finalArtifactType;
     private String createTime;

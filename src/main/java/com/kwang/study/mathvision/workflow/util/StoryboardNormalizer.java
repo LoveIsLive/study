@@ -1,0 +1,329 @@
+package com.kwang.study.mathvision.workflow.util;
+
+import com.kwang.study.mathvision.workflow.model.Narrative.Storyboard;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardAction;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardConstraint;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardObject;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardPlacement;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardPlacementAxis;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardScene;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardStyle;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Normalizes a {@link Storyboard} by ensuring all fields have safe defaults.
+ * Used by VisualDesignNode and StoryboardValidationNode.
+ */
+public final class StoryboardNormalizer {
+
+    private StoryboardNormalizer() {}
+
+    public static Storyboard normalize(Storyboard storyboard) {
+        if (storyboard == null) {
+            return null;
+        }
+
+        if (storyboard.getGlobalVisualRules() == null) {
+            storyboard.setGlobalVisualRules(new ArrayList<>());
+        }
+        if (storyboard.getScenes() == null) {
+            storyboard.setScenes(new ArrayList<>());
+        }
+        if (storyboard.getContinuityPlan() == null || storyboard.getContinuityPlan().isBlank()) {
+            storyboard.setContinuityPlan(
+                    "Maintain one stable layout and update existing objects instead of redrawing the whole scene.");
+        }
+        storyboard.setCoordinateBounds(CoordinateBoundsUtils.normalize(storyboard.getCoordinateBounds()));
+
+        List<String> globalRules = new ArrayList<>(storyboard.getGlobalVisualRules());
+        if (globalRules.isEmpty()) {
+            globalRules.add("Keep absolute storyboard placements strictly inside coordinate_bounds.");
+            globalRules.add("Reuse stable anchors for persistent objects.");
+        }
+        storyboard.setGlobalVisualRules(globalRules);
+
+        if (storyboard.getObjectRegistry() == null) {
+            storyboard.setObjectRegistry(new ArrayList<>());
+        } else {
+            storyboard.setObjectRegistry(normalizeRegistryObjects(storyboard.getObjectRegistry()));
+            relocateMisownedObjectConstraints(storyboard.getObjectRegistry());
+        }
+
+        List<StoryboardScene> normalizedScenes = new ArrayList<>();
+        for (int i = 0; i < storyboard.getScenes().size(); i++) {
+            StoryboardScene scene = storyboard.getScenes().get(i);
+            if (scene == null) {
+                continue;
+            }
+            normalizeScene(scene, i);
+            normalizedScenes.add(scene);
+        }
+        storyboard.setScenes(normalizedScenes);
+        return storyboard;
+    }
+
+    public static void normalizeScene(StoryboardScene scene, int index) {
+        String sceneId = scene.getSceneId() == null || scene.getSceneId().isBlank()
+                ? "scene_" + (index + 1)
+                : scene.getSceneId().trim();
+        scene.setSceneId(sceneId);
+
+        if (scene.getTitle() == null || scene.getTitle().isBlank()) {
+            scene.setTitle("Scene " + (index + 1));
+        }
+        if (scene.getGoal() == null || scene.getGoal().isBlank()) {
+            scene.setGoal(scene.getTitle());
+        }
+        if (scene.getNarration() == null || scene.getNarration().isBlank()) {
+            scene.setNarration(scene.getGoal());
+        }
+        if (scene.getDurationSeconds() <= 0) {
+            scene.setDurationSeconds(8);
+        }
+        if (scene.getCameraAnchor() == null || scene.getCameraAnchor().isBlank()) {
+            scene.setCameraAnchor("center");
+        }
+        if (scene.getCameraPlan() == null || scene.getCameraPlan().isBlank()) {
+            scene.setCameraPlan("Static 2D view.");
+        }
+        if (scene.getLayoutGoal() == null || scene.getLayoutGoal().isBlank()) {
+            scene.setLayoutGoal("Keep the layout stable and uncluttered.");
+        }
+        if (scene.getSafeAreaPlan() == null || scene.getSafeAreaPlan().isBlank()) {
+            scene.setSafeAreaPlan(
+                    "Keep absolute storyboard placements strictly inside coordinate_bounds and keep relative labels readable around their anchors.");
+        }
+        if (scene.getScreenOverlayPlan() == null || scene.getScreenOverlayPlan().isBlank()) {
+            scene.setScreenOverlayPlan("No separate overlay needed.");
+        }
+        if (scene.getConstraints() == null) {
+            scene.setConstraints(new ArrayList<>());
+        }
+        if (scene.getStepRefs() == null) {
+            scene.setStepRefs(new ArrayList<>());
+        }
+        if (scene.getPersistentObjects() == null) {
+            scene.setPersistentObjects(new ArrayList<>());
+        }
+        if (scene.getExitingObjects() == null) {
+            scene.setExitingObjects(new ArrayList<>());
+        }
+        if (scene.getNotesForCodegen() == null) {
+            scene.setNotesForCodegen(new ArrayList<>());
+        }
+
+        scene.setEnteringObjects(normalizeScenePatchObjects(scene.getEnteringObjects(), sceneId, PatchMode.ENTERING));
+        scene.setPersistentObjects(normalizeScenePatchObjects(scene.getPersistentObjects(), sceneId, PatchMode.PERSISTENT));
+        scene.setExitingObjects(normalizeScenePatchObjects(scene.getExitingObjects(), sceneId, PatchMode.EXITING));
+        normalizeActions(scene);
+    }
+
+    private static List<StoryboardObject> normalizeRegistryObjects(List<StoryboardObject> objects) {
+        List<StoryboardObject> normalizedObjects = new ArrayList<>();
+        if (objects == null) {
+            return normalizedObjects;
+        }
+        for (StoryboardObject object : objects) {
+            if (object == null) {
+                continue;
+            }
+            object.setPlacement(null);
+            object.setStyle(normalizeStyle(object.getStyle()));
+            if (object.getConstraints() == null) {
+                object.setConstraints(new ArrayList<>());
+            }
+            normalizedObjects.add(object);
+        }
+        return normalizedObjects;
+    }
+
+    private static void relocateMisownedObjectConstraints(List<StoryboardObject> objects) {
+        Map<String, StoryboardObject> registryById = registryById(objects);
+        if (registryById.isEmpty()) {
+            return;
+        }
+        List<ConstraintMove> moves = new ArrayList<>();
+        for (StoryboardObject object : objects) {
+            String ownerId = objectId(object);
+            if (ownerId == null || object.getConstraints() == null || object.getConstraints().isEmpty()) {
+                continue;
+            }
+            Iterator<StoryboardConstraint> iterator = object.getConstraints().iterator();
+            while (iterator.hasNext()) {
+                StoryboardConstraint constraint = iterator.next();
+                String targetOwnerId = singleKnownConstraintOwnerId(constraint, registryById.keySet());
+                if (targetOwnerId == null || targetOwnerId.equals(ownerId)) {
+                    continue;
+                }
+                iterator.remove();
+                moves.add(new ConstraintMove(targetOwnerId, constraint));
+            }
+        }
+        for (ConstraintMove move : moves) {
+            StoryboardObject target = registryById.get(move.targetOwnerId);
+            if (target == null) {
+                continue;
+            }
+            if (target.getConstraints() == null) {
+                target.setConstraints(new ArrayList<>());
+            }
+            target.getConstraints().add(move.constraint);
+        }
+    }
+
+    private static String singleKnownConstraintOwnerId(StoryboardConstraint constraint, Set<String> knownIds) {
+        Set<String> ownerIds = StoryboardConstraintUtils.ownerIds(constraint);
+        if (ownerIds.size() != 1) {
+            return null;
+        }
+        String ownerId = ownerIds.iterator().next();
+        return knownIds.contains(ownerId) ? ownerId : null;
+    }
+
+    private static Map<String, StoryboardObject> registryById(List<StoryboardObject> objects) {
+        Map<String, StoryboardObject> registryById = new LinkedHashMap<>();
+        for (StoryboardObject object : objects) {
+            String id = objectId(object);
+            if (id != null) {
+                registryById.put(id, object);
+            }
+        }
+        return registryById;
+    }
+
+    private static String objectId(StoryboardObject object) {
+        if (object == null || object.getId() == null || object.getId().isBlank()) {
+            return null;
+        }
+        return object.getId().trim();
+    }
+
+    private static final class ConstraintMove {
+        private final String targetOwnerId;
+        private final StoryboardConstraint constraint;
+
+        private ConstraintMove(String targetOwnerId, StoryboardConstraint constraint) {
+            this.targetOwnerId = targetOwnerId;
+            this.constraint = constraint;
+        }
+    }
+
+    private static List<StoryboardObject> normalizeScenePatchObjects(List<StoryboardObject> objects,
+                                                                     String sceneId,
+                                                                     PatchMode mode) {
+        List<StoryboardObject> normalizedObjects = new ArrayList<>();
+        List<StoryboardObject> patchObjects = objects == null ? new ArrayList<>() : objects;
+        for (int j = 0; j < patchObjects.size(); j++) {
+            StoryboardObject object = patchObjects.get(j);
+            if (object == null) {
+                continue;
+            }
+
+            if (object.getId() != null && object.getId().isBlank()) {
+                object.setId(null);
+            }
+            object.setPlacement(normalizePlacement(object.getPlacement()));
+            object.setStyle(normalizeStyle(object.getStyle()));
+
+            if (mode == PatchMode.EXITING) {
+                object.setPlacement(null);
+                object.setStyle(null);
+            }
+
+            stripPatchOnlyFields(object, mode);
+            normalizedObjects.add(object);
+        }
+        return normalizedObjects;
+    }
+
+    private static void normalizeActions(StoryboardScene scene) {
+        List<StoryboardAction> normalizedActions = new ArrayList<>();
+        List<StoryboardAction> actions = scene.getActions() == null
+                ? new ArrayList<>()
+                : scene.getActions();
+        for (int j = 0; j < actions.size(); j++) {
+            StoryboardAction action = actions.get(j);
+            if (action == null) {
+                continue;
+            }
+            if (action.getOrder() <= 0) {
+                action.setOrder(j + 1);
+            }
+            if (action.getType() == null || action.getType().isBlank()) {
+                action.setType("transform");
+            }
+            if (action.getTargets() == null) {
+                action.setTargets(new ArrayList<>());
+            }
+            if (action.getDescription() == null || action.getDescription().isBlank()) {
+                action.setDescription("Advance the explanation with a precise visual update.");
+            }
+            if (action.getVoiceoverText() == null || action.getVoiceoverText().isBlank()) {
+                action.setVoiceoverText(null);
+            } else {
+                action.setVoiceoverText(action.getVoiceoverText().trim());
+            }
+            if (action.getExpectedSeconds() != null && action.getExpectedSeconds() <= 0) {
+                action.setExpectedSeconds(null);
+            }
+            normalizedActions.add(action);
+        }
+        scene.setActions(normalizedActions);
+    }
+
+    private static void stripPatchOnlyFields(StoryboardObject object, PatchMode mode) {
+        object.setKind(null);
+        object.setContent(null);
+        object.setConstraints(new ArrayList<>());
+        if (mode == PatchMode.EXITING) {
+            object.setStyle(null);
+        }
+    }
+
+    private static StoryboardStyle normalizeStyle(StoryboardStyle style) {
+        return style != null && style.hasData() ? style : null;
+    }
+
+    private static StoryboardPlacement normalizePlacement(StoryboardPlacement placement) {
+        if (placement == null) {
+            return null;
+        }
+
+        if (placement.getPositioning() != null && placement.getPositioning().isBlank()) {
+            placement.setPositioning(null);
+        }
+        placement.setX(normalizePlacementAxis(placement.getX()));
+        placement.setY(normalizePlacementAxis(placement.getY()));
+        placement.setZ(normalizePlacementAxis(placement.getZ()));
+        return placement.hasData() ? placement : null;
+    }
+
+    private static StoryboardPlacementAxis normalizePlacementAxis(StoryboardPlacementAxis axis) {
+        if (axis == null || !axis.hasData()) {
+            return null;
+        }
+        return axis;
+    }
+
+    public static int calculateStoryboardDuration(Storyboard storyboard, int fallbackDuration) {
+        if (storyboard == null || storyboard.getScenes() == null || storyboard.getScenes().isEmpty()) {
+            return fallbackDuration;
+        }
+        int total = storyboard.getScenes().stream()
+                .mapToInt(StoryboardScene::getDurationSeconds)
+                .sum();
+        return total > 0 ? total : fallbackDuration;
+    }
+
+    private enum PatchMode {
+        ENTERING,
+        PERSISTENT,
+        EXITING
+    }
+}

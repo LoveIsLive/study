@@ -21,6 +21,9 @@ public interface MathVisionStageResultMapper {
                                                  @Param("stage") String stage,
                                                  @Param("version") Integer version);
 
+    @Delete("DELETE FROM mathvision_stage_results WHERE task_id = #{taskId}")
+    int deleteByTaskId(Long taskId);
+
     @Update("UPDATE mathvision_stage_results SET result_json = #{resultJson}, update_time = NOW() WHERE id = #{id}")
     void updateResultJson(MathVisionStageResult result);
 }

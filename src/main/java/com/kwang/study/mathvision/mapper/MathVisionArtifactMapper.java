@@ -32,6 +32,9 @@ public interface MathVisionArtifactMapper {
     @Select("SELECT * FROM mathvision_artifacts WHERE task_id = #{taskId} AND stage = #{stage} ORDER BY version ASC")
     List<MathVisionArtifact> findByTaskStage(@Param("taskId") Long taskId, @Param("stage") String stage);
 
+    @Delete("DELETE FROM mathvision_artifacts WHERE task_id = #{taskId}")
+    int deleteByTaskId(Long taskId);
+
     /** 原地更新产物内容 (仅未确认的私有行可用, 见 Copy-on-Write 不变式) */
     @Update("UPDATE mathvision_artifacts SET artifact_json = #{artifactJson}, " +
             "change_source = #{changeSource}, change_summary = #{changeSummary}, update_time = NOW() " +

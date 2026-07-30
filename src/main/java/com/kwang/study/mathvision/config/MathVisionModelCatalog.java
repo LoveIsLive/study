@@ -26,6 +26,12 @@ public class MathVisionModelCatalog {
     /** 对应配置根键 model-providers */
     private List<ProviderCatalog> modelProviders = new ArrayList<>();
 
+    /** 工作流运行参数也由同一个 Nacos dataId 统一管理。 */
+    private WorkflowCatalog workflow = new WorkflowCatalog();
+
+    /** 模型未显式声明时使用的 Nacos 全局默认值。 */
+    private ModelDefaultsCatalog modelDefaults = new ModelDefaultsCatalog();
+
     /** 返回启用的供应商 */
     public List<ProviderCatalog> enabledProviders() {
         List<ProviderCatalog> list = new ArrayList<>();
@@ -69,6 +75,21 @@ public class MathVisionModelCatalog {
         private String code;
         private String name;
         private String baseUrl;
+        private String extraHeadersJson;
+        private Boolean reasoningContentFallback;
+        private Double temperature;
+        private Double topP;
+        private Boolean adaptiveThinking;
+        private String effort;
+        private String thinking;
+        private Integer requestTimeoutSeconds;
+        private Integer timeoutRetryAttempts;
+        private Double timeoutRetryMultiplier;
+        private Integer maxRequestTimeoutSeconds;
+        private Integer transientFailureRetries;
+        private Integer rateLimitRetries;
+        private Long rateLimitBaseDelayMillis;
+        private Long rateLimitMaxDelayMillis;
         private Boolean enabled;
         private List<ModelCatalog> models = new ArrayList<>();
     }
@@ -80,7 +101,60 @@ public class MathVisionModelCatalog {
         private Boolean supportVision;
         private Boolean supportJsonOutput;
         private Boolean supportThinking;
+        private Boolean reasoningContentFallback;
+        private Double temperature;
+        private Double topP;
+        private Boolean adaptiveThinking;
+        private String effort;
+        private String thinking;
+        private String extraHeadersJson;
         private Integer contextWindow;
         private Integer maxOutputTokens;
+        private Integer requestTimeoutSeconds;
+        private Integer timeoutRetryAttempts;
+        private Double timeoutRetryMultiplier;
+        private Integer maxRequestTimeoutSeconds;
+        private Integer transientFailureRetries;
+        private Integer rateLimitRetries;
+        private Long rateLimitBaseDelayMillis;
+        private Long rateLimitMaxDelayMillis;
+    }
+
+    @Data
+    public static class WorkflowCatalog {
+        private Integer visualDesignSceneMaxRetries = 3;
+        private Integer storyboardValidationMaxRetries = 5;
+        private Integer placementEnrichmentMaxRetries = 3;
+        private Integer storyboardCleanupConversationRounds = 8;
+        private Integer placementEnrichmentConversationRounds = 4;
+        private Integer codeGenerationMaxRetries = 2;
+        private Long codeGenerationRetryDelayMillis = 2_000L;
+        private Integer codeEvaluationMaxRetries = 3;
+        private Integer codeFixConversationRounds = 4;
+        private String renderQuality = "low";
+        private Integer renderMaxRetries = 10;
+        private Integer sceneEvaluationMaxRetries = 5;
+        private Integer renderFixConversationRounds = 10;
+        private Boolean aiTraceEnabled = true;
+        private Integer aiTraceMaxChars = 200_000;
+    }
+
+    @Data
+    public static class ModelDefaultsCatalog {
+        private Boolean reasoningContentFallback = false;
+        private Double temperature = 0.6D;
+        private Double topP;
+        private Integer requestTimeoutSeconds = 300;
+        private Integer timeoutRetryAttempts = 1;
+        private Double timeoutRetryMultiplier = 2.0D;
+        private Integer maxRequestTimeoutSeconds = 900;
+        private Integer emptyResponseRetries = 2;
+        private Integer transientFailureRetries = 2;
+        private Long transientRetryBaseDelayMillis = 1_000L;
+        private Long transientRetryMaxDelayMillis = 4_000L;
+        private Integer rateLimitRetries = 12;
+        private Long rateLimitBaseDelayMillis = 5_000L;
+        private Long rateLimitMaxDelayMillis = 300_000L;
+        private Double rateLimitJitterRatio = 0.25D;
     }
 }

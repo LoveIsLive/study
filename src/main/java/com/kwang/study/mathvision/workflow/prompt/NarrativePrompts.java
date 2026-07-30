@@ -1,0 +1,338 @@
+package com.kwang.study.mathvision.workflow.prompt;
+
+import com.kwang.study.mathvision.workflow.model.ProblemBundle;
+import com.kwang.study.mathvision.workflow.model.Narrative.Storyboard;
+import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
+
+/**
+ * Prompts for storyboard validation and codegen-prompt assembly.
+ * Used by StoryboardValidationNode (Stage 4) and CodeGenerationNode (Stage 5).
+ * Scene-level design rules live in {@link VisualDesignPrompts}.
+ */
+public final class NarrativePrompts {
+
+    private static final String COMMON_RULES =
+            "You are a STEM narrative designer validating and fixing a structured storyboard for a math teaching visualization.\n"
+                    + "The storyboard functions as a visual presentation plan rather than a written solution.\n"
+                    + "Introduce foundations before advanced content, and keep the storyboard continuity-safe.\n\n"
+                    + SystemPrompts.NARRATIVE_PHILOSOPHY
+                    + SystemPrompts.VISUAL_PLANNING_RULES
+                    + SystemPrompts.OBJECT_LIFECYCLE_RULES
+                    + "Layout rules:\n"
+                    + "- Treat all placement numbers as storyboard world coordinates. The storyboard must carry top-level `coordinate_bounds` that strictly contain resolved placements with at least 1 unit padding.\n"
+                    + "- Use `placement.positioning = absolute` for direct storyboard coordinates and `relative` for offsets from an anchor object.\n"
+                    + "- Keep simultaneous main visual elements around 7 to 10 unless several are quiet carry-over context.\n"
+                    + "- Place formulas near edges, not over the main geometry\n"
+                    + "- " + SystemPrompts.STORYBOARD_FIELD_GUIDE_OBJECT_SEMANTICS
+                    .replace("\n- ", "\n- ")
+                    .replace("How to interpret the storyboard fields:\n", "Field responsibilities: ").trim() + "\n"
+                    + "- " + SystemPrompts.STORYBOARD_FIELD_GUIDE_SCENE_STRUCTURE.trim() + "\n"
+                    + "- " + SystemPrompts.STORYBOARD_FIELD_GUIDE_SCENE_LAYOUT.trim() + "\n"
+                    + SystemPrompts.GEOMETRY_CONSTRAINT_AUTHORING_RULES
+                    + SystemPrompts.GEOMETRIC_MARKER_AUTHORING_RULES
+                    + SystemPrompts.MINIMIZE_HELPER_OBJECTS_AUTHORING_RULES
+                    + "Dimensionality rules:\n"
+                    + "- Problem dimensionality comes from ProblemBundle `scene_mode`; do not add `scene_mode` to storyboard scenes.\n"
+                    + "- Include explicit `camera_plan` when the problem-level scene_mode is 3d.\n"
+                    + "- Use `screen_overlay_plan` when text must stay fixed relative to the viewport rather than the main geometry.\n\n"
+                    + "Storyboard-level rules:\n"
+                    + "- Prefer 3 to 5 strong scenes for problem-solving unless more are truly needed\n"
+                    + "- Plan per-scene variation: vary the dominant visual focus, spatial layout pattern, and visual density across scenes. Avoid identical composition for consecutive scenes\n"
+                    + "- " + SystemPrompts.COLOR_FORMAT_RULES + "\n"
+                    + "Storyboard style cleanup rules:\n"
+                    + "- Treat the visual design pass as a strong draft, not an immutable contract; this stage may repair layout, style, continuity, and backend practicality before the storyboard becomes the validated downstream authority.\n"
+                    + "- Decide object lifecycle by teaching utility rather than by a blanket keep/remove rule: preserve, dim, transform, merge, or exit objects based on whether they remain useful for upcoming reasoning, continuity, comparison, dependency evidence, or learner orientation.\n"
+                    + "- Remove or merge redundant storyboard objects introduced by the visual design pass when they do not carry distinct teaching, geometry, dependency, continuity, or future support meaning.\n"
+                    + "- Prefer one reusable object plus actions/style changes over multiple near-duplicate labels, highlights, helper objects, or repeated construction elements.\n"
+                    + "- Preserve intentional scene-level placement, style, color, and visual hierarchy from the visual design pass unless they cause global consistency, overlap, or readability problems.\n"
+                    + "- Once a color is assigned to a concept, it keeps that meaning across the entire storyboard. Record color-to-concept assignments in `global_visual_rules`.\n"
+                    + "- Use a single typed `style` object per storyboard object, never a style array and never custom style keys.\n"
+                    + "- Style describes the object itself only. Create separate storyboard objects for labels, badges, helper outlines, cards, or callouts that have their own identity.\n"
+                    + "- Prefer `kind = text` or `kind = equation` over `kind = text_card` or `kind = formula_card`. Display text directly without a background box/card unless the card itself is teaching-essential (e.g. a titled result panel). Most formulas and labels are clearer without a surrounding box. Convert existing text_card/formula_card objects to text/equation when the card is not teaching-essential.\n"
+                    + "- Simplify visible mathematical label content aggressively. For `kind = text` objects attached to geometry or representing element names, `content` must be the exact concise mathematical label only: use `B′`, `l`, `AB`, `P_min`, not `反射点B′`, `直线l`, `线段AB`, or other descriptive phrases. Keep prose in narration, action descriptions, goals, or notes instead.\n"
+                    + "- Do not expand a valid symbolic label into Chinese prose just to satisfy visible-text rules; symbolic mathematical labels and equations are valid as-is.\n"
+                    + "- Preserve the motion-first visual-action teaching intent from exploration and visual design: do not turn a movable reveal, construction, transform, or manipulation into a static text/formula-only explanation unless backend practicality makes the motion impossible.\n"
+                    + "- When repairing clutter, overlap, or redundancy, choose among simplifying text/cards, dimming context, merging duplicates, repositioning groups, or exiting objects according to each object's future teaching utility; do not preserve or remove an object solely because it is mathematically important in isolation.\n"
+                    + "- Only include `style` when it adds meaningful rendering properties; omit it for visually plain objects.\n"
+                    + SystemPrompts.ASCII_TEXT_RULES
+                    + SystemPrompts.VISIBLE_CHINESE_TEXT_RULES;
+
+    private static final String GEOGEBRA_RULES =
+            "GeoGebra-specific storyboard validation rules:\n"
+                    + SystemPrompts.GEOGEBRA_NAMING_RULES
+                    + SystemPrompts.GEOGEBRA_COLOR_RULES
+                    + "- Use style changes (color, line thickness, dash style) on existing objects rather than creating visual duplicates on the same endpoints. GeoGebra objects persist globally, so every redundant object adds permanent clutter.\n"
+                    + SystemPrompts.MINIMIZE_HELPER_OBJECTS_AUTHORING_RULES;
+
+    private static final String MANIM_RULES =
+            "Manim-specific storyboard validation rules:\n"
+                    + SystemPrompts.MANIM_MOTION_AND_PACING_RULES
+                    + SystemPrompts.MANIM_COLOR_RULES
+                    + SystemPrompts.MANIM_NAMING_RULES
+                    + "- For named teaching-essential points, lines, intersections, and other geometry whose id or value must be read by the learner, preserve or add a visible companion label unless the current beat explicitly hides it.\n"
+                    + "- Do not express a visible label with `style.label_visible`; use an explicit `kind: text` or `kind: equation` companion object and attach it with a structured `attachment/label_for` constraint whose refs name the label and parent anchor.\n"
+                    + StoryboardSchemaPrompts.MANIM_COMPANION_LABEL_EXAMPLE
+                    + "- Prefer dark backgrounds (#1C1C1C to #2D2B55) with light content for maximum contrast and cinema feel when the storyboard does not already establish a different valid style.\n";
+
+    private static String outputFormat(String outputTarget) {
+        return "Output format:\n"
+                + StoryboardSchemaPrompts.JSON_SYNTAX_REQUIREMENTS
+                + "Return a JSON object with this shape:\n"
+                + StoryboardSchemaPrompts.PATCH_SEMANTICS_NOTE
+                + "{\n"
+                + "  \"continuity_plan\": \"string, how object identities, anchors, and layout stay stable across scenes\",\n"
+                + StoryboardSchemaPrompts.coordinateBoundsSchema("2d") + ",\n"
+                + "  \"global_visual_rules\": [\"string, global staging rule that should hold across the whole presentation\"],\n"
+                + "  \"object_registry\": [\n"
+                + StoryboardSchemaPrompts.OBJECT_DEFINITION_SCHEMA
+                + "\n  ],\n"
+                + "  \"scenes\": [\n"
+                + "    {\n"
+                + StoryboardSchemaPrompts.sceneFieldsSchema(outputTarget)
+                + "\n    }\n"
+                + "  ]\n"
+                + "}\n"
+                + StoryboardSchemaPrompts.TEXT_STYLE_SEMANTICS;
+    }
+
+    private static final String EXAMPLE_OUTPUT =
+            "Example output:\n"
+                    + StoryboardSchemaPrompts.JSON_LEXICAL_EXAMPLES
+                    + "{\n"
+                    + "  \"continuity_plan\": \"Objects keep stable ids across scenes via object_registry. Anchor-based objects follow their anchors.\",\n"
+                    + "  \"coordinate_bounds\": {\n"
+                    + "    \"x\": { \"min\": -4, \"max\": 4 },\n"
+                    + "    \"y\": { \"min\": -1, \"max\": 3 },\n"
+                    + "    \"padding\": 1\n"
+                    + "  },\n"
+                    + "  \"global_visual_rules\": [\n"
+                    + "    \"Keep resolved storyboard placements strictly inside coordinate_bounds.\",\n"
+                    + "    \"Prefer transforms and persistent anchors over redraws.\"\n"
+                    + "  ],\n"
+                    + "  \"object_registry\": [\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_NUMBER_LINE
+                    + ",\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_POINT_P
+                    + ",\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_FORMULA_CARD
+                    + ",\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_MIN_MARKER
+                    + "\n  ],\n"
+                    + "  \"scenes\": [\n"
+                    + "    {\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_SCENE1_BODY
+                    + "\n    },\n"
+                    + "    {\n"
+                    + StoryboardSchemaPrompts.EXAMPLE_SCENE2_BODY
+                    + "\n    }\n"
+                    + "  ]\n"
+                    + "}\n\n";
+
+    private static String responseRules(String outputTarget) {
+        return outputFormat(outputTarget)
+                + "\n"
+                + EXAMPLE_OUTPUT
+                + SystemPrompts.TOOL_CALL_HINT
+                + SystemPrompts.JSON_ONLY_OUTPUT + " Do not wrap it in markdown.";
+    }
+
+    // ========================================================================
+    // Placement enrichment prompts (for layout validation of derived objects)
+    // ========================================================================
+
+    /** System prompt for the placement-enrichment LLM pass. */
+    public static final String PLACEMENT_ENRICHMENT_SYSTEM_PROMPT =
+            "You are a coordinate computation assistant for a math visualization storyboard.\n"
+                    + "Your only task is to compute placement coordinates for objects that do not have them.\n"
+                    + "Rules:\n"
+                    + "- Do NOT modify any existing placement that already has data.\n"
+                    + "- For objects without placement, compute a reasonable world-space coordinate "
+                    + "based on their structured constraints, kind, content, and any available source placements.\n"
+                    + "- Use placement.positioning = \"absolute\" for computed placements, or \"relative\" when x/y are offsets from an anchor object.\n"
+                    + "- Return only `placement_patches`: one patch per visible scene object in entering_objects or persistent_objects that needs a computed placement.\n"
+                    + "- Each patch must identify the target by `scene_id` and `object_id`; do not return object_registry, scene titles, narration, actions, content, styles, constraints, or full storyboard JSON.\n"
+                    + "- If the same object appears in multiple scenes without placement, return one patch for each visible scene occurrence that needs layout validation.\n"
+                    + "- Use top-level `coordinate_bounds` as the storyboard world-coordinate validation window when present. Keep computed placements strictly inside it; equality with a min/max boundary is out of bounds.";
+
+    /**
+     * Build the user prompt for the placement-enrichment pass.
+     *
+     * @param storyboardJson serialized storyboard JSON
+     * @return user prompt string
+     */
+    public static String buildPlacementEnrichmentUserPrompt(String storyboardJson) {
+        return "Compute placement coordinates for all visible storyboard objects that lack a `placement` field.\n"
+                + "Preserve every existing placement exactly as-is; only add new placements where none exists.\n"
+                + "Return only compact patches in `placement_patches`; do not return the full storyboard JSON.\n"
+                + "For each computed placement, include the scene-level target as `scene_id` and `object_id`.\n"
+                + "If an object is visible in multiple scenes without placement, include a patch for every such scene occurrence.\n"
+                + "Use the object's structured constraints, kind, content, and any available source placements to infer its position.\n\n"
+                + "Storyboard:\n```json\n" + storyboardJson + "\n```\n\n"
+                + "Return JSON matching this shape exactly: {\"placement_patches\":[{\"scene_id\":\"scene_1\",\"object_id\":\"A\",\"placement\":{\"positioning\":\"absolute\",\"x\":{\"value\":0},\"y\":{\"value\":0}}}]}";
+    }
+
+    // ========================================================================
+    // Repair rules (appended to buildRulesPrompt for the LLM cleanup pass)
+    // ========================================================================
+
+    /**
+     * Build repair-specific rules that are appended to the base rules prompt
+     * during the LLM cleanup pass.
+     *
+     * @param outputTarget the output target backend (manim / geogebra)
+     * @return repair rules string
+     */
+    public static String buildRepairRules(String outputTarget) {
+        String defaultBackground = "geogebra".equalsIgnoreCase(outputTarget)
+                ? "#FFFFFF" : "#000000";
+        String backendSpecific = "manim".equalsIgnoreCase(outputTarget)
+                ? SystemPrompts.MANIM_VOICEOVER_RULES
+                : "";
+        return "Storyboard validation repair rules:\n"
+                + "Constraint relation catalog for reference:\n"
+                + com.kwang.study.mathvision.workflow.util.StoryboardConstraintCatalog.detailedCatalogSummary()
+                + "\n"
+                + "- Use structured constraints as the authoritative dependency graph and semantic contract.\n"
+                + "- Use a single typed `style` object only. Do not return style arrays, nested `properties`, role/type layer entries, or custom style keys.\n"
+                + "- Rewrite storyboard colors as 6-digit hex strings (`#RRGGBB`) only; do not use named colors or 8-digit hex.\n"
+                + "- Keep opacity in separate `opacity`, `fill_opacity`, or `stroke_opacity` fields.\n"
+                + "- For text objects, ensure text color contrasts with the text box/background color at ratio >= 4.5, falling back to "
+                + defaultBackground + " when no text background is present.\n"
+                + "- For non-text objects, ensure foreground colors contrast with " + defaultBackground
+                + " at ratio >= 3.0.\n"
+                + "- If a derived object is out of bounds, adjust upstream source objects from structured constraint refs, the whole constrained group, or the camera/layout; do not repair by directly moving that derived object when it would contradict structured constraints.\n"
+                + "- Every dependency-driven object must define structured constraints for hard geometric invariants, with refs naming owner objects and source objects using catalog role names.\n"
+                + "- Place each object-level constraint on the registry object named by its catalog owner ref role. For example, `point_at` with refs {\"point\":\"lLeft\"} must be stored on object `lLeft`, not on parent line `l`; `label_for` with refs {\"label\":\"labelA\",\"anchor\":\"A\"} must be stored on `labelA`, not on point `A`.\n"
+                + "- ASCII repair applies only to backend identifiers such as scene_id, object ids, constraint ids, action target ids, and structured ref role names; preserve Chinese learner-facing titles, narration, object content, descriptions, and visible text.\n"
+                + "- Visible natural-language `object_registry[].content` must be Chinese; symbolic mathematical labels and equations should stay concise and symbolic.\n"
+                + "- For `kind = text` objects that label mathematical elements, simplify content to the mathematical name only: `B′`, not `反射点B′`; `l`, not `直线l`; `AB`, not `线段AB`.\n"
+                + backendSpecific
+                + "Angle boundary-vertex consistency rules:\n"
+                + "- For every angle_between, right_angle_at, or angle-like arc_sweep constraint, each boundary line (line_a, line_b, start_boundary, end_boundary, ray_a, ray_b) must pass through the declared vertex/anchor.\n"
+                + "- A boundary line passes through the vertex when a structured connector constraint names the vertex as one endpoint (e.g. `connects_points` refs include both endpoints; `line_through_points` or `ray_from_to` refs include the vertex and another point).\n"
+                + "- If no structured constraint shows that a boundary passes through the vertex, the line likely does not pass through the vertex, and the angle will be drawn at the wrong location.\n"
+                + "- Common mistake: using a perpendicular or normal from a different point as the angle boundary. For example, using a perpendicular from A to l as the normal at P_min is wrong if P_min is not on that perpendicular. Instead, create a normal at P_min (a line through P_min perpendicular to l).\n"
+                + "- When fixing, either: (a) replace the incorrect boundary reference with a line that passes through the vertex, or (b) create a new helper object (e.g. a normal at the vertex) and reference it instead.\n"
+                + "- Verify that equal-angle markers reference symmetrically constructed boundaries so downstream code can render them correctly.";
+    }
+
+    /**
+     * Build the user prompt for the LLM cleanup/repair pass.
+     *
+     * @param storyboardJson serialized storyboard JSON
+     * @param issues         list of static validation issues (may be null or empty)
+     * @return user prompt string
+     */
+    public static String buildCleanupUserPrompt(String storyboardJson, java.util.List<String> issues) {
+        StringBuilder userPrompt = new StringBuilder();
+        userPrompt.append("Please clean up this storyboard so it is coherent, and ensure that all resolved placements stay strictly inside top-level `coordinate_bounds` and do not visibly overlap. Optimize cognitive load by judging which objects should persist, dim, transform, merge, or exit based on their usefulness for upcoming teaching steps.\n");
+        userPrompt.append("Preserve the original narrative order, object identity, Chinese learner-facing text, and motion-first visual teaching intent as much as possible; only adjust the layout and wording where necessary.\n");
+        userPrompt.append("Apply ASCII cleanup only to backend identifiers such as scene_id, object ids, constraint ids, refs, and action target ids; do not ASCII-normalize titles, narration, descriptions, or visible object content. In Manim mode, also preserve voiceover text.\n");
+        userPrompt.append("Visible natural-language object content must be Chinese, but symbolic mathematical labels and equations should remain concise and symbolic. For `kind=text` objects that label geometry, simplify redundant descriptions to the element name only, e.g. `反射点B′` -> `B′`, `直线l` -> `l`, `线段AB` -> `AB`.\n");
+        userPrompt.append("If you find issues, fix them directly. If there are no issues, still perform a full cleanup to make the storyboard more stable and readable, but do not make objects persist or exit mechanically; decide lifecycle from future teaching utility and visual clarity.\n");
+        if (issues != null && !issues.isEmpty()) {
+            userPrompt.append("Static validation findings:\n");
+            for (String issue : issues) {
+                if (issue.startsWith("Issue:")) {
+                    userPrompt.append(issue).append("\n");
+                } else {
+                    userPrompt.append("- ").append(issue).append("\n");
+                }
+            }
+            userPrompt.append("\n");
+        }
+        userPrompt.append("Current storyboard:\n```json\n").append(storyboardJson).append("\n```\n\n");
+        userPrompt.append("Return the full corrected storyboard JSON with all scenes, object_registry, coordinate_bounds, and metadata.");
+        return userPrompt.toString();
+    }
+
+    private NarrativePrompts() {}
+
+    public static String buildRulesPrompt(String outputTarget) {
+        String prompt = COMMON_RULES;
+        if ("geogebra".equalsIgnoreCase(outputTarget)) {
+            prompt += SystemPrompts.STORYBOARD_FIELD_GUIDE_GEOGEBRA_REPAIR;
+            prompt += "\n" + GEOGEBRA_RULES;
+        } else if ("manim".equalsIgnoreCase(outputTarget)) {
+            prompt += SystemPrompts.STORYBOARD_FIELD_GUIDE_MANIM_REPAIR;
+            prompt += "\n" + MANIM_RULES;
+        }
+        prompt += "\n" + responseRules(outputTarget);
+        if ("geogebra".equalsIgnoreCase(outputTarget)) {
+            return SystemPrompts.buildRulesSection(SystemPrompts.ensureGeoGebraStyleReference(prompt));
+        }
+        if ("manim".equalsIgnoreCase(outputTarget)) {
+            return SystemPrompts.buildRulesSection(SystemPrompts.ensureManimStyleReference(prompt));
+        }
+        return SystemPrompts.buildRulesSection(prompt);
+    }
+
+    public static String buildFixedContextPrompt(ProblemBundle problemBundle,
+                                                  String targetDescription,
+                                                  String outputTarget) {
+        return buildFixedContextPrompt(problemBundle, targetDescription, outputTarget, "");
+    }
+
+    public static String buildFixedContextPrompt(String legacyTargetConcept,
+                                                  String targetDescription,
+                                                  String outputTarget) {
+        return buildFixedContextPrompt(
+                ProblemBundleContextBuilder.legacyBundle(legacyTargetConcept),
+                targetDescription,
+                outputTarget);
+    }
+
+    public static String buildFixedContextPrompt(String legacyTargetConcept,
+                                                  String targetDescription,
+                                                  String outputTarget,
+                                                  String solutionChainSummary) {
+        return buildFixedContextPrompt(
+                ProblemBundleContextBuilder.legacyBundle(legacyTargetConcept),
+                targetDescription,
+                outputTarget,
+                solutionChainSummary);
+    }
+
+    public static String buildFixedContextPrompt(ProblemBundle problemBundle,
+                                                  String targetDescription,
+                                                  String outputTarget,
+                                                  String solutionChainSummary) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(SystemPrompts.buildWorkflowPrefix(
+                "Stage 4 / Storyboard Validation",
+                "Storyboard composition and validation",
+                ProblemBundleContextBuilder.displayTitle(problemBundle),
+                targetDescription,
+                outputTarget
+        ));
+        sb.append(ProblemBundleContextBuilder.buildProblemBundleAuthorityContext(problemBundle)).append("\n");
+        sb.append("Output target backend: ").append(outputTarget).append(".\n");
+        sb.append("Keep the storyboard reusable, but make it practical for this backend.\n");
+        if (solutionChainSummary != null && !solutionChainSummary.isBlank()) {
+            sb.append("\n").append(solutionChainSummary.trim()).append("\n");
+        }
+        return SystemPrompts.buildFixedContextSection(sb.toString());
+    }
+
+    public static String storyboardCodegenPrompt(Storyboard storyboard,
+                                                 String outputTarget) {
+        return storyboardCodegenPrompt(
+                StoryboardJsonBuilder.buildForCodegen(storyboard, outputTarget),
+                outputTarget);
+    }
+
+    public static String storyboardCodegenPrompt(String storyboardJson,
+                                                 String outputTarget) {
+        if ("geogebra".equalsIgnoreCase(outputTarget)) {
+            return SystemPrompts.buildCurrentRequestSection(String.format(
+                    "Compact storyboard JSON:\n```json\n%s\n```\n\n"
+                            + "Remember: Return ONLY the single GeoGebra code block. No explanation.",
+                    storyboardJson));
+        }
+        return SystemPrompts.buildCurrentRequestSection(String.format(
+                "Compact storyboard JSON:\n```json\n%s\n```\n\n"
+                        + "Remember: Return ONLY the single Python code block. No explanation.",
+                storyboardJson));
+    }
+}
+

@@ -18,7 +18,9 @@ public class MathVisionTaskItemVO {
     private String outputTarget;
     private String providerCode;
     private String modelName;
+    private Boolean cancelRequested;
     private String finalArtifactType;
+    private Long squareShareId;
     private String createTime;
     private String updateTime;
 }

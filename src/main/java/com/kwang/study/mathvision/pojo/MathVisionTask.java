@@ -2,6 +2,8 @@ package com.kwang.study.mathvision.pojo;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +13,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MathVisionTask {
     private Long id;
     /** 对应 chat_sessions.session_id */
@@ -48,10 +52,14 @@ public class MathVisionTask {
     private String lastConfirmedStage;
     /** 自动修复累计次数 (限流) */
     private Integer autoFixCount;
+    /** 运行中取消请求标记 */
+    private Boolean cancelRequested;
     /** 当前版本最终产物路径 */
     private String finalArtifactPath;
     /** mp4/html */
     private String finalArtifactType;
+    /** 当前任务版本在创作广场中的分享记录ID，仅列表关联查询时赋值。 */
+    private Long squareShareId;
     /** 创建幂等键 */
     private String requestId;
     /** 软删除标记 */

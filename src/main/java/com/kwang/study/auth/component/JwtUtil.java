@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
 import java.security.Key;
@@ -29,7 +30,24 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        this.key = Keys.hmacShaKeyFor(HexUtil.decodeHex(jwtConfig.getSecurity()));
+        String security = jwtConfig.getSecurity();
+        if (!StringUtils.hasText(security)) {
+            throw new IllegalStateException("Missing JWT config: kwang.jwt.security");
+        }
+        if (jwtConfig.getExpiration() == null || jwtConfig.getExpiration() <= 0) {
+            throw new IllegalStateException("Missing JWT config: kwang.jwt.expiration must be a positive millisecond value");
+        }
+
+        byte[] keyBytes;
+        try {
+            keyBytes = HexUtil.decodeHex(security.trim());
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Invalid JWT config: kwang.jwt.security must be a hex string", e);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("Invalid JWT config: kwang.jwt.security must decode to at least 32 bytes for HS256");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Authentication authentication) {

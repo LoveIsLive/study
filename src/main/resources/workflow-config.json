@@ -1,0 +1,19 @@
+{
+  "max_depth": 10,
+  "min_depth": 1,
+  "parallel_math_enrichment": true,
+  "parallel_visual_design": true,
+  "max_concurrent": 16,
+  "visual_design_scene_max_retries": 3,
+  "storyboard_validation_max_retries": 5,
+  "placement_enrichment_max_retries": 3,
+  "code_gen_max_retries": 2,
+  "code_evaluation_max_retries": 3,
+  "render_enabled": true,
+  "render_quality": "low",
+  "render_max_retries": 10,
+  "scene_evaluation_max_retries": 5,
+  "input_mode": "auto",
+  "output_target": "manim",
+  "model": "GLM-5V-Turbo"
+}

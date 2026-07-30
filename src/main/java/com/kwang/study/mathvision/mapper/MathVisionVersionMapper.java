@@ -10,10 +10,10 @@ public interface MathVisionVersionMapper {
 
     @Insert("INSERT INTO mathvision_versions(task_id, version, base_version, pn_version, rg_version, " +
             "vs_version, cg_version, rr_version, branch_stage, change_source, change_summary, " +
-            "workflow_summary_json, is_current, create_time, update_time) " +
+            "change_instruction, workflow_summary_json, is_current, create_time, update_time) " +
             "VALUES(#{taskId}, #{version}, #{baseVersion}, #{pnVersion}, #{rgVersion}, #{vsVersion}, " +
             "#{cgVersion}, #{rrVersion}, #{branchStage}, #{changeSource}, #{changeSummary}, " +
-            "#{workflowSummaryJson}, #{isCurrent}, NOW(), NOW())")
+            "#{changeInstruction}, #{workflowSummaryJson}, #{isCurrent}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(MathVisionVersion version);
 
@@ -23,11 +23,29 @@ public interface MathVisionVersionMapper {
     @Select("SELECT * FROM mathvision_versions WHERE task_id = #{taskId} AND is_current = 1 LIMIT 1")
     MathVisionVersion findCurrent(Long taskId);
 
-    @Select("SELECT * FROM mathvision_versions WHERE task_id = #{taskId} ORDER BY version ASC")
+    @Select("SELECT * FROM mathvision_versions WHERE task_id = #{taskId} ORDER BY version DESC")
     List<MathVisionVersion> findByTask(Long taskId);
+
+    @Delete("DELETE FROM mathvision_versions WHERE task_id = #{taskId}")
+    int deleteByTaskId(Long taskId);
 
     @Select("SELECT MAX(version) FROM mathvision_versions WHERE task_id = #{taskId}")
     Integer findMaxVersion(Long taskId);
+
+    @Select("<script>" +
+            "SELECT COUNT(*) FROM mathvision_versions WHERE task_id = #{taskId} AND " +
+            "<choose>" +
+            "<when test='stage == \"problem_normalization\"'>pn_version = #{stageVersion}</when>" +
+            "<when test='stage == \"reasoning_graph\"'>rg_version = #{stageVersion}</when>" +
+            "<when test='stage == \"visual_storyboard\"'>vs_version = #{stageVersion}</when>" +
+            "<when test='stage == \"code_generation\"'>cg_version = #{stageVersion}</when>" +
+            "<when test='stage == \"render_result\"'>rr_version = #{stageVersion}</when>" +
+            "<otherwise>1 = 0</otherwise>" +
+            "</choose>" +
+            "</script>")
+    int countStageReferences(@Param("taskId") Long taskId,
+                             @Param("stage") String stage,
+                             @Param("stageVersion") Integer stageVersion);
 
     /** 更新某个任务版本对各阶段的指针 (NULL 表示该阶段下游失效, 待重新生成) */
     @Update("UPDATE mathvision_versions SET pn_version = #{pnVersion}, rg_version = #{rgVersion}, " +
@@ -58,5 +76,11 @@ public interface MathVisionVersionMapper {
 
     /** 设置指定任务版本为当前版本 */
     @Update("UPDATE mathvision_versions SET is_current = 1, update_time = NOW() WHERE task_id = #{taskId} AND version = #{version}")
-    void setCurrent(@Param("taskId") Long taskId, @Param("version") Integer version);
+    int setCurrent(@Param("taskId") Long taskId, @Param("version") Integer version);
+
+    @Update("UPDATE mathvision_versions SET workflow_summary_json = #{summaryJson}, update_time = NOW() " +
+            "WHERE task_id = #{taskId} AND version = #{version}")
+    int updateWorkflowSummary(@Param("taskId") Long taskId,
+                              @Param("version") Integer version,
+                              @Param("summaryJson") String summaryJson);
 }

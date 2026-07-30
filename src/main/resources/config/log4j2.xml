@@ -1,39 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration dest="err" status="info" name="XMLConfig" monitorInterval="30">
+<Configuration dest="err" status="warn" name="StudyLogConfig" monitorInterval="30">
     <Properties>
-        <!--       / 是从盘开始   -->
+        <Property name="LOG_DIR">${sys:study.log.dir:-logs}</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level [%logger{36}] - %msg%n%throwable</Property>
+        <Property name="CONSOLE_PATTERN">%style{%d{yyyy-MM-dd HH:mm:ss.SSS}}{black} [%pid] %highlight{%-5level} [%logger{36}] - %msg%n%throwable</Property>
     </Properties>
 
     <Appenders>
 
-        <Console name="Console1" target="SYSTEM_OUT">
-            <PatternLayout disableAnsi="false" pattern="%style{%d{yyyy-MM-dd HH:mm:ss:SSS} [%pid]}{black} %highlight{%-6p%r %sn %c{-8}} - %m%n" />
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout disableAnsi="false" pattern="${CONSOLE_PATTERN}" charset="UTF-8" />
         </Console>
 
-        <RollingFile name="RollingFile1" fileName="logs/study.log"
-                     filePattern="logs/$${date:yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz">
-            <PatternLayout>
-                <Pattern>%d{ISO8601} [%t] %p %c{3} - %m%n</Pattern>
-            </PatternLayout>
+        <RollingFile name="AppFile"
+                     fileName="${LOG_DIR}/study.log"
+                     filePattern="${LOG_DIR}/archive/study-%d{yyyy-MM-dd}-%i.log.gz"
+                     append="true"
+                     immediateFlush="true">
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="10MB"/> <!-- 默认就是10MB -->
+                <SizeBasedTriggeringPolicy size="20MB"/>
             </Policies>
+            <DefaultRolloverStrategy max="30"/>
         </RollingFile>
 
-        <Routing name="Routing">
-            <Routes pattern="$${sys:spring.profiles.active}">
-                <Route key="prod" ref="RollingFile1" />
-                <Route key="dev" ref="Console1" />
-                <!-- key为null, 即defaultRoute -->
-                <Route ref="Console1" />
-            </Routes>
-        </Routing>
+        <RollingFile name="MathVisionWorkflowFile"
+                     fileName="${LOG_DIR}/mathvision-workflow.log"
+                     filePattern="${LOG_DIR}/archive/mathvision-workflow-%d{yyyy-MM-dd}-%i.log.gz"
+                     append="true"
+                     immediateFlush="true">
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="20MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+
+        <RollingFile name="MathVisionAiTraceFile"
+                     fileName="${LOG_DIR}/mathvision-ai-trace.log"
+                     filePattern="${LOG_DIR}/archive/mathvision-ai-trace-%d{yyyy-MM-dd}-%i.log.gz"
+                     append="true"
+                     immediateFlush="true">
+            <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="14"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
+        <Logger name="com.kwang.study.mathvision" level="info" additivity="true">
+            <AppenderRef ref="MathVisionWorkflowFile" />
+        </Logger>
+        <Logger name="com.kwang.study.mathvision.ai.trace" level="debug" additivity="false">
+            <AppenderRef ref="MathVisionAiTraceFile" />
+        </Logger>
         <Root level="info">
-            <AppenderRef ref="Routing" />
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="AppFile" />
         </Root>
     </Loggers>
 

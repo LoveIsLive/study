@@ -116,6 +116,23 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Dependencies required by the MathVision core sources migrated into study. -->
+        <dependency>
+            <groupId>io.github.the-pocket</groupId>
+            <artifactId>PocketFlow</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>2.34.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.53.0</version>
+        </dependency>
+
 <!--        编译工具 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

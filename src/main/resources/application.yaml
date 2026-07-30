@@ -2,6 +2,19 @@ spring:
   application:
     name: study
 
+nacos:
+  config:
+    server-addr: 47.121.116.149:8848
+    username: nacos
+    password: kwangnacos123
+    data-ids: study,index
+    type: yaml
+    group: ${spring.profiles.active:dev}
+    auto-refreshed: true
+    bootstrap:
+      enable: true
+      log-enable: true
+
 logging:
   config: "classpath:config/log4j2.xml"
 

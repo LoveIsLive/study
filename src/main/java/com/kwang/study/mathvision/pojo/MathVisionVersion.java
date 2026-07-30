@@ -2,6 +2,8 @@ package com.kwang.study.mathvision.pojo;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -14,6 +16,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MathVisionVersion {
     private Long id;
     private Long taskId;
@@ -37,6 +41,8 @@ public class MathVisionVersion {
     private String changeSource;
     /** 版本变更摘要 */
     private String changeSummary;
+    /** 用户提交的完整变更指令，仅 user_revision 使用。 */
+    private String changeInstruction;
     /** 整次 workflow 执行摘要 (运行级, JSON 文本) */
     private String workflowSummaryJson;
     /** 是否当前版本 */

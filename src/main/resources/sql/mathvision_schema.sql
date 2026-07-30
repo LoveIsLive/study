@@ -9,6 +9,7 @@
 --   3) mathvision_artifacts     阶段核心产物 (按 task+stage 独立版本, 产物列合一)
 --   4) mathvision_stage_results 阶段校验/执行结果 (同 grain, 结果列合一)
 --   5) mathvision_versions      任务版本组合表 (UX 的 V1/V2/V3)
+--   6) mathvision_square_posts  广场发布记录 (绑定任务的指定版本)
 -- =============================================================
 
 -- -------------------------------------------------------------
@@ -59,6 +60,7 @@ CREATE TABLE `mathvision_tasks` (
   `current_version`          INT          NOT NULL DEFAULT 1      COMMENT '当前激活/工作版本, 指向 mathvision_versions.version',
   `last_confirmed_stage`     VARCHAR(40)  NULL                    COMMENT '手动模式最近确认到的阶段',
   `auto_fix_count`           INT          NOT NULL DEFAULT 0      COMMENT '自动修复累计次数 (限流)',
+  `cancel_requested`         TINYINT(1)   NOT NULL DEFAULT 0      COMMENT '运行中取消请求标记',
   `final_artifact_path`      VARCHAR(512) NULL                    COMMENT '当前版本最终产物路径',
   `final_artifact_type`      VARCHAR(16)  NULL                    COMMENT 'mp4/html',
   `request_id`               VARCHAR(64)  NULL                    COMMENT '创建幂等键',
@@ -147,6 +149,7 @@ CREATE TABLE `mathvision_versions` (
   `change_source`         VARCHAR(32) NOT NULL DEFAULT 'initial_generation'
                           COMMENT 'initial_generation/user_revision/manual_edit/regenerate/auto_fix/retry',
   `change_summary`        VARCHAR(512) NULL                   COMMENT '版本变更摘要',
+  `change_instruction`    TEXT        NULL                    COMMENT '用户提交的完整变更指令 (仅 user_revision 使用)',
   `workflow_summary_json` JSON        NULL                    COMMENT '整次 workflow 执行摘要 (运行级)',
   `is_current`            TINYINT(1)  NOT NULL DEFAULT 0      COMMENT '是否当前版本',
   `create_time`           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -156,3 +159,20 @@ CREATE TABLE `mathvision_versions` (
   KEY `idx_task_current` (`task_id`, `is_current`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务版本组合表';
 
+
+-- -------------------------------------------------------------
+-- 6) 广场发布记录
+--    每条记录固定指向发布时的任务版本；任务软删除后不再展示，永久删除时级联清理。
+-- -------------------------------------------------------------
+CREATE TABLE `mathvision_square_posts` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT,
+  `task_id`     BIGINT   NOT NULL                COMMENT '来源任务ID',
+  `version`     INT      NOT NULL                COMMENT '分享的任务版本号',
+  `load_count`  INT      NOT NULL DEFAULT 0      COMMENT '被加载到工作台的次数',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_version` (`task_id`, `version`),
+  KEY `idx_square_create_time` (`create_time`),
+  CONSTRAINT `fk_square_task` FOREIGN KEY (`task_id`)
+      REFERENCES `mathvision_tasks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MathVision 广场发布记录';
