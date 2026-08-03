@@ -11,6 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,7 +32,7 @@ class MathVisionModelCatalogYamlTest {
         assertEquals(10, catalog.getWorkflow().getRenderMaxRetries());
         assertEquals(5, catalog.getWorkflow().getSceneEvaluationMaxRetries());
         assertEquals("low", catalog.getWorkflow().getRenderQuality());
-        assertTrue(Boolean.TRUE.equals(catalog.getWorkflow().getAiTraceEnabled()));
+        assertFalse(Boolean.TRUE.equals(catalog.getWorkflow().getAiTraceEnabled()));
         assertEquals(300, catalog.getModelDefaults().getRequestTimeoutSeconds());
         assertEquals(2, catalog.getModelDefaults().getEmptyResponseRetries());
         assertEquals(1_000L, catalog.getModelDefaults().getTransientRetryBaseDelayMillis());

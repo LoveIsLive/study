@@ -47,7 +47,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 public class RenderResultStageExecutor implements MathVisionStageExecutor {
@@ -98,6 +100,19 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
     @Override
     public MathVisionStageExecutionResult execute(MathVisionStageExecutionContext context) {
         MathVisionTask task = context.getTask();
+        Path renderOutputDir = outputDir(task);
+        AtomicReference<Path> localArtifactToPreserve = new AtomicReference<>();
+        try {
+            return executeInternal(context, renderOutputDir, localArtifactToPreserve);
+        } finally {
+            cleanupRenderWorkspace(renderOutputDir, localArtifactToPreserve.get());
+        }
+    }
+
+    private MathVisionStageExecutionResult executeInternal(MathVisionStageExecutionContext context,
+                                                           Path renderOutputDir,
+                                                           AtomicReference<Path> localArtifactToPreserve) {
+        MathVisionTask task = context.getTask();
         ProblemBundle bundle = load(task, StageEnum.PROBLEM_NORMALIZATION, ProblemBundle.class);
         Narrative narrative = load(task, StageEnum.VISUAL_STORYBOARD, Narrative.class);
         CodeResult codeResult = load(task, StageEnum.CODE_GENERATION, CodeResult.class);
@@ -129,7 +144,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 maxTotalIterations);
 
         for (int iteration = 0; iteration < maxTotalIterations; iteration++) {
-            log.info("MathVision render stage iteration started, taskId={}, iteration={}, renderAttempts={}, "
+            log.debug("MathVision render stage iteration started, taskId={}, iteration={}, renderAttempts={}, "
                             + "renderFixToolCalls={}, sceneFixAttempts={}, codeLines={}",
                     task.getId(),
                     iteration + 1,
@@ -139,10 +154,10 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     countNonBlankLines(codeResult.getGeneratedCode()));
             RenderNode.Result renderNodeResult = renderNode.run(
                     task, codeResult, narrative, renderRetryState, renderQuality,
-                    renderMaxRetries, outputDir(task), context);
+                    renderMaxRetries, renderOutputDir, context);
             renderResult = renderNodeResult.getRenderResult();
             apiCalls += renderNodeResult.getApiCalls();
-            log.info("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
+            log.debug("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
                             + "executionSeconds={}, artifactPath={}, geometryPath={}, requestFix={}, errorSignature={}",
                     task.getId(),
                     iteration + 1,
@@ -155,6 +170,8 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     errorSignature(renderResult.getLastError()));
 
             if (!renderResult.isSuccess()) {
+                cleanupRenderWorkspace(renderOutputDir, artifactPath(successfulRenderResult));
+                clearDeletedAttemptPaths(renderResult);
                 // RenderNode already enforces the render-fix cap via canRequestFix().
                 if (!renderRetryState.isRequestFix()) {
                     log.warn("MathVision render stage stops without CodeFix, taskId={}, iteration={}, attempts={}, "
@@ -167,7 +184,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 }
                 CodeFixRequest request = buildRenderFixRequest(
                         bundle, narrative, codeResult, renderResult, renderRetryState, fixTrace);
-                log.info("MathVision routing render failure to CodeFix, taskId={}, iteration={}, attempts={}, "
+                log.debug("MathVision routing render failure to CodeFix, taskId={}, iteration={}, attempts={}, "
                                 + "staticIssues={}, fixHistory={}, promptTokens~{}, errorSignature={}",
                         task.getId(),
                         iteration + 1,
@@ -187,7 +204,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         fixNodeResult.getAssistantTranscript(),
                         renderFixConversationRounds());
                 apiCalls += fixNodeResult.getApiCalls();
-                log.info("MathVision render CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
+                log.debug("MathVision render CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
                                 + "apiCalls={}, executionSeconds={}, postStaticIssues={}, failureReason={}",
                         task.getId(),
                         iteration + 1,
@@ -205,7 +222,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                             abbreviate(fixResult != null ? fixResult.getFailureReason() : null, 500));
                     break;
                 }
-                log.info("MathVision render CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
+                log.debug("MathVision render CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
                         task.getId(), iteration + 1, countNonBlankLines(codeResult.getGeneratedCode()));
                 continue;
             }
@@ -214,7 +231,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     task, narrative, codeResult, renderResult, sceneFixAttempts, context);
             sceneEvaluationResult = sceneNodeResult.getSceneEvaluationResult();
             apiCalls += sceneNodeResult.getApiCalls();
-            log.info("MathVision scene evaluation result, taskId={}, iteration={}, approved={}, evaluated={}, "
+            log.debug("MathVision scene evaluation result, taskId={}, iteration={}, approved={}, evaluated={}, "
                             + "revisionAttempts={}, totalIssues={}, blockingIssues={}, apiCalls={}, executionSeconds={}, reason={}",
                     task.getId(),
                     iteration + 1,
@@ -229,7 +246,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
 
             boolean successfulArtifactRetained = true;
             try {
-                retainSuccessfulArtifact(renderResult, outputDir(task));
+                retainSuccessfulArtifact(renderResult, renderOutputDir);
             } catch (Exception e) {
                 successfulArtifactRetained = false;
                 log.warn("MathVision successful render retention failed, taskId={}, artifactPath={}, error={}",
@@ -237,9 +254,16 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             }
             // Keep the latest successful artifact even if a later scene-layout fix breaks rendering.
             successfulRenderResult = renderResult;
+            if (successfulArtifactRetained) {
+                cleanupRenderWorkspace(renderOutputDir, artifactPath(successfulRenderResult));
+                renderResult.setGeometryPath(null);
+                if (sceneEvaluationResult != null) {
+                    sceneEvaluationResult.setGeometryPath(null);
+                }
+            }
 
             if (sceneEvaluationResult.isApproved()) {
-                log.info("MathVision render stage scene evaluation approved, taskId={}, iteration={}",
+                log.debug("MathVision render stage scene evaluation approved, taskId={}, iteration={}",
                         task.getId(), iteration + 1);
                 break;
             }
@@ -265,7 +289,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             if (StringUtils.hasText(request.getErrorReason())) {
                 sceneFixHistory.add(request.getErrorReason());
             }
-            log.info("MathVision routing scene evaluation to CodeFix, taskId={}, iteration={}, sceneFixAttempt={}, "
+            log.debug("MathVision routing scene evaluation to CodeFix, taskId={}, iteration={}, sceneFixAttempt={}, "
                             + "promptTokens~{}, issueSummary={}",
                     task.getId(),
                     iteration + 1,
@@ -277,7 +301,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             CodeFixResult fixResult = fixNodeResult.getFixResult();
             fixTrace.add(fixResult);
             apiCalls += fixNodeResult.getApiCalls();
-            log.info("MathVision scene evaluation CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
+            log.debug("MathVision scene evaluation CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
                             + "apiCalls={}, executionSeconds={}, postStaticIssues={}, failureReason={}",
                     task.getId(),
                     iteration + 1,
@@ -298,7 +322,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         abbreviate(fixResult != null ? fixResult.getFailureReason() : null, 500));
                 break;
             }
-            log.info("MathVision scene evaluation CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
+            log.debug("MathVision scene evaluation CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
                     task.getId(), iteration + 1, countNonBlankLines(codeResult.getGeneratedCode()));
         }
 
@@ -334,6 +358,8 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 renderResult.setArtifactType(stored.getArtifactType());
                 renderResult.setArtifactFileName(stored.getFileName());
                 renderResult.setArtifactMimeType(stored.getMimeType());
+                renderResult.setLocalArtifactPath(null);
+                renderResult.setGeometryPath(null);
                 if ("mp4".equalsIgnoreCase(renderResult.getArtifactType())) {
                     renderResult.setVideoPath(stored.getPath());
                 }
@@ -341,6 +367,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         task.getId(), localArtifactPath, stored.getPath(), stored.getArtifactType());
             } catch (Exception e) {
                 storageError = trim(e.getMessage());
+                localArtifactToPreserve.set(artifactPath(renderResult));
                 log.warn("MathVision final artifact storage failed; retained render remains successful, "
                                 + "taskId={}, artifactPath={}, error={}",
                         task.getId(), renderResult.getArtifactPath(), storageError, e);
@@ -506,7 +533,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 renderResult.setGeometryPath(retainedGeometry.toString());
             }
         }
-        log.info("MathVision successful render retained, artifactPath={}, geometryPath={}",
+        log.debug("MathVision successful render retained, artifactPath={}, geometryPath={}",
                 renderResult.getArtifactPath(), renderResult.getGeometryPath());
     }
 
@@ -726,6 +753,103 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
     private Path outputDir(MathVisionTask task) {
         return Paths.get(outputRoot, "task-" + task.getId(),
                 "v" + task.getCurrentVersion(), "render").toAbsolutePath().normalize();
+    }
+
+    private Path artifactPath(RenderResult renderResult) {
+        if (renderResult == null || !StringUtils.hasText(renderResult.getArtifactPath())) {
+            return null;
+        }
+        try {
+            return Paths.get(renderResult.getArtifactPath()).toAbsolutePath().normalize();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void clearDeletedAttemptPaths(RenderResult renderResult) {
+        if (renderResult == null) {
+            return;
+        }
+        renderResult.setArtifactPath(null);
+        renderResult.setVideoPath(null);
+        renderResult.setGeometryPath(null);
+    }
+
+    private void cleanupRenderWorkspace(Path renderOutputDir, Path artifactToPreserve) {
+        if (renderOutputDir == null) {
+            return;
+        }
+        Path configuredRoot = Paths.get(outputRoot).toAbsolutePath().normalize();
+        Path workspace = renderOutputDir.toAbsolutePath().normalize();
+        if (workspace.equals(configuredRoot) || !workspace.startsWith(configuredRoot)) {
+            log.warn("MathVision render workspace cleanup skipped for unsafe path, workspace={}, outputRoot={}",
+                    workspace, configuredRoot);
+            return;
+        }
+        if (!Files.exists(workspace)) {
+            return;
+        }
+
+        Path preserved = artifactToPreserve != null
+                ? artifactToPreserve.toAbsolutePath().normalize()
+                : null;
+        if (preserved != null && (!preserved.startsWith(workspace) || !Files.isRegularFile(preserved))) {
+            preserved = null;
+        }
+
+        List<Path> paths = new ArrayList<>();
+        try (java.util.stream.Stream<Path> walk = Files.walk(workspace)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(paths::add);
+        } catch (IOException e) {
+            log.warn("MathVision render workspace scan failed, workspace={}, error={}",
+                    workspace, e.getMessage());
+            return;
+        }
+
+        int deleted = 0;
+        IOException firstFailure = null;
+        for (Path path : paths) {
+            if (preserved != null && (path.equals(preserved) || preserved.startsWith(path))) {
+                continue;
+            }
+            try {
+                if (Files.deleteIfExists(path)) {
+                    deleted++;
+                }
+            } catch (IOException e) {
+                if (firstFailure == null) {
+                    firstFailure = e;
+                }
+            }
+        }
+        if (firstFailure != null) {
+            log.warn("MathVision render workspace cleanup incomplete, workspace={}, preserved={}, error={}",
+                    workspace, preserved, firstFailure.getMessage());
+            return;
+        }
+        cleanupEmptyParents(workspace, configuredRoot);
+        log.debug("MathVision render workspace cleaned, workspace={}, deletedEntries={}, preserved={}",
+                workspace, deleted, preserved);
+    }
+
+    private void cleanupEmptyParents(Path workspace, Path configuredRoot) {
+        Path current = workspace.getParent();
+        for (int depth = 0; depth < 2 && current != null
+                && current.startsWith(configuredRoot) && !current.equals(configuredRoot); depth++) {
+            try (java.util.stream.Stream<Path> entries = Files.list(current)) {
+                if (entries.findAny().isPresent()) {
+                    return;
+                }
+            } catch (IOException e) {
+                return;
+            }
+            try {
+                Files.deleteIfExists(current);
+            } catch (IOException e) {
+                return;
+            }
+            current = current.getParent();
+        }
     }
 
     private <T> T load(MathVisionTask task, StageEnum stage, Class<T> type) {

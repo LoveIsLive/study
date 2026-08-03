@@ -9,4 +9,4 @@ nacos:
     auto-refreshed: true
     bootstrap:
       enable: true
-      log-enable: true
+      log-enable: false

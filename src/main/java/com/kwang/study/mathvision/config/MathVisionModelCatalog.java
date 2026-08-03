@@ -135,7 +135,7 @@ public class MathVisionModelCatalog {
         private Integer renderMaxRetries = 10;
         private Integer sceneEvaluationMaxRetries = 5;
         private Integer renderFixConversationRounds = 10;
-        private Boolean aiTraceEnabled = true;
+        private Boolean aiTraceEnabled = false;
         private Integer aiTraceMaxChars = 200_000;
     }
 

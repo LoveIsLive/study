@@ -148,8 +148,8 @@ public class GeoGebraRenderService {
             }
 
             Files.writeString(validationPath, JsonUtils.toPrettyJson(report), StandardCharsets.UTF_8);
-            log.info("GeoGebra preview generated: {}", previewPath);
-            log.info("GeoGebra validation report generated: {}", validationPath);
+            log.debug("GeoGebra preview generated: {}", previewPath);
+            log.debug("GeoGebra validation report generated: {}", validationPath);
 
             String normalizedPreviewPath = previewPath.toAbsolutePath().normalize().toString();
             String normalizedGeometryPath = Files.exists(geometryPath)
@@ -271,7 +271,7 @@ public class GeoGebraRenderService {
                             log.warn("GeoGebra geometry extraction reported error: {}",
                                     geometryJson.length() > 300 ? geometryJson.substring(0, 300) : geometryJson);
                             Files.writeString(geometryPath, buildFallbackElementGeometryReport(figureName, sceneDirectives, viewBounds), StandardCharsets.UTF_8);
-                            log.info("Wrote fallback geometry report due to extraction error");
+                            log.debug("Wrote fallback geometry report due to extraction error");
                         } else {
                             // Check if extraction actually found elements; log a warning if not
                             if (geometryJson.contains("\"element_count\": 0") || geometryJson.contains("\"element_count\":0")) {
@@ -279,7 +279,7 @@ public class GeoGebraRenderService {
                                         + "writing report anyway", parsed.totalObjects);
                             }
                             Files.writeString(geometryPath, geometryJson, StandardCharsets.UTF_8);
-                            log.info("GeoGebra geometry report generated: {}", geometryPath);
+                            log.debug("GeoGebra geometry report generated: {}", geometryPath);
                         }
                     } else {
                         Files.writeString(geometryPath, buildFallbackElementGeometryReport(figureName, sceneDirectives, viewBounds), StandardCharsets.UTF_8);
@@ -289,7 +289,7 @@ public class GeoGebraRenderService {
                     log.warn("Failed to extract GeoGebra geometry: {}", e.getMessage());
                     try {
                         Files.writeString(geometryPath, buildFallbackElementGeometryReport(figureName, sceneDirectives, viewBounds), StandardCharsets.UTF_8);
-                        log.info("Wrote minimal fallback geometry report after extraction failure");
+                        log.debug("Wrote minimal fallback geometry report after extraction failure");
                     } catch (IOException writeError) {
                         log.warn("Failed to write fallback geometry report: {}", writeError.getMessage());
                     }
@@ -863,7 +863,7 @@ public class GeoGebraRenderService {
         byte[] downloaded = downloadBytes(remoteUrl, "GeoGebra asset");
         Files.createDirectories(cachePath.getParent());
         Files.write(cachePath, downloaded);
-        log.info("Cached GeoGebra asset at {}", cachePath);
+        log.debug("Cached GeoGebra asset at {}", cachePath);
         return downloaded;
     }
 
@@ -910,7 +910,7 @@ public class GeoGebraRenderService {
             byte[] downloaded = downloadBytes(deployUrl, "GeoGebra deploy script");
             Files.createDirectories(cachePath.getParent());
             Files.write(cachePath, downloaded);
-            log.info("Cached GeoGebra deploy script at {}", cachePath);
+            log.debug("Cached GeoGebra deploy script at {}", cachePath);
             return downloaded;
         } catch (IOException e) {
             throw new IOException("GeoGebra deploy script is not cached and could not be downloaded from "

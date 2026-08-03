@@ -70,7 +70,7 @@ public class MathVisionTaskScheduler {
             if (claimed == 0) {
                 continue;
             }
-            log.info("MathVision 任务已领取执行, taskId={}, stage={}", task.getId(), task.getCurrentStage());
+            log.debug("MathVision 任务已领取执行, taskId={}, stage={}", task.getId(), task.getCurrentStage());
             taskNotifier.notifyTaskChanged(task.getId(), "running");
             executor.execute(() -> stageRunner.runOneVisibleStage(task.getId()));
         }

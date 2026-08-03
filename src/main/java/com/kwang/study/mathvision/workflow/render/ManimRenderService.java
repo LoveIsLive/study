@@ -76,7 +76,7 @@ public class ManimRenderService {
             boolean voiceoverCode = containsVoiceoverCode(manimCode);
             List<String> command = buildCommand(
                     codeFile, effectiveSceneName, quality, outputDir, voiceoverCode);
-            log.info("MathVision Manim 渲染开始, sceneName={}, quality={}, timeout={}min, codeLines={}, scenes={}, outputDir={}",
+            log.debug("MathVision Manim 渲染开始, sceneName={}, quality={}, timeout={}min, codeLines={}, scenes={}, outputDir={}",
                     effectiveSceneName, quality, timeoutBudget.timeoutMinutes(),
                     timeoutBudget.codeLines(), timeoutBudget.sceneCount(),
                     outputDir.toAbsolutePath().normalize());
@@ -122,7 +122,7 @@ public class ManimRenderService {
                 return Attempt.failed(stdout, append(stderr, "No video file produced"),
                         false, secondsSince(start), geometryPath);
             }
-            log.info("MathVision Manim 渲染成功, sceneName={}, videoPath={}, geometry={}",
+            log.debug("MathVision Manim 渲染成功, sceneName={}, videoPath={}, geometry={}",
                     effectiveSceneName, videoPath, geometryPath);
             return Attempt.success(stdout, stderr, videoPath, secondsSince(start), geometryPath);
         } catch (Exception e) {
@@ -328,7 +328,7 @@ public class ManimRenderService {
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append('\n');
                 if (errorStream) {
-                    log.warn("[manim:{}] {}", streamName, line);
+                    log.debug("[manim:{}] {}", streamName, line);
                     if (line.contains("Traceback (most recent call last)")) {
                         tracebackSeen = true;
                     } else if (tracebackSeen
@@ -340,7 +340,7 @@ public class ManimRenderService {
                         terminateProcessTree(process, FATAL_STDERR_MESSAGE);
                     }
                 } else {
-                    log.info("[manim:{}] {}", streamName, line);
+                    log.debug("[manim:{}] {}", streamName, line);
                 }
             }
         }

@@ -227,7 +227,7 @@ public class NodeConversationContext {
         }
 
         if (removedMessages > 0) {
-            log.info("Rolling context trimmed: {} messages removed, rolling ~{} -> ~{} tokens (budget {})",
+            log.debug("Rolling context trimmed: {} messages removed, rolling ~{} -> ~{} tokens (budget {})",
                     removedMessages, beforeTokens, rollingTokens, rollingBudget);
         }
     }
@@ -252,7 +252,7 @@ public class NodeConversationContext {
             }
         }
         if (removedMessages > 0) {
-            log.info("Rolling context trimmed by round limit: {} messages removed, rounds {} -> {}",
+            log.debug("Rolling context trimmed by round limit: {} messages removed, rounds {} -> {}",
                     removedMessages, rounds, countRoundsLocked());
         }
     }
@@ -356,7 +356,7 @@ public class NodeConversationContext {
 
         int afterTokens = estimateAiSnapshotTokens(snapshot);
         if (snapshot.size() < beforeCount) {
-            log.info("MathVision AI prompt context trimmed: {} messages removed, messages ~{} -> ~{} tokens, tool/schema ~{} tokens, budget {}",
+            log.debug("MathVision AI prompt context trimmed: {} messages removed, messages ~{} -> ~{} tokens, tool/schema ~{} tokens, budget {}",
                     beforeCount - snapshot.size(), beforeTokens, afterTokens, requestPayloadTokens, effectiveBudget);
         }
         warnIfStillOverBudget(afterTokens, requestPayloadTokens, effectiveBudget);

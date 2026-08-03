@@ -154,6 +154,10 @@ class RenderResultStageExecutorTest {
                 storageService,
                 catalog,
                 tempDir.resolve("runs").toString());
+        Path renderWorkspace = tempDir.resolve("runs/task-42/v3/render");
+        Path intermediateFile = renderWorkspace.resolve("media/partial/temporary.bin");
+        Files.createDirectories(intermediateFile.getParent());
+        Files.writeString(intermediateFile, "temporary-render-data");
 
         MathVisionStageExecutionResult result = executor.execute(
                 MathVisionStageExecutionContext.builder()
@@ -164,6 +168,7 @@ class RenderResultStageExecutorTest {
         assertFalse(result.isFailed());
         assertEquals("/mathvision/task-42/v3/final/final.mp4", result.getFinalArtifactPath());
         assertFalse(Files.exists(localVideo));
+        assertFalse(Files.exists(renderWorkspace));
         assertTrue(sceneResult.getGateReason().contains("after 2 fix attempts"));
 
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
@@ -384,6 +389,10 @@ class RenderResultStageExecutorTest {
                 artifactMapper, versionMapper, objectMapper, renderNode, sceneEvaluationNode, codeFixNode,
                 finalCodeArtifactService, storageService, new MathVisionModelCatalog(),
                 tempDir.resolve("runs").toString());
+        Path renderWorkspace = tempDir.resolve("runs/task-44/v5/render");
+        Path intermediateFile = renderWorkspace.resolve("07_geogebra_validation.json");
+        Files.createDirectories(renderWorkspace);
+        Files.writeString(intermediateFile, "temporary-validation-data");
 
         MathVisionStageExecutionResult result = executor.execute(
                 MathVisionStageExecutionContext.builder()
@@ -395,6 +404,10 @@ class RenderResultStageExecutorTest {
         assertTrue(String.valueOf(result.getFinalArtifactPath()).endsWith("retained\\final.mp4")
                 || String.valueOf(result.getFinalArtifactPath()).endsWith("retained/final.mp4"));
         assertTrue(Files.isRegularFile(Path.of(result.getFinalArtifactPath())));
+        assertFalse(Files.exists(intermediateFile));
+        try (java.util.stream.Stream<Path> files = Files.walk(renderWorkspace)) {
+            assertEquals(1L, files.filter(Files::isRegularFile).count());
+        }
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertTrue(resultJson.path("success").asBoolean());
         assertEquals("archive unavailable", resultJson.path("artifactStorageWarning").asText());
@@ -433,6 +446,10 @@ class RenderResultStageExecutorTest {
         AtomicInteger renderAttempt = new AtomicInteger();
         doAnswer(invocation -> {
             int attempt = renderAttempt.incrementAndGet();
+            Path renderWorkspace = invocation.getArgument(6);
+            Path intermediate = renderWorkspace.resolve("media/attempt-" + attempt + "/partial.tmp");
+            Files.createDirectories(intermediate.getParent());
+            Files.writeString(intermediate, "failed-attempt");
             RenderNode.RenderRetryState state = invocation.getArgument(3);
             setRenderRetryState(state, attempt, "NameError: failure " + attempt);
             RenderResult failed = new RenderResult();
@@ -486,6 +503,7 @@ class RenderResultStageExecutorTest {
         assertEquals("assistant", conversationSnapshots.get(1).get(1).getRole());
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertEquals(4, resultJson.path("renderFixConversationMessages").asInt());
+        assertFalse(Files.exists(tempDir.resolve("runs/task-44/v1/render")));
     }
 
     private static Narrative narrativeWithStoryboard() {

@@ -78,7 +78,7 @@ public class MathVisionFinalCodeArtifactService {
         artifactMapper.updateArtifactJson(currentArtifact);
         updateStageResult(currentArtifact, finalCodeResult);
 
-        log.info("MathVision final render code written back in place, taskId={}, taskVersion={}, "
+        log.debug("MathVision final render code written back in place, taskId={}, taskVersion={}, "
                         + "codeVersion={}, codeLines={}",
                 task.getId(), taskVersion.getVersion(), currentCodeVersion, finalCodeResult.codeLineCount());
         return WritebackResult.updated(currentCodeVersion, currentCodeVersion);

@@ -139,7 +139,7 @@ public class MathVisionFinalArtifactStorageService {
         try {
             boolean deleted = Files.deleteIfExists(source);
             if (deleted) {
-                log.info("MathVision local render artifact deleted after FS archive, localPath={}, storagePath={}",
+                log.debug("MathVision local render artifact deleted after FS archive, localPath={}, storagePath={}",
                         source, storagePath);
             }
         } catch (IOException e) {

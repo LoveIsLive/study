@@ -73,7 +73,7 @@ public class CodeFixNode {
         result.setRulesPrompt(rulesPrompt);
         result.setFixedContextPrompt(fixedContextPrompt);
         result.setCurrentRequestPrompt(currentRequestPrompt);
-        log.info("MathVision CodeFix request prepared, taskId={}, source={}, outputTarget={}, codeLines={}, "
+        log.debug("MathVision CodeFix request prepared, taskId={}, source={}, outputTarget={}, codeLines={}, "
                         + "rulesTokens~{}, fixedContextTokens~{}, currentRequestTokens~{}, errorSignature={}",
                 task != null ? task.getId() : null,
                 request.getSource(),
@@ -111,7 +111,7 @@ public class CodeFixNode {
 
         String fixedCode = response.getCode();
         result.setToolCalls(response.getApiCalls());
-        log.info("MathVision CodeFix provider response received, taskId={}, source={}, apiCalls={}, hasCode={}, "
+        log.debug("MathVision CodeFix provider response received, taskId={}, source={}, apiCalls={}, hasCode={}, "
                         + "failureReason={}",
                 task != null ? task.getId() : null,
                 request.getSource(),
@@ -166,7 +166,7 @@ public class CodeFixNode {
         }
         result.setExecutionTimeSeconds(secondsSince(start));
 
-        log.info("MathVision 共享代码修复完成, taskId={}, source={}, outcome={}, applied={}, staticIssues={}",
+        log.debug("MathVision 共享代码修复完成, taskId={}, source={}, outcome={}, applied={}, staticIssues={}",
                 task.getId(), request.getSource(), result.getOutcome(), result.isApplied(), staticIssues.size());
         return finish(task, result, response.getApiCalls(), start, response.getAssistantText());
     }

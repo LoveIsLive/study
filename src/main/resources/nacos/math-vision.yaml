@@ -15,7 +15,7 @@ workflow:
   renderMaxRetries: 10
   sceneEvaluationMaxRetries: 5
   renderFixConversationRounds: 10
-  aiTraceEnabled: true
+  aiTraceEnabled: false
   aiTraceMaxChars: 200000
 
 modelDefaults:

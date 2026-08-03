@@ -13,7 +13,7 @@ nacos:
     auto-refreshed: true
     bootstrap:
       enable: true
-      log-enable: true
+      log-enable: false
 
 logging:
   config: "classpath:config/log4j2.xml"

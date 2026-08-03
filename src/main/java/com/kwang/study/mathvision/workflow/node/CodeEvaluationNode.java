@@ -131,7 +131,7 @@ public class CodeEvaluationNode {
         evaluation.getAttempts().add(attempt);
 
         if (approved) {
-            log.info("MathVision 代码评估通过, taskId={}, sceneName={}, apiCalls={}",
+            log.debug("MathVision 代码评估通过, taskId={}, sceneName={}, apiCalls={}",
                     task.getId(), evaluation.getSceneName(), apiCalls);
         } else {
             log.warn("MathVision 代码评估未通过, taskId={}, sceneName={}, reason={}",

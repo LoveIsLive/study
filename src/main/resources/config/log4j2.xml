@@ -2,8 +2,8 @@
 <Configuration dest="err" status="warn" name="StudyLogConfig" monitorInterval="30">
     <Properties>
         <Property name="LOG_DIR">${sys:study.log.dir:-logs}</Property>
-        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level [%logger{36}] - %msg%n%throwable</Property>
-        <Property name="CONSOLE_PATTERN">%style{%d{yyyy-MM-dd HH:mm:ss.SSS}}{black} [%pid] %highlight{%-5level} [%logger{36}] - %msg%n%throwable</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss} %-5level [%logger{32}] %msg%n%throwable</Property>
+        <Property name="CONSOLE_PATTERN">%style{%d{yyyy-MM-dd HH:mm:ss}}{black} %highlight{%-5level} [%logger{32}] %msg%n%throwable</Property>
     </Properties>
 
     <Appenders>
@@ -20,9 +20,14 @@
             <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="20MB"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="30"/>
+            <DefaultRolloverStrategy max="14">
+                <Delete basePath="${LOG_DIR}/archive" maxDepth="1">
+                    <IfFileName glob="study-*.log.gz"/>
+                    <IfLastModified age="14d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingFile>
 
         <RollingFile name="MathVisionWorkflowFile"
@@ -33,9 +38,14 @@
             <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="20MB"/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="30"/>
+            <DefaultRolloverStrategy max="14">
+                <Delete basePath="${LOG_DIR}/archive" maxDepth="1">
+                    <IfFileName glob="mathvision-workflow-*.log.gz"/>
+                    <IfLastModified age="14d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingFile>
 
         <RollingFile name="MathVisionAiTraceFile"
@@ -46,19 +56,30 @@
             <PatternLayout pattern="${LOG_PATTERN}" charset="UTF-8" />
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="50MB"/>
+                <SizeBasedTriggeringPolicy size="20MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="14"/>
+            <DefaultRolloverStrategy max="3">
+                <Delete basePath="${LOG_DIR}/archive" maxDepth="1">
+                    <IfFileName glob="mathvision-ai-trace-*.log.gz"/>
+                    <IfLastModified age="3d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingFile>
     </Appenders>
 
     <Loggers>
-        <Logger name="com.kwang.study.mathvision" level="info" additivity="true">
+        <Logger name="com.kwang.study.mathvision" level="info" additivity="false">
             <AppenderRef ref="MathVisionWorkflowFile" />
+            <AppenderRef ref="Console" />
         </Logger>
         <Logger name="com.kwang.study.mathvision.ai.trace" level="debug" additivity="false">
             <AppenderRef ref="MathVisionAiTraceFile" />
         </Logger>
+        <Logger name="com.alibaba.nacos" level="warn" />
+        <Logger name="com.zaxxer.hikari" level="warn" />
+        <Logger name="org.mybatis" level="warn" />
+        <Logger name="com.microsoft.playwright" level="warn" />
+        <Logger name="io.netty" level="warn" />
         <Root level="info">
             <AppenderRef ref="Console" />
             <AppenderRef ref="AppFile" />

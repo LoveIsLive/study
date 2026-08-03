@@ -55,7 +55,7 @@ public class RenderNode {
         if (context != null) {
             context.checkCanceled();
         }
-        log.info("MathVision RenderNode 执行完成, taskId={}, success={}, artifactPath={}",
+        log.debug("MathVision RenderNode 执行完成, taskId={}, success={}, artifactPath={}",
                 task.getId(), renderResult.isSuccess(), renderResult.getArtifactPath());
         return new Result(renderResult, 0);
     }

@@ -660,7 +660,7 @@ public class MathVisionAiChatService {
         JsonNode copiedMessage = copied.path("choices").path(0).path("message");
         if (copiedMessage instanceof ObjectNode) {
             ((ObjectNode) copiedMessage).put("content", reasoningContent);
-            log.info("MathVision AI using reasoning_content as fallback, provider={}, model={}, chars={}",
+            log.debug("MathVision AI using reasoning_content as fallback, provider={}, model={}, chars={}",
                     runtime.providerCode, runtime.model, reasoningContent.length());
             return copied;
         }
@@ -1497,7 +1497,7 @@ public class MathVisionAiChatService {
                 response.path("usage").path("completion_tokens").asLong(0L),
                 response.path("usageMetadata").path("candidatesTokenCount").asLong(0L),
                 response.path("usage").path("output_tokens").asLong(0L));
-        log.info("MathVision AI response received, provider={}, model={}, http={}, finishReason={}, "
+        log.debug("MathVision AI response received, provider={}, model={}, http={}, finishReason={}, "
                         + "hasToolPayload={}, contentChars={}, reasoningChars={}, inputTokens={}, outputTokens={}",
                 runtime.providerCode,
                 runtime.model,

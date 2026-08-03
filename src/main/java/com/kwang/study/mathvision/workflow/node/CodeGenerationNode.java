@@ -109,7 +109,7 @@ public class CodeGenerationNode {
         PerSceneDraft perSceneDraft = null;
 
         if (resolvedRequest.isUserRevision()) {
-            log.info("MathVision CodeGeneration complete-code revision, taskId={}, target={}",
+            log.debug("MathVision CodeGeneration complete-code revision, taskId={}, target={}",
                     task.getId(), outputTarget);
             SingleSceneDraft draft = reviseCompleteCode(
                     task, baseMessages, narrative, outputTarget, resolvedRequest, context, apiCalls);
@@ -123,7 +123,7 @@ public class CodeGenerationNode {
                         ? "Complete GeoGebra construction revised from existing generated code"
                         : "Complete Manim animation revised from existing generated code");
         } else if (multiScene) {
-            log.info("MathVision CodeGeneration 逐场景生成, taskId={}, scenes={}, target={}",
+            log.debug("MathVision CodeGeneration 逐场景生成, taskId={}, scenes={}, target={}",
                     task.getId(), storyboard.getScenes().size(), outputTarget);
             perSceneDraft = generatePerScene(
                     task, baseMessages, storyboard, isGeoGebra, sceneMode, context, apiCalls);

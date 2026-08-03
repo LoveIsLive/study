@@ -170,7 +170,7 @@ public class SceneEvaluationNode {
                         blockingIssues, issueSamples, totalIssues));
             }
             result.setExecutionTimeSeconds(secondsSince(start));
-            log.info("MathVision SceneEvaluationNode completed, taskId={}, approved={}, blockingIssues={}",
+            log.debug("MathVision SceneEvaluationNode completed, taskId={}, approved={}, blockingIssues={}",
                     task != null ? task.getId() : null, result.isApproved(), result.getBlockingIssueCount());
             return finish(result, context);
         } catch (IOException e) {

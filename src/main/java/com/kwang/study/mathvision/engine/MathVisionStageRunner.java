@@ -92,7 +92,7 @@ public class MathVisionStageRunner {
             boolean failed = result != null && result.isFailed();
             if (!failed || !context.isUserRevision()) {
                 persistStageResult(task, stage, result, context);
-                log.info("MathVision 阶段结果已持久化, taskId={}, stage={}, hasArtifact={}, hasResult={}, finalArtifactPath={}",
+                log.debug("MathVision 阶段结果已持久化, taskId={}, stage={}, hasArtifact={}, hasResult={}, finalArtifactPath={}",
                         taskId,
                         stage.getCode(),
                         result != null && StringUtils.hasText(result.getArtifactJson()),
