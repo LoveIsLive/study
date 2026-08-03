@@ -309,6 +309,14 @@ public final class SystemPrompts {
                     + "- For `kind=text` objects that label mathematical elements, `content` is the exact on-screen label and must be as concise as the mathematical name: use `B′`, not `反射点B′`; use `l`, not `直线l`; use `AB`, not `线段AB`. Put explanatory wording in narration, action descriptions, or goals instead.\n"
                     + "- Preserve Chinese learner-facing text during cleanup, code generation, review, and repair; do not translate it to English or pinyin.\n";
 
+    /** User-visible Stage 2 reasoning-graph language rules. */
+    public static final String REASONING_GRAPH_CHINESE_TEXT_RULES =
+            "Reasoning-graph learner-facing Chinese text rules:\n"
+                    + "- Write every learner-facing natural-language field in Chinese: each node's `step` and `reason`, every `definitions` value, `interpretation`, and every `examples` item.\n"
+                    + "- Keep formulas, variable names, point names, geometric notation, and LaTeX symbolic; do not translate symbols such as `A`, `P`, `AB`, `x`, `\\angle APB`, or formula content into Chinese prose.\n"
+                    + "- Keep backend-only identifiers and enum values in ASCII English, including node `id`, `start_id`, `node_type`, `next_edges` keys and values, and `teaching_order` entries. Definition keys should remain the exact symbol or notation being defined.\n"
+                    + "- During enrichment and user revision, preserve Chinese learner-facing text; do not translate it to English or pinyin.\n";
+
     /** Manim-only action narration and voiceover planning rules. */
     public static final String MANIM_VOICEOVER_RULES =
             "Manim voiceover rules:\n"

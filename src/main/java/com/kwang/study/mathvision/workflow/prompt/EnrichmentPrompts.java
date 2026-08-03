@@ -38,6 +38,7 @@ public final class EnrichmentPrompts {
                     + "- Return multi-line formulas as separate array items.\n"
                     + "- Keep formulas compact and directly relevant to the current step.\n\n"
                     + SystemPrompts.ASCII_TEXT_RULES
+                    + SystemPrompts.REASONING_GRAPH_CHINESE_TEXT_RULES
                     + "Step text verification:\n"
                     + "- Carefully review the original step text and reason for mathematical errors such as wrong coordinates, wrong formulas, wrong rotation/branch direction, wrong locus center, wrong endpoint image, wrong extremum, missing primes, wrong subscripts, swapped variables, or incorrect symbol references.\n"
                     + "- If you find any such error, return corrected `step` and `reason` fields that faithfully reflect the ProblemBundle-consistent mathematics.\n"
@@ -46,12 +47,12 @@ public final class EnrichmentPrompts {
                     + "Output format:\n"
                     + "Return a JSON object with this shape:\n"
                     + "{\n"
-                    + "  \"step\": \"string, the corrected (or unchanged) step text; fix any missing primes, wrong subscripts, or incorrect symbol references\",\n"
-                    + "  \"reason\": \"string, the corrected (or unchanged) reason text; fix notation errors to match the corrected step\",\n"
+                    + "  \"step\": \"string, the corrected (or unchanged) natural-Chinese step text; fix any missing primes, wrong subscripts, or incorrect symbol references\",\n"
+                    + "  \"reason\": \"string, the corrected (or unchanged) natural-Chinese reason text; fix notation errors to match the corrected step\",\n"
                     + "  \"equations\": [\"string, one key LaTeX formula for this step\"],\n"
-                    + "  \"definitions\": {\"symbol\": \"string, meaning of a visual or mathematical symbol, variable, geometric object, or notation that appears in the diagram or formulas\"},\n"
-                    + "  \"interpretation\": \"string, short learner-facing intuition that explains what the formula means or why it matters\",\n"
-                    + "  \"examples\": [\"string, optional concrete example that sharpens the explanation without overloading the future scene\"]\n"
+                    + "  \"definitions\": {\"symbol\": \"string, concise Chinese meaning of a visual or mathematical symbol, variable, geometric object, or notation that appears in the diagram or formulas\"},\n"
+                    + "  \"interpretation\": \"string, short natural-Chinese learner-facing intuition that explains what the formula means or why it matters\",\n"
+                    + "  \"examples\": [\"string, optional concrete example written in natural Chinese that sharpens the explanation without overloading the future scene\"]\n"
                     + "}\n\n"
                     + SystemPrompts.TOOL_CALL_HINT
                     + "If formulas are unnecessary, return empty arrays/objects instead of padding the response.\n"
@@ -90,4 +91,3 @@ public final class EnrichmentPrompts {
         return SystemPrompts.buildFixedContextSection(sb.toString());
     }
 }
-

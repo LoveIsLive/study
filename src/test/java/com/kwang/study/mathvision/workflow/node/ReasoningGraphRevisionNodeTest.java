@@ -76,6 +76,8 @@ class ReasoningGraphRevisionNodeTest {
         verify(aiChatService).requestJson(eq(task), messagesCaptor.capture(), anyString());
         List<AiMessage> messages = messagesCaptor.getValue();
         assertTrue(messageText(messages.get(0)).contains("Reasoning-graph user-revision mode"));
+        assertTrue(messageText(messages.get(0)).contains("each node's `step` and `reason`"));
+        assertTrue(messageText(messages.get(0)).contains("do not translate it to English or pinyin"));
         assertTrue(messageText(messages.get(1)).contains("Base reasoning_graph stage version: 5"));
         assertTrue(messageText(messages.get(2)).contains("旧版观察"));
         assertTrue(messageText(messages.get(2)).contains("将辅助构造提前"));
@@ -120,8 +122,28 @@ class ReasoningGraphRevisionNodeTest {
         assertTrue(lastMessageText(calls.get(1)).contains("旧版直观解释二"));
         for (List<AiMessage> messages : calls) {
             assertTrue(messageText(messages.get(0)).contains("Mathematical-enrichment user-revision mode"));
+            assertTrue(messageText(messages.get(0)).contains("every `definitions` value"));
+            assertTrue(messageText(messages.get(0)).contains("natural-Chinese reason text"));
             assertTrue(lastMessageText(messages).contains("将辅助构造提前"));
         }
+    }
+
+    @Test
+    void explorationUsesChineseTextForSyntheticRootFallback() {
+        task.setOutputTarget("geogebra");
+        ObjectNode payload = graphPayload("观察变量变化", "得到最终结论");
+        payload.putObject("next_edges")
+                .putArray("step_1").add("step_2");
+        ((ObjectNode) payload.get("next_edges"))
+                .putArray("step_2").add("step_1");
+        when(aiChatService.requestJson(eq(task), anyList(), anyString())).thenReturn(payload);
+
+        ExplorationNode.Result result = new ExplorationNode(aiChatService, objectMapper)
+                .run(task, bundle, context);
+
+        KnowledgeNode syntheticStart = result.getGraph().getStartNode();
+        assertEquals("呈现问题并引出第一步解题思路", syntheticStart.getStep());
+        assertEquals("该步骤用于明确问题情境，并建立后续求解的起点。", syntheticStart.getReason());
     }
 
     private StageGenerationRequest<KnowledgeGraph> revisionRequest(KnowledgeGraph existing) {

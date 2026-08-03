@@ -1,0 +1,43 @@
+# MathVision Python rendering runtime.
+#
+# Python >= 3.11 is required by Manim 0.20.1. These versions were validated
+# end-to-end with Python 3.12. Install them inside a virtual environment with:
+#   python3 -m pip install -r requirements.txt
+#
+# This file intentionally contains only packages installable by pip. Native
+# Ubuntu packages and the Playwright browser installation are listed below as
+# comments and must be installed separately.
+
+# Generated teaching-animation code and the geometry-export helper use Manim
+# Community plus NumPy directly.
+manim==0.20.1
+numpy==2.4.4
+
+# Generated narrated scenes use VoiceoverScene and the Chinese gTTS service.
+manim-voiceover[gtts]==0.3.7
+gTTS==2.5.4
+
+# Runtime-critical audio packages used by manim-voiceover. `sox` here is the
+# Python wrapper; the native Ubuntu `sox` executable is still required.
+pydub==0.25.1
+mutagen==1.47.0
+sox==1.5.0
+
+# manim-voiceover 0.3.7 still imports pkg_resources.
+setuptools<81
+
+# Server packages that must be installed separately because pip cannot provide
+# them reliably:
+# - FFmpeg: Manim video encoding and pydub audio processing.
+# - SoX: manim-voiceover audio processing.
+# - A LaTeX distribution with dvisvgm: Manim Tex/MathTex rendering.
+# - Cairo/Pango and their native build/runtime libraries: Manim text rendering.
+# - A Chinese font such as Noto Sans CJK SC or Microsoft YaHei.
+# - Outbound HTTPS access for gTTS voice synthesis and configured model APIs.
+# - Playwright Chromium and its Linux libraries for GeoGebra validation.
+# - Outbound HTTPS access to https://www.geogebra.org/apps/ for the GeoGebra
+#   deploy script and web app assets, unless those assets are already cached.
+#
+# Install Playwright Chromium after Maven dependencies are available with:
+#   ./mvnw exec:java -Dexec.mainClass=com.microsoft.playwright.CLI \
+#     -Dexec.args="install --with-deps chromium"

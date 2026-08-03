@@ -62,12 +62,13 @@ public final class ExplorationPrompts {
                     + "2. Avoid synonyms, near-duplicates, and parent-child duplication across nodes.\n"
                     + "3. Include prerequisite observations or misconceptions only when they are needed to make the later insight feel earned - preferably through a visual contrast or brief operation.\n\n"
                     + SystemPrompts.ASCII_TEXT_RULES
+                    + SystemPrompts.REASONING_GRAPH_CHINESE_TEXT_RULES
                     + "Output format:\n"
                     + "Return a JSON object with this shape:\n"
                     + "{\n"
                     + "  \"start_id\": \"string, id of the first teaching beat\",\n"
                     + "  \"nodes\": [\n"
-                    + "    {\"id\": \"string, unique node id\", \"step\": \"string, one presentation-ready teaching beat\", \"reason\": \"string, why this beat matters in the explanation flow\", \"node_type\": \"string, one of concept|observation|construction|derivation|conclusion\", \"min_depth\": \"integer, minimum distance from the start beat\"}\n"
+                    + "    {\"id\": \"string, unique ASCII node id\", \"step\": \"string, one presentation-ready teaching beat written in natural Chinese\", \"reason\": \"string, concise Chinese explanation of why this beat matters in the explanation flow\", \"node_type\": \"string, one of concept|observation|construction|derivation|conclusion\", \"min_depth\": \"integer, minimum distance from the start beat\"}\n"
                     + "  ],\n"
                     + "  \"next_edges\": {\"node_id\": [\"direct_next_node_id\"]},\n"
                     + "  \"teaching_order\": [\"node_id_1\", \"node_id_2\", \"...\"]\n"
@@ -111,12 +112,13 @@ public final class ExplorationPrompts {
                     + "2. Avoid synonyms, near-duplicates, and parent-child duplication across nodes.\n"
                     + "3. Include prerequisite observations, failed attempts, or misconceptions only when they are needed to make the key insight understandable.\n\n"
                     + SystemPrompts.ASCII_TEXT_RULES
+                    + SystemPrompts.REASONING_GRAPH_CHINESE_TEXT_RULES
                     + "Output format:\n"
                     + "Return a JSON object with this shape:\n"
                     + "{\n"
                     + "  \"start_id\": \"string, id of the first solving beat\",\n"
                     + "  \"nodes\": [\n"
-                    + "    {\"id\": \"string, unique node id\", \"step\": \"string, one presentation-ready solving beat\", \"reason\": \"string, why this beat matters in the solution flow\", \"node_type\": \"string, one of problem|observation|construction|derivation|conclusion\", \"min_depth\": \"integer, minimum distance from the start beat\"}\n"
+                    + "    {\"id\": \"string, unique ASCII node id\", \"step\": \"string, one presentation-ready solving beat written in natural Chinese\", \"reason\": \"string, concise Chinese explanation of why this beat matters in the solution flow\", \"node_type\": \"string, one of problem|observation|construction|derivation|conclusion\", \"min_depth\": \"integer, minimum distance from the start beat\"}\n"
                     + "  ],\n"
                     + "  \"next_edges\": {\"node_id\": [\"direct_next_node_id\"]},\n"
                     + "  \"teaching_order\": [\"node_id_1\", \"node_id_2\", \"...\"]\n"
@@ -171,5 +173,4 @@ public final class ExplorationPrompts {
     }
 
 }
-
 

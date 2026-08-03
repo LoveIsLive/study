@@ -558,8 +558,8 @@ public class ExplorationNode {
                 ),
                 KnowledgeNode.NODE_TYPE_CONCEPT,
                 "concept_entry",
-                "Introduce the concept and the first key observation",
-                "This beat frames the concept and establishes the first learner-facing anchor.",
+                "引入概念并呈现第一个关键观察",
+                "该步骤用于界定概念，并建立学习者理解所需的第一个直观支点。",
                 KnowledgeNode.NODE_TYPE_CONCEPT
         ),
         PROBLEM(
@@ -572,8 +572,8 @@ public class ExplorationNode {
                 ),
                 KnowledgeNode.NODE_TYPE_DERIVATION,
                 "problem_entry",
-                "State the problem and frame the first solving move",
-                "This beat frames the problem and establishes the first solving direction.",
+                "呈现问题并引出第一步解题思路",
+                "该步骤用于明确问题情境，并建立后续求解的起点。",
                 KnowledgeNode.NODE_TYPE_PROBLEM
         );
 
