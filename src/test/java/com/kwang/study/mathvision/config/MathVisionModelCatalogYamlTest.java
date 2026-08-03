@@ -13,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MathVisionModelCatalogYamlTest {
@@ -25,6 +26,8 @@ class MathVisionModelCatalogYamlTest {
         MathVisionModelCatalog catalog = binder.bind("", Bindable.of(MathVisionModelCatalog.class)).get();
 
         assertEquals(5, catalog.getModelProviders().size());
+        assertNotNull(catalog.getApikey());
+        assertNull(catalog.getApikey().getSecret());
         assertEquals(2, catalog.getWorkflow().getCodeGenerationMaxRetries());
         assertEquals(3, catalog.getWorkflow().getVisualDesignSceneMaxRetries());
         assertEquals(5, catalog.getWorkflow().getStoryboardValidationMaxRetries());

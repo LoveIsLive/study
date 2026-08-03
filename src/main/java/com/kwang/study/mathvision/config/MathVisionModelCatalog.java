@@ -3,6 +3,7 @@ package com.kwang.study.mathvision.config;
 import com.alibaba.nacos.api.config.ConfigType;
 import com.alibaba.nacos.api.config.annotation.NacosConfigurationProperties;
 import lombok.Data;
+import lombok.ToString;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
@@ -28,6 +29,10 @@ public class MathVisionModelCatalog {
 
     /** 工作流运行参数也由同一个 Nacos dataId 统一管理。 */
     private WorkflowCatalog workflow = new WorkflowCatalog();
+
+    /** API Key 密文的应用层加密密钥配置。 */
+    @ToString.Exclude
+    private ApiKeyCatalog apikey = new ApiKeyCatalog();
 
     /** 模型未显式声明时使用的 Nacos 全局默认值。 */
     private ModelDefaultsCatalog modelDefaults = new ModelDefaultsCatalog();
@@ -137,6 +142,12 @@ public class MathVisionModelCatalog {
         private Integer renderFixConversationRounds = 10;
         private Boolean aiTraceEnabled = false;
         private Integer aiTraceMaxChars = 200_000;
+    }
+
+    @Data
+    public static class ApiKeyCatalog {
+        @ToString.Exclude
+        private String secret;
     }
 
     @Data

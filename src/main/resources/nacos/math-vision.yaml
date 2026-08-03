@@ -1,6 +1,7 @@
 # Canonical Nacos dataId: math-vision
-# Mirrors the active dev catalog. Runtime credentials remain user-owned in MySQL;
-# all non-secret model and workflow behavior is controlled by this Nacos document.
+# Mirrors the active dev catalog. Runtime credentials remain user-owned in MySQL.
+# The required apikey.secret is stored only in remote Nacos and intentionally
+# omitted from this repository template; all other runtime behavior is below.
 workflow:
   visualDesignSceneMaxRetries: 3
   storyboardValidationMaxRetries: 5

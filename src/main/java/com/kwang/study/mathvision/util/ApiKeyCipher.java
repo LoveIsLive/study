@@ -1,7 +1,9 @@
 package com.kwang.study.mathvision.util;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.kwang.study.mathvision.config.MathVisionModelCatalog;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -13,7 +15,7 @@ import java.util.Base64;
 
 /**
  * API Key 对称加解密 + 脱敏。
- * 算法: AES-256-GCM; 密钥由配置 mathvision.apikey.secret 经 SHA-256 派生为 32 字节。
+ * 算法: AES-256-GCM; 密钥由 Nacos dataId math-vision 的 apikey.secret 经 SHA-256 派生为 32 字节。
  * 存储格式: base64(iv(12 bytes) || ciphertext || tag)。
  */
 @Component
@@ -25,8 +27,25 @@ public class ApiKeyCipher {
 
     private final SecretKeySpec keySpec;
 
-    public ApiKeyCipher(@Value("${mathvision.apikey.secret:mathvision-default-dev-secret-change-me}") String secret) {
+    @Autowired
+    public ApiKeyCipher(MathVisionModelCatalog catalog) {
+        this(requireSecret(catalog));
+    }
+
+    /** 仅供不启动 Spring/Nacos 的单元测试构造。 */
+    public ApiKeyCipher(String secret) {
         this.keySpec = deriveKey(secret);
+    }
+
+    private static String requireSecret(MathVisionModelCatalog catalog) {
+        String secret = catalog != null && catalog.getApikey() != null
+                ? catalog.getApikey().getSecret()
+                : null;
+        if (!StringUtils.hasText(secret)) {
+            throw new IllegalStateException(
+                    "Nacos 配置缺失: dataId=math-vision, key=apikey.secret");
+        }
+        return secret.trim();
     }
 
     private static SecretKeySpec deriveKey(String secret) {
