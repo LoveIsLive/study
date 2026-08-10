@@ -17,6 +17,7 @@ import com.kwang.study.mathvision.workflow.model.ProblemBundle;
 import com.kwang.study.mathvision.workflow.model.VisualDesignMode;
 import com.kwang.study.mathvision.workflow.model.VisualDesignRequest;
 import com.kwang.study.mathvision.workflow.node.VisualDesignNode;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import com.kwang.study.mathvision.workflow.validation.StoryboardValidationNode;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -54,24 +55,33 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         bundle.setOutputTarget(task.getOutputTarget());
         KnowledgeGraph graph = loadKnowledgeGraph(task);
 
-        VisualDesignNode.Result designResult = context.isUserRevision()
-                ? visualDesignNode.run(
-                        task,
-                        bundle,
-                        graph,
-                        VisualDesignRequest.builder()
-                                .mode(VisualDesignMode.USER_REVISION)
-                                .existingNarrative(readExistingNarrative(context))
-                                .instruction(context.getInstruction())
-                                .baseStageVersion(context.getBaseStageVersion())
-                                .build(),
-                        context)
-                : visualDesignNode.run(task, bundle, graph, context);
+        VisualDesignNode.Result designResult = NodeExecutionLogger.execute(
+                task.getId(),
+                stage().getCode(),
+                "VisualDesignNode",
+                () -> context.isUserRevision()
+                        ? visualDesignNode.run(
+                                task,
+                                bundle,
+                                graph,
+                                VisualDesignRequest.builder()
+                                        .mode(VisualDesignMode.USER_REVISION)
+                                        .existingNarrative(readExistingNarrative(context))
+                                        .instruction(context.getInstruction())
+                                        .baseStageVersion(context.getBaseStageVersion())
+                                        .build(),
+                                context)
+                        : visualDesignNode.run(task, bundle, graph, context),
+                VisualDesignNode.Result::getApiCalls);
         Narrative narrative = designResult.getNarrative();
         com.fasterxml.jackson.databind.JsonNode visualDesignCheckpoint =
                 objectMapper.valueToTree(narrative).deepCopy();
-        StoryboardValidationNode.Result validationResult =
-                storyboardValidationNode.run(task, bundle, graph, narrative, context);
+        StoryboardValidationNode.Result validationResult = NodeExecutionLogger.execute(
+                task.getId(),
+                stage().getCode(),
+                "StoryboardValidationNode",
+                () -> storyboardValidationNode.run(task, bundle, graph, narrative, context),
+                StoryboardValidationNode.Result::getApiCalls);
         Narrative validatedNarrative = validationResult.getNarrative() != null
                 ? validationResult.getNarrative()
                 : narrative;

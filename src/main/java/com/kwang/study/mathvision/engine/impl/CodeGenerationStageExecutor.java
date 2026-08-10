@@ -29,6 +29,7 @@ import com.kwang.study.mathvision.workflow.node.CodeFixNode;
 import com.kwang.study.mathvision.workflow.node.CodeGenerationNode;
 import com.kwang.study.mathvision.workflow.prompt.CodeEvaluationPrompts;
 import com.kwang.study.mathvision.workflow.prompt.StoryboardJsonBuilder;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
 import com.kwang.study.mathvision.workflow.util.TextHealthDiagnostics;
 import org.slf4j.Logger;
@@ -101,8 +102,23 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         int maxCodeEvaluationFixAttempts = codeEvaluationMaxRetries();
         for (int fixAttempt = 0; fixAttempt <= maxCodeEvaluationFixAttempts; fixAttempt++) {
             context.checkCanceled();
-            CodeEvaluationNode.Result evaluationNodeResult = codeEvaluationNode.run(
-                    task, bundle, narrative, codeResult, fixAttempt, revisedCodeApplied, context);
+            int evaluationAttempt = fixAttempt + 1;
+            int currentFixAttempt = fixAttempt;
+            boolean currentRevisedCodeApplied = revisedCodeApplied;
+            CodeEvaluationNode.Result evaluationNodeResult = NodeExecutionLogger.execute(
+                    task.getId(),
+                    stage().getCode(),
+                    "CodeEvaluationNode",
+                    "attempt=" + evaluationAttempt,
+                    () -> codeEvaluationNode.run(
+                            task,
+                            bundle,
+                            narrative,
+                            codeResult,
+                            currentFixAttempt,
+                            currentRevisedCodeApplied,
+                            context),
+                    CodeEvaluationNode.Result::getApiCalls);
             latestEvaluation = evaluationNodeResult.getEvaluationResult();
             evaluationAttempts.add(latestEvaluation);
             apiCalls += evaluationNodeResult.getApiCalls();
@@ -114,8 +130,13 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
             }
             CodeFixRequest fixRequest = buildEvaluationFixRequest(
                     bundle, narrative, codeResult, latestEvaluation, fixTrace);
-            CodeFixNode.Result fixNodeResult = codeFixNode.run(
-                    task, fixRequest, context, codeFixConversation);
+            CodeFixNode.Result fixNodeResult = NodeExecutionLogger.execute(
+                    task.getId(),
+                    stage().getCode(),
+                    "CodeFixNode",
+                    "source=code_evaluation,attempt=" + evaluationAttempt,
+                    () -> codeFixNode.run(task, fixRequest, context, codeFixConversation),
+                    CodeFixNode.Result::getApiCalls);
             CodeFixResult fixResult = fixNodeResult.getFixResult();
             fixTrace.add(fixResult);
             appendFixConversation(
@@ -198,8 +219,14 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             context.checkCanceled();
             try {
-                CodeGenerationNode.Result result = codeGenerationNode.run(
-                        task, bundle, narrative, request, context);
+                int generationAttempt = attempt + 1;
+                CodeGenerationNode.Result result = NodeExecutionLogger.execute(
+                        task.getId(),
+                        stage().getCode(),
+                        "CodeGenerationNode",
+                        "attempt=" + generationAttempt,
+                        () -> codeGenerationNode.run(task, bundle, narrative, request, context),
+                        CodeGenerationNode.Result::getApiCalls);
                 return new GenerationRun(result, attempt + 1, failures);
             } catch (IllegalArgumentException e) {
                 throw e;

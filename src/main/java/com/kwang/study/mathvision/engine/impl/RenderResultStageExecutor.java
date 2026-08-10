@@ -32,6 +32,7 @@ import com.kwang.study.mathvision.workflow.prompt.RenderFixPrompts;
 import com.kwang.study.mathvision.workflow.prompt.SceneEvaluationPrompts;
 import com.kwang.study.mathvision.workflow.prompt.StoryboardJsonBuilder;
 import com.kwang.study.mathvision.workflow.util.ErrorSummarizer;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
 import com.kwang.study.mathvision.workflow.util.TextHealthDiagnostics;
 import com.kwang.study.mathvision.workflow.util.TokenEstimator;
@@ -152,9 +153,21 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     renderRetryState.getFixToolCalls(),
                     sceneFixAttempts,
                     countNonBlankLines(codeResult.getGeneratedCode()));
-            RenderNode.Result renderNodeResult = renderNode.run(
-                    task, codeResult, narrative, renderRetryState, renderQuality,
-                    renderMaxRetries, renderOutputDir, context);
+            RenderNode.Result renderNodeResult = NodeExecutionLogger.execute(
+                    task.getId(),
+                    stage().getCode(),
+                    "RenderNode",
+                    "iteration=" + (iteration + 1),
+                    () -> renderNode.run(
+                            task,
+                            codeResult,
+                            narrative,
+                            renderRetryState,
+                            renderQuality,
+                            renderMaxRetries,
+                            renderOutputDir,
+                            context),
+                    RenderNode.Result::getApiCalls);
             renderResult = renderNodeResult.getRenderResult();
             apiCalls += renderNodeResult.getApiCalls();
             log.debug("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
@@ -193,8 +206,13 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         request.getFixHistory() != null ? request.getFixHistory().size() : 0,
                         estimateCodeFixPromptTokens(request),
                         errorSignature(request.getErrorReason()));
-                CodeFixNode.Result fixNodeResult = codeFixNode.run(
-                        task, request, context, renderFixConversation);
+                CodeFixNode.Result fixNodeResult = NodeExecutionLogger.execute(
+                        task.getId(),
+                        stage().getCode(),
+                        "CodeFixNode",
+                        "source=render,iteration=" + (iteration + 1),
+                        () -> codeFixNode.run(task, request, context, renderFixConversation),
+                        CodeFixNode.Result::getApiCalls);
                 CodeFixResult fixResult = fixNodeResult.getFixResult();
                 fixTrace.add(fixResult);
                 renderRetryState.recordFixResult(fixResult);
@@ -227,8 +245,21 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 continue;
             }
 
-            SceneEvaluationNode.Result sceneNodeResult = sceneEvaluationNode.run(
-                    task, narrative, codeResult, renderResult, sceneFixAttempts, context);
+            RenderResult currentRenderResult = renderResult;
+            int currentSceneFixAttempts = sceneFixAttempts;
+            SceneEvaluationNode.Result sceneNodeResult = NodeExecutionLogger.execute(
+                    task.getId(),
+                    stage().getCode(),
+                    "SceneEvaluationNode",
+                    "iteration=" + (iteration + 1) + ",revisionAttempt=" + currentSceneFixAttempts,
+                    () -> sceneEvaluationNode.run(
+                            task,
+                            narrative,
+                            codeResult,
+                            currentRenderResult,
+                            currentSceneFixAttempts,
+                            context),
+                    SceneEvaluationNode.Result::getApiCalls);
             sceneEvaluationResult = sceneNodeResult.getSceneEvaluationResult();
             apiCalls += sceneNodeResult.getApiCalls();
             log.debug("MathVision scene evaluation result, taskId={}, iteration={}, approved={}, evaluated={}, "
@@ -296,8 +327,14 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     sceneFixAttempts,
                     estimateCodeFixPromptTokens(request),
                     abbreviate(request.getErrorReason(), 500));
-            CodeFixNode.Result fixNodeResult = codeFixNode.run(
-                    task, request, context, List.of());
+            CodeFixNode.Result fixNodeResult = NodeExecutionLogger.execute(
+                    task.getId(),
+                    stage().getCode(),
+                    "CodeFixNode",
+                    "source=scene_evaluation,iteration=" + (iteration + 1)
+                            + ",attempt=" + sceneFixAttempts,
+                    () -> codeFixNode.run(task, request, context, List.of()),
+                    CodeFixNode.Result::getApiCalls);
             CodeFixResult fixResult = fixNodeResult.getFixResult();
             fixTrace.add(fixResult);
             apiCalls += fixNodeResult.getApiCalls();

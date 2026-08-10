@@ -15,6 +15,7 @@ import com.kwang.study.mathvision.workflow.model.AiContentPart;
 import com.kwang.study.mathvision.workflow.model.AiMessage;
 import com.kwang.study.mathvision.workflow.util.JsonUtils;
 import com.kwang.study.mathvision.workflow.util.NodeConversationContext;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,6 +98,7 @@ public class MathVisionAiChatService {
     }
 
     public JsonNode requestJson(MathVisionTask task, List<AiMessage> messages, String toolsJson) {
+        NodeExecutionLogger.recordLogicalRequest();
         JsonNode response = requestRaw(task, messages, toolsJson);
         JsonExtraction first = extractJsonResponse(response);
         if (first.payload != null || !StringUtils.hasText(toolsJson)) {
@@ -120,6 +122,7 @@ public class MathVisionAiChatService {
                               List<AiMessage> messages,
                               String toolsJson,
                               List<String> preferredPayloadFields) {
+        NodeExecutionLogger.recordLogicalRequest();
         List<String> fields = normalizePreferredFields(preferredPayloadFields);
         JsonNode response = requestRaw(task, messages, toolsJson);
         TextExtraction first = extractPreferredText(response, fields);
@@ -187,6 +190,7 @@ public class MathVisionAiChatService {
      * the platform, while response parsing remains owned by the core workflow.
      */
     public JsonNode requestRawResponse(MathVisionTask task, List<AiMessage> messages, String toolsJson) {
+        NodeExecutionLogger.recordLogicalRequest();
         return requestRaw(task, messages, toolsJson);
     }
 
@@ -202,6 +206,7 @@ public class MathVisionAiChatService {
                                     List<AiMessage> messages,
                                     String toolsJson,
                                     List<String> preferredPayloadFields) {
+        NodeExecutionLogger.recordLogicalRequest();
         List<String> fields = normalizePreferredFields(preferredPayloadFields);
         JsonNode response = requestRaw(task, messages, toolsJson);
         CodeResponse first = extractCodeResponse(response, fields, 1);
@@ -869,6 +874,7 @@ public class MathVisionAiChatService {
                     .header("Content-Type", "application/json");
             customizer.apply(builder);
             HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(jsonBody)).build();
+            NodeExecutionLogger.recordHttpAttempt();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (aiTraceEnabled()) {
                 MathVisionAiTraceLogger.logResponse(

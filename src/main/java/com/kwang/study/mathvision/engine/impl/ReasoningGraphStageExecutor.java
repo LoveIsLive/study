@@ -17,6 +17,7 @@ import com.kwang.study.mathvision.workflow.model.StageGenerationMode;
 import com.kwang.study.mathvision.workflow.model.StageGenerationRequest;
 import com.kwang.study.mathvision.workflow.node.ExplorationNode;
 import com.kwang.study.mathvision.workflow.node.MathEnrichmentNode;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -60,15 +61,25 @@ public class ReasoningGraphStageExecutor implements MathVisionStageExecutor {
                         .baseStageVersion(context.getBaseStageVersion())
                         .build()
                 : null;
-        ExplorationNode.Result explorationResult = context.isUserRevision()
-                ? explorationNode.run(task, bundle, revisionRequest, context)
-                : explorationNode.run(task, bundle, context);
+        ExplorationNode.Result explorationResult = NodeExecutionLogger.execute(
+                task.getId(),
+                stage().getCode(),
+                "ExplorationNode",
+                () -> context.isUserRevision()
+                        ? explorationNode.run(task, bundle, revisionRequest, context)
+                        : explorationNode.run(task, bundle, context),
+                ExplorationNode.Result::getApiCalls);
         KnowledgeGraph graph = explorationResult.getGraph();
         com.fasterxml.jackson.databind.JsonNode explorationCheckpoint =
                 objectMapper.valueToTree(graph).deepCopy();
-        MathEnrichmentNode.Result enrichmentResult = context.isUserRevision()
-                ? mathEnrichmentNode.run(task, bundle, graph, revisionRequest, context)
-                : mathEnrichmentNode.run(task, bundle, graph, context);
+        MathEnrichmentNode.Result enrichmentResult = NodeExecutionLogger.execute(
+                task.getId(),
+                stage().getCode(),
+                "MathEnrichmentNode",
+                () -> context.isUserRevision()
+                        ? mathEnrichmentNode.run(task, bundle, graph, revisionRequest, context)
+                        : mathEnrichmentNode.run(task, bundle, graph, context),
+                MathEnrichmentNode.Result::getApiCalls);
 
         ObjectNode resultJson = objectMapper.createObjectNode();
         resultJson.put("apiCalls", explorationResult.getApiCalls() + enrichmentResult.getApiCalls());

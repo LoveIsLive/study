@@ -11,6 +11,7 @@ import com.kwang.study.mathvision.workflow.model.ProblemBundle;
 import com.kwang.study.mathvision.workflow.model.StageGenerationMode;
 import com.kwang.study.mathvision.workflow.model.StageGenerationRequest;
 import com.kwang.study.mathvision.workflow.node.ProblemNormalizationNode;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,17 +34,22 @@ public class ProblemNormalizationStageExecutor implements MathVisionStageExecuto
     @Override
     public MathVisionStageExecutionResult execute(MathVisionStageExecutionContext context) {
         MathVisionTask task = context.getTask();
-        ProblemNormalizationNode.Result nodeResult = context.isUserRevision()
-                ? problemNormalizationNode.run(
-                        task,
-                        StageGenerationRequest.<ProblemBundle>builder()
-                                .mode(StageGenerationMode.USER_REVISION)
-                                .existingArtifact(readExistingArtifact(context, ProblemBundle.class))
-                                .instruction(context.getInstruction())
-                                .baseStageVersion(context.getBaseStageVersion())
-                                .build(),
-                        context)
-                : problemNormalizationNode.run(task, context);
+        ProblemNormalizationNode.Result nodeResult = NodeExecutionLogger.execute(
+                task.getId(),
+                stage().getCode(),
+                "ProblemNormalizationNode",
+                () -> context.isUserRevision()
+                        ? problemNormalizationNode.run(
+                                task,
+                                StageGenerationRequest.<ProblemBundle>builder()
+                                        .mode(StageGenerationMode.USER_REVISION)
+                                        .existingArtifact(readExistingArtifact(context, ProblemBundle.class))
+                                        .instruction(context.getInstruction())
+                                        .baseStageVersion(context.getBaseStageVersion())
+                                        .build(),
+                                context)
+                        : problemNormalizationNode.run(task, context),
+                ProblemNormalizationNode.Result::getApiCalls);
         ProblemBundle problemBundle = nodeResult.getProblemBundle();
 
         ObjectNode resultJson = objectMapper.createObjectNode();
