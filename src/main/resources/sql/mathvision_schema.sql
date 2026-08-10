@@ -15,11 +15,19 @@
 -- -------------------------------------------------------------
 -- 1) LLM 模型 / API Key 配置
 -- -------------------------------------------------------------
--- 供应商与模型目录改由 Nacos (dataId: math-vision) 声明, 本表只存每用户每厂家的 API Key 凭据。
+-- 系统供应商与模型目录由 Nacos (dataId: math-vision) 声明；自定义兼容供应商的调用信息也存放在本表。
 CREATE TABLE `llm_model_configs` (
   `id`                 BIGINT       NOT NULL AUTO_INCREMENT,
   `owner_user_id`      BIGINT       NOT NULL                COMMENT '配置所属用户ID',
-  `provider`           VARCHAR(32)  NOT NULL                COMMENT 'openai/anthropic/google/moonshot/zhipu',
+  `provider`           VARCHAR(64)  NOT NULL                COMMENT '系统供应商编码或 custom_* 自定义编码',
+  `is_custom`          TINYINT(1)   NOT NULL DEFAULT 0      COMMENT '是否为用户自定义供应商',
+  `provider_name`      VARCHAR(128) NULL                    COMMENT '自定义供应商展示名称',
+  `compatibility_type` VARCHAR(32)  NULL                    COMMENT '自定义供应商兼容协议: openai/anthropic/google',
+  `base_url`           VARCHAR(512) NULL                    COMMENT '自定义供应商 API 根地址',
+  `model_name`         VARCHAR(128) NULL                    COMMENT '自定义供应商模型名称',
+  `support_vision`     TINYINT(1)   NULL DEFAULT 0          COMMENT '自定义模型是否支持视觉输入',
+  `context_window`     INT          NULL                    COMMENT '自定义模型上下文窗口',
+  `max_output_tokens`  INT          NULL                    COMMENT '自定义模型最大输出 Token 数',
   `api_key_encrypted`  TEXT         NULL                    COMMENT '应用层加密后的 API Key',
   `api_key_masked`     VARCHAR(64)  NULL                    COMMENT '脱敏展示值, 如 sk-****abcd',
   `status`             VARCHAR(16)  NOT NULL DEFAULT 'enabled' COMMENT 'enabled/disabled/invalid/not_configured',
@@ -33,7 +41,7 @@ CREATE TABLE `llm_model_configs` (
   `update_time`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_owner_provider` (`owner_user_id`, `provider`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM API Key 配置 (每用户每厂家)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LLM API Key 与自定义兼容模型配置';
 
 
 -- -------------------------------------------------------------
@@ -55,7 +63,7 @@ CREATE TABLE `mathvision_tasks` (
   `error_type`               VARCHAR(32)  NULL                    COMMENT 'input_error/credential_error/model_error/workflow_error/validation_error/code_error/render_error/storage_error/permission_error',
   `error_message`            TEXT         NULL                    COMMENT '失败原因摘要',
   `selected_model_config_id` BIGINT       NULL                    COMMENT '对应 llm_model_configs.id',
-  `provider_code`            VARCHAR(32)  NULL                    COMMENT '冗余, 便于展示/校验',
+  `provider_code`            VARCHAR(64)  NULL                    COMMENT '系统供应商编码或 custom_* 自定义编码',
   `model_name`               VARCHAR(128) NULL                    COMMENT '本次实际使用的模型名称',
   `current_version`          INT          NOT NULL DEFAULT 1      COMMENT '当前激活/工作版本, 指向 mathvision_versions.version',
   `last_confirmed_stage`     VARCHAR(40)  NULL                    COMMENT '手动模式最近确认到的阶段',

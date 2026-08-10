@@ -220,7 +220,7 @@ public class MathVisionAiChatService {
                 messages,
                 runtime.promptInputBudgetTokens,
                 toolsJson);
-        String provider = runtime.providerCode.toLowerCase(Locale.ROOT);
+        String provider = runtime.protocolCode.toLowerCase(Locale.ROOT);
         if ("google".equals(provider)) {
             return requestGemini(runtime, preparedMessages, toolsJson);
         }
@@ -498,17 +498,13 @@ public class MathVisionAiChatService {
         if (task == null) {
             throw new IllegalArgumentException("MathVision task is missing.");
         }
-        ProviderCatalog provider = catalog.findEnabled(task.getProviderCode());
-        if (provider == null) {
-            throw new IllegalArgumentException("Model provider is not enabled: " + task.getProviderCode());
-        }
         LlmModelConfig config = task.getSelectedModelConfigId() != null
                 ? configMapper.findById(task.getSelectedModelConfigId())
                 : configMapper.findByOwnerAndProvider(task.getUserId(), task.getProviderCode());
         if (config == null || !task.getUserId().equals(config.getOwnerUserId())) {
             throw new IllegalArgumentException("No model credential was found for the current user.");
         }
-        if (!provider.getCode().equalsIgnoreCase(config.getProvider())) {
+        if (!task.getProviderCode().equalsIgnoreCase(config.getProvider())) {
             throw new IllegalArgumentException("Task provider does not match credential provider.");
         }
         if (!"enabled".equalsIgnoreCase(config.getStatus())) {
@@ -518,6 +514,14 @@ public class MathVisionAiChatService {
         if (!StringUtils.hasText(apiKey)) {
             throw new IllegalArgumentException("Model API key is empty.");
         }
+        if (Boolean.TRUE.equals(config.getIsCustom())) {
+            return resolveCustomRuntime(task, config, apiKey);
+        }
+
+        ProviderCatalog provider = catalog.findEnabled(task.getProviderCode());
+        if (provider == null) {
+            throw new IllegalArgumentException("Model provider is not enabled: " + task.getProviderCode());
+        }
         ModelCatalog model = catalog.findModel(task.getProviderCode(), task.getModelName());
         if (model == null) {
             throw new IllegalArgumentException("Model is not configured in Nacos math-vision: "
@@ -526,6 +530,7 @@ public class MathVisionAiChatService {
         validateNacosModelRuntime(provider.getCode(), model);
         return new AiRuntime(
                 task.getId(),
+                provider.getCode(),
                 provider.getCode(),
                 resolveBaseUrl(provider.getCode(), provider.getBaseUrl()),
                 task.getModelName(),
@@ -552,6 +557,64 @@ public class MathVisionAiChatService {
                         model.getAdaptiveThinking(), provider.getAdaptiveThinking(), false)),
                 firstNonBlank(model.getEffort(), provider.getEffort()),
                 firstNonBlank(model.getThinking(), provider.getThinking())
+        );
+    }
+
+    private AiRuntime resolveCustomRuntime(MathVisionTask task,
+                                           LlmModelConfig config,
+                                           String apiKey) {
+        String protocol = config.getCompatibilityType() == null
+                ? ""
+                : config.getCompatibilityType().trim().toLowerCase(Locale.ROOT);
+        if (!"openai".equals(protocol) && !"anthropic".equals(protocol) && !"google".equals(protocol)) {
+            throw new IllegalArgumentException("Unsupported custom provider compatibility type: " + protocol);
+        }
+        if (!StringUtils.hasText(config.getBaseUrl())) {
+            throw new IllegalArgumentException("Custom model provider baseUrl is missing.");
+        }
+        if (config.getContextWindow() == null || config.getContextWindow() <= 0
+                || config.getMaxOutputTokens() == null || config.getMaxOutputTokens() <= 0) {
+            throw new IllegalArgumentException("Custom model context settings are incomplete: "
+                    + config.getModelName());
+        }
+
+        ModelCatalog customModel = new ModelCatalog();
+        customModel.setModelName(config.getModelName());
+        customModel.setContextWindow(config.getContextWindow());
+        customModel.setMaxOutputTokens(config.getMaxOutputTokens());
+        customModel.setTemperature(config.getTemperature());
+        customModel.setTopP(config.getTopP());
+        Double temperature = firstConfigured(
+                config.getTemperature(), catalog.getModelDefaults().getTemperature(), 0.6D);
+
+        return new AiRuntime(
+                task.getId(),
+                config.getProvider(),
+                protocol,
+                trimTrailingSlash(config.getBaseUrl()),
+                task.getModelName(),
+                apiKey,
+                temperature,
+                firstConfigured(config.getTopP(), catalog.getModelDefaults().getTopP()),
+                config.getMaxOutputTokens(),
+                resolvePromptInputBudgetTokens(customModel),
+                config.getExtraHeadersJson(),
+                resolveRequestTimeoutSeconds(null, null),
+                resolveTimeoutRetryAttempts(null, null),
+                resolveTimeoutRetryMultiplier(null, null),
+                resolveMaxRequestTimeoutSeconds(null, null),
+                resolveEmptyResponseRetries(),
+                resolveTransientFailureRetries(null, null),
+                resolveTransientRetryBaseDelayMillis(),
+                resolveTransientRetryMaxDelayMillis(),
+                resolveRateLimitRetries(null, null),
+                resolveRateLimitBaseDelayMillis(null, null),
+                resolveRateLimitMaxDelayMillis(null, null),
+                resolveRateLimitJitterRatio(),
+                "openai".equals(protocol) && resolveReasoningContentFallback(null, null),
+                false,
+                "",
+                ""
         );
     }
 
@@ -1585,10 +1648,7 @@ public class MathVisionAiChatService {
         if (base.endsWith("/messages")) {
             return base;
         }
-        if (base.endsWith("/v1")) {
-            return base + "/messages";
-        }
-        return base + "/v1/messages";
+        return base + "/messages";
     }
 
     private String trimTrailingSlash(String value) {
@@ -1739,6 +1799,7 @@ public class MathVisionAiChatService {
     private static final class AiRuntime {
         private final Long taskId;
         private final String providerCode;
+        private final String protocolCode;
         private final String baseUrl;
         private final String model;
         private final String apiKey;
@@ -1766,6 +1827,7 @@ public class MathVisionAiChatService {
 
         private AiRuntime(Long taskId,
                           String providerCode,
+                          String protocolCode,
                           String baseUrl,
                           String model,
                           String apiKey,
@@ -1792,6 +1854,7 @@ public class MathVisionAiChatService {
                           String thinking) {
             this.taskId = taskId;
             this.providerCode = providerCode;
+            this.protocolCode = protocolCode;
             this.baseUrl = baseUrl;
             this.model = model;
             this.apiKey = apiKey;

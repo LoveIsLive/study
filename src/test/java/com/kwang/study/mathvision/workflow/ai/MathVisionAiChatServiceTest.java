@@ -41,6 +41,7 @@ class MathVisionAiChatServiceTest {
     private LlmModelConfigMapper configMapper;
     private HttpClient httpClient;
     private MathVisionAiChatService service;
+    private ApiKeyCipher cipher;
     private MathVisionTask task;
     private MathVisionModelCatalog catalog;
     private ProviderCatalog catalogProvider;
@@ -51,7 +52,7 @@ class MathVisionAiChatServiceTest {
         configMapper = mock(LlmModelConfigMapper.class);
         httpClient = mock(HttpClient.class);
 
-        ApiKeyCipher cipher = new ApiKeyCipher("mathvision-ai-test-secret");
+        cipher = new ApiKeyCipher("mathvision-ai-test-secret");
         LlmModelConfig config = LlmModelConfig.builder()
                 .id(9L)
                 .ownerUserId(1L)
@@ -284,6 +285,82 @@ class MathVisionAiChatServiceTest {
         assertTrue(response.getAssistantText().contains("Tool payload:"));
         assertTrue(response.getAssistantText().contains("manimCode"));
         verifySends(1);
+    }
+
+    @Test
+    void routesCustomOpenAiCompatibleProviderWithStoredRuntimeSettings() throws Exception {
+        LlmModelConfig custom = LlmModelConfig.builder()
+                .id(10L)
+                .ownerUserId(1L)
+                .provider("custom_demo")
+                .isCustom(true)
+                .compatibilityType("openai")
+                .baseUrl("https://custom.example/v1")
+                .modelName("demo-chat")
+                .contextWindow(64_000)
+                .maxOutputTokens(8_000)
+                .temperature(0.25D)
+                .apiKeyEncrypted(cipher.encrypt("custom-key"))
+                .status("enabled")
+                .build();
+        when(configMapper.findById(10L)).thenReturn(custom);
+        task.setProviderCode("custom_demo");
+        task.setModelName("demo-chat");
+        task.setSelectedModelConfigId(10L);
+        enqueueResponses(plainContentOpenAiResponse("ok"));
+
+        service.requestRawResponse(
+                task,
+                List.of(AiMessage.user(List.of(AiContentPart.text("hello")))),
+                null);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(
+                requestCaptor.capture(),
+                ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+        HttpRequest request = requestCaptor.getValue();
+        JsonNode body = new ObjectMapper().readTree(readRequestBody(request));
+        assertEquals("https://custom.example/v1/chat/completions", request.uri().toString());
+        assertEquals("Bearer custom-key", request.headers().firstValue("Authorization").orElse(""));
+        assertEquals("demo-chat", body.path("model").asText());
+        assertEquals(8_000, body.path("max_tokens").asInt());
+        assertEquals(0.25D, body.path("temperature").asDouble());
+    }
+
+    @Test
+    void routesCustomAnthropicCompatibleProviderByProtocolInsteadOfProviderCode() throws Exception {
+        LlmModelConfig custom = LlmModelConfig.builder()
+                .id(11L)
+                .ownerUserId(1L)
+                .provider("custom_claude_proxy")
+                .isCustom(true)
+                .compatibilityType("anthropic")
+                .baseUrl("https://claude.example/api")
+                .modelName("claude-compatible")
+                .contextWindow(100_000)
+                .maxOutputTokens(4_096)
+                .apiKeyEncrypted(cipher.encrypt("anthropic-key"))
+                .status("enabled")
+                .build();
+        when(configMapper.findById(11L)).thenReturn(custom);
+        task.setProviderCode("custom_claude_proxy");
+        task.setModelName("claude-compatible");
+        task.setSelectedModelConfigId(11L);
+        enqueueResponses(response("{\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}"));
+
+        service.requestRawResponse(
+                task,
+                List.of(AiMessage.user(List.of(AiContentPart.text("hello")))),
+                null);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(
+                requestCaptor.capture(),
+                ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+        HttpRequest request = requestCaptor.getValue();
+        assertEquals("https://claude.example/api/messages", request.uri().toString());
+        assertEquals("anthropic-key", request.headers().firstValue("x-api-key").orElse(""));
+        assertEquals("2023-06-01", request.headers().firstValue("anthropic-version").orElse(""));
     }
 
     private MathVisionAiChatService.CodeResponse requestCode() {

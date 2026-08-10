@@ -4,6 +4,7 @@ import com.kwang.study.auth.utils.AuthenticationUserUtil;
 import com.kwang.study.common.R;
 import com.kwang.study.constant.ApiPrefixConstant;
 import com.kwang.study.mathvision.dto.CredentialTestResultVO;
+import com.kwang.study.mathvision.dto.CustomProviderConfigDTO;
 import com.kwang.study.mathvision.dto.ProviderCredentialDTO;
 import com.kwang.study.mathvision.dto.ProviderInfoVO;
 import com.kwang.study.mathvision.dto.ProviderModelsVO;
@@ -47,6 +48,21 @@ public class MathVisionLlmController {
         return ResponseEntity.ok(R.success(vo));
     }
 
+    @PostMapping("/providers/custom")
+    public ResponseEntity<R<ProviderInfoVO>> createCustomProvider(
+            @Valid @RequestBody CustomProviderConfigDTO request) {
+        Long userId = AuthenticationUserUtil.getCurrentUserId();
+        return ResponseEntity.ok(R.success(service.createCustomProvider(userId, request)));
+    }
+
+    @PutMapping("/providers/{providerCode}/custom")
+    public ResponseEntity<R<ProviderInfoVO>> updateCustomProvider(
+            @PathVariable String providerCode,
+            @Valid @RequestBody CustomProviderConfigDTO request) {
+        Long userId = AuthenticationUserUtil.getCurrentUserId();
+        return ResponseEntity.ok(R.success(service.updateCustomProvider(userId, providerCode, request)));
+    }
+
     /** 删除厂家 API Key */
     @DeleteMapping("/providers/{providerCode}/credential")
     public ResponseEntity<R<Void>> deleteCredential(@PathVariable String providerCode) {
@@ -65,6 +81,7 @@ public class MathVisionLlmController {
     /** 获取某厂家在目录中的可用模型列表 (含能力声明) */
     @GetMapping("/providers/{providerCode}/models")
     public ResponseEntity<R<ProviderModelsVO>> listModels(@PathVariable String providerCode) {
-        return ResponseEntity.ok(R.success(service.listModels(providerCode)));
+        Long userId = AuthenticationUserUtil.getCurrentUserId();
+        return ResponseEntity.ok(R.success(service.listModels(userId, providerCode)));
     }
 }

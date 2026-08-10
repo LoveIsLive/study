@@ -17,4 +17,14 @@ public class ProviderInfoVO {
     /** 脱敏后的 API Key, 仅展示; 永不返回明文 */
     private String apiKeyMasked;
     private String lastTestTime;
+    private Boolean custom;
+    /** openai/anthropic/google，仅自定义供应商返回。 */
+    private String compatibilityType;
+    private String baseUrl;
+    private String modelName;
+    private Boolean supportVision;
+    private Integer contextWindow;
+    private Integer maxOutputTokens;
+    private Double temperature;
+    private Double topP;
 }

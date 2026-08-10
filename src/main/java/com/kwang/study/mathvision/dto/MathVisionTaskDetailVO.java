@@ -26,6 +26,7 @@ public class MathVisionTaskDetailVO {
     private String errorMessage;
     private Long selectedModelConfigId;
     private String providerCode;
+    private String providerName;
     private String modelName;
     private Integer currentVersion;
     private String lastConfirmedStage;

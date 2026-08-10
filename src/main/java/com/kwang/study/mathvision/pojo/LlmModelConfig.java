@@ -21,6 +21,16 @@ public class LlmModelConfig {
     private Long ownerUserId;
     /** openai/anthropic/google/moonshot/zhipu */
     private String provider;
+    /** 是否为用户自定义的兼容供应商。 */
+    private Boolean isCustom;
+    private String providerName;
+    /** openai/anthropic/google */
+    private String compatibilityType;
+    private String baseUrl;
+    private String modelName;
+    private Boolean supportVision;
+    private Integer contextWindow;
+    private Integer maxOutputTokens;
     /** 应用层加密后的 API Key */
     private String apiKeyEncrypted;
     /** 脱敏展示值, 如 sk-****abcd */

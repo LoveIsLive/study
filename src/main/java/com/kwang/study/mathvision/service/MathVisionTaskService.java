@@ -143,7 +143,7 @@ public class MathVisionTaskService {
                 && a.getMimeTypeName().startsWith("image/"));
 
         // 校验模型合法性 + 图片任务视觉能力
-        validateModel(request.getProviderCode(), request.getModelName(), hasImage);
+        validateModel(userId, request.getProviderCode(), request.getModelName(), hasImage);
 
         // 解析或创建会话
         String sessionId = resolveSession(request, userId);
@@ -153,6 +153,7 @@ public class MathVisionTaskService {
 
         // 落任务主表
         LlmModelConfig cfg = configMapper.findByOwnerAndProvider(userId, request.getProviderCode());
+        requireUsableCredential(cfg);
         boolean autoStart = Boolean.TRUE.equals(request.getAutoStart());
         String status = autoStart ? "queued" : "created";
 
@@ -233,7 +234,22 @@ public class MathVisionTaskService {
     }
 
     /** 校验模型属于目录, 且图片任务必须选支持视觉的模型。 */
-    private void validateModel(String providerCode, String modelName, boolean hasImage) {
+    private void validateModel(Long userId, String providerCode, String modelName, boolean hasImage) {
+        LlmModelConfig custom = configMapper.findByOwnerAndProvider(userId, providerCode);
+        if (custom != null && Boolean.TRUE.equals(custom.getIsCustom())) {
+            if (!modelName.equals(custom.getModelName())) {
+                throw new IllegalArgumentException("该自定义厂家下不存在可用模型: " + modelName);
+            }
+            if (hasImage && !Boolean.TRUE.equals(custom.getSupportVision())) {
+                throw new IllegalArgumentException("所选模型不支持图片输入, 请更换支持视觉的模型");
+            }
+            if (custom.getContextWindow() == null || custom.getContextWindow() <= 0
+                    || custom.getMaxOutputTokens() == null || custom.getMaxOutputTokens() <= 0) {
+                throw new IllegalArgumentException("自定义模型的上下文配置不完整: " + modelName);
+            }
+            requireUsableCredential(custom);
+            return;
+        }
         ProviderCatalog provider = catalog.findEnabled(providerCode);
         if (provider == null) {
             throw new IllegalArgumentException("不支持或未启用的模型厂家: " + providerCode);
@@ -256,6 +272,16 @@ public class MathVisionTaskService {
                 : catalog.getModelDefaults().getTemperature());
         if (!"anthropic".equalsIgnoreCase(providerCode) && temperature == null) {
             throw new IllegalArgumentException("Nacos math-vision 模型缺少 temperature: " + modelName);
+        }
+    }
+
+    private void requireUsableCredential(LlmModelConfig config) {
+        if (config == null || !StringUtils.hasText(config.getApiKeyEncrypted())) {
+            throw new IllegalArgumentException("请先配置所选模型厂家的 API Key");
+        }
+        if (StringUtils.hasText(config.getStatus())
+                && !"enabled".equalsIgnoreCase(config.getStatus())) {
+            throw new IllegalArgumentException("所选模型厂家的凭证当前不可用");
         }
     }
 
@@ -526,6 +552,7 @@ public class MathVisionTaskService {
                 .errorMessage(task.getErrorMessage())
                 .selectedModelConfigId(task.getSelectedModelConfigId())
                 .providerCode(task.getProviderCode())
+                .providerName(resolveProviderName(task))
                 .modelName(task.getModelName())
                 .currentVersion(task.getCurrentVersion())
                 .lastConfirmedStage(task.getLastConfirmedStage())
@@ -535,6 +562,20 @@ public class MathVisionTaskService {
                 .createTime(task.getCreateTime() != null ? task.getCreateTime().format(TS) : null)
                 .updateTime(task.getUpdateTime() != null ? task.getUpdateTime().format(TS) : null)
                 .build();
+    }
+
+    private String resolveProviderName(MathVisionTask task) {
+        if (task.getSelectedModelConfigId() != null) {
+            LlmModelConfig config = configMapper.findById(task.getSelectedModelConfigId());
+            if (config != null && Boolean.TRUE.equals(config.getIsCustom())
+                    && StringUtils.hasText(config.getProviderName())) {
+                return config.getProviderName();
+            }
+        }
+        ProviderCatalog provider = catalog.findEnabled(task.getProviderCode());
+        return provider != null && StringUtils.hasText(provider.getName())
+                ? provider.getName()
+                : task.getProviderCode();
     }
 
     @Transactional
@@ -568,15 +609,9 @@ public class MathVisionTaskService {
             boolean hasImage = readAssets(task.getInputAssetsJson()).stream()
                     .anyMatch(asset -> StringUtils.hasText(asset.getMimeTypeName())
                             && asset.getMimeTypeName().startsWith("image/"));
-            validateModel(providerCode, modelName, hasImage);
+            validateModel(userId, providerCode, modelName, hasImage);
             LlmModelConfig config = configMapper.findByOwnerAndProvider(userId, providerCode);
-            if (config == null || !StringUtils.hasText(config.getApiKeyEncrypted())) {
-                throw new IllegalArgumentException("请先配置所选模型厂家的 API Key");
-            }
-            if (StringUtils.hasText(config.getStatus())
-                    && !"enabled".equalsIgnoreCase(config.getStatus())) {
-                throw new IllegalArgumentException("所选模型厂家的凭证当前不可用");
-            }
+            requireUsableCredential(config);
             selectedModelConfigId = config.getId();
         }
 
