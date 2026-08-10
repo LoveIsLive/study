@@ -25,4 +25,14 @@ class ErrorSummarizerTest {
         assertTrue(displayError.contains("font_weight"));
         assertFalse(displayError.contains("Using cached"));
     }
+
+    @Test
+    void edgeTtsConnectivityFailureIsClassifiedAsEnvironmentError() {
+        String error = String.join("\n",
+                "Traceback (most recent call last):",
+                "edge_tts.exceptions.NoAudioReceived: No audio was received.",
+                "RuntimeError: Edge TTS synthesis failed. Check access to speech.platform.bing.com.");
+
+        assertTrue(ErrorSummarizer.isEnvironmentError(error));
+    }
 }

@@ -210,6 +210,7 @@ public class CodeFixNode {
                     GeoGebraCodeUtils.extractCode(normalized));
         } else {
             normalized = ManimCodeUtils.enforceMainSceneName(ManimCodeUtils.extractCode(normalized));
+            normalized = ManimCodeUtils.migrateLegacyGttsService(normalized);
         }
         return normalized;
     }

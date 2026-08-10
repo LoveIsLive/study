@@ -204,11 +204,11 @@ class CodeGenerationNodeTest {
                 List.of(scene), List.of("scene_1"), "2d");
 
         assertTrue(skeleton.contains("from manim_voiceover import VoiceoverScene"));
-        assertTrue(skeleton.contains("from manim_voiceover.services.gtts import GTTSService"));
+        assertTrue(skeleton.contains("from mathvision_edge_tts import EdgeTTSService"));
         assertTrue(skeleton.contains("VOICEOVER_SPEED = 1.5"));
         assertTrue(skeleton.contains("class MainScene(VoiceoverScene):"));
         assertTrue(skeleton.contains(
-                "self.set_speech_service(GTTSService(lang=\"zh-CN\", global_speed=VOICEOVER_SPEED))"));
+                "self.set_speech_service(EdgeTTSService(voice=\"zh-CN-XiaoxiaoNeural\", global_speed=VOICEOVER_SPEED))"));
     }
 
     @Test

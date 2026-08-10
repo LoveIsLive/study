@@ -139,13 +139,16 @@ Syntax:
 ```python
 from manim import *
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
+from mathvision_edge_tts import EdgeTTSService
 
 VOICEOVER_SPEED = 1.5
 
 class MainScene(VoiceoverScene):
     def construct(self):
-        self.set_speech_service(GTTSService(lang="zh-CN", global_speed=VOICEOVER_SPEED))
+        self.set_speech_service(EdgeTTSService(
+            voice="zh-CN-XiaoxiaoNeural",
+            global_speed=VOICEOVER_SPEED,
+        ))
 
         title = Text("勾股定理", font="Microsoft YaHei", font_size=48).to_edge(UP)
         formula = MathTex(r"a^2 + b^2 = c^2")
@@ -163,12 +166,13 @@ Usage notes:
 
 - Use `class MainScene(VoiceoverScene):` instead of `Scene` when any action has narration.
 - Call `self.set_speech_service(...)` once near the start of `construct()` before the first `self.voiceover(...)` block.
-- For Chinese narration, use `GTTSService(lang="zh-CN", global_speed=VOICEOVER_SPEED)` and keep narration text natural Chinese.
+- For Chinese narration, import `EdgeTTSService` from `mathvision_edge_tts`, use `EdgeTTSService(voice="zh-CN-XiaoxiaoNeural", global_speed=VOICEOVER_SPEED)`, and keep narration text natural Chinese.
 - Wrap each learner-visible narrated beat with `with self.voiceover(text="...") as tracker:`.
 - If the beat has animation, set `run_time=tracker.duration` or otherwise align the animation duration with the narration.
 - If the beat has narration but no animation, use `self.wait(tracker.duration)` inside the voiceover block.
 - Render voiceover scenes with `--disable_caching`, for example `manim -pql file.py MainScene --disable_caching`.
-- Do not use `VoiceoverScene`, `GTTSService`, or `self.voiceover(...)` for non-narrated Manim scenes.
+- Never use `GTTSService` or import `manim_voiceover.services.gtts`; Edge TTS is the only supported online voice service in generated code.
+- Do not use `VoiceoverScene`, `EdgeTTSService`, or `self.voiceover(...)` for non-narrated Manim scenes.
 
 ### Multiple Scenes in One File
 

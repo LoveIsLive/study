@@ -525,14 +525,14 @@ public class CodeGenerationNode {
         sb.append("import numpy as np\n");
         if (useVoiceover) {
             sb.append("from manim_voiceover import VoiceoverScene\n");
-            sb.append("from manim_voiceover.services.gtts import GTTSService\n\n");
+            sb.append("from mathvision_edge_tts import EdgeTTSService\n\n");
             sb.append("VOICEOVER_SPEED = 1.5\n");
         }
         sb.append("\n");
         sb.append("class MainScene(").append(baseClass).append("):\n");
         sb.append("    def construct(self):\n");
         if (useVoiceover) {
-            sb.append("        self.set_speech_service(GTTSService(lang=\"zh-CN\", global_speed=VOICEOVER_SPEED))\n");
+            sb.append("        self.set_speech_service(EdgeTTSService(voice=\"zh-CN-XiaoxiaoNeural\", global_speed=VOICEOVER_SPEED))\n");
         }
         sb.append("        self.objects = {}\n");
         sb.append("        self.setup_shared_scene()\n");
@@ -1305,6 +1305,7 @@ public class CodeGenerationNode {
             normalized = GeoGebraCodeUtils.extractCode(normalized);
         } else {
             normalized = ManimCodeUtils.enforceMainSceneName(normalized);
+            normalized = ManimCodeUtils.migrateLegacyGttsService(normalized);
         }
         return normalized;
     }

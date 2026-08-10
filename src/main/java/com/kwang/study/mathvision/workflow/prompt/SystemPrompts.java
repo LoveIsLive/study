@@ -324,7 +324,7 @@ public final class SystemPrompts {
                     + "- Most routine actions should omit `voiceover_text`, including simple object entry/exit, obvious movement, incremental styling, label appearance, and visual changes that the screen already explains clearly.\n"
                     + "- Prefer 0-2 narrated actions per scene; use more only when a long scene has multiple genuinely independent key ideas.\n"
                     + "- Use `expected_seconds` as the intended audio/animation duration only for narrated key actions where timing matters.\n"
-                    + "- Generated Manim code may use `VoiceoverScene`, `GTTSService(lang=\"zh-CN\")`, and `with self.voiceover(text=...) as tracker:` to synchronize selected audio and animation.\n"
+                    + "- Generated Manim code may use `VoiceoverScene`, `EdgeTTSService(voice=\"zh-CN-XiaoxiaoNeural\")`, and `with self.voiceover(text=...) as tracker:` to synchronize selected audio and animation.\n"
                     + "- Keep `voiceover_text` concise, natural Chinese; do not write English narration, pinyin, or backend implementation notes in it.\n";
 
     /** Manim-only Chinese text rendering rules. */
@@ -339,7 +339,7 @@ public final class SystemPrompts {
             "Manim code-fix class inheritance rules:\n"
                     + "- Preserve the exact base class from the current code's main scene declaration. If the input has `class MainScene(Scene):`, keep `Scene`; if it has `class MainScene(VoiceoverScene):`, keep `VoiceoverScene`; if it has `class MainScene(ThreeDScene):`, keep `ThreeDScene`.\n"
                     + "- Do not switch between `Scene`, `VoiceoverScene`, `ThreeDScene`, `MovingCameraScene`, `ZoomedScene`, or another scene subclass during a code-fix pass unless the request explicitly asks to change the inheritance.\n"
-                    + "- If the original base class is `VoiceoverScene`, preserve the `manim_voiceover` imports, `set_speech_service(...)`, and `self.voiceover(...)` blocks; fix runtime, layout, or pacing issues inside that structure instead of downgrading to `Scene`.\n"
+                    + "- If the original base class is `VoiceoverScene`, preserve the `manim_voiceover` imports, `EdgeTTSService` imported from `mathvision_edge_tts`, `set_speech_service(...)`, and `self.voiceover(...)` blocks; migrate legacy `GTTSService` usage to `EdgeTTSService`, and fix runtime, layout, or pacing issues inside that structure instead of downgrading to `Scene`.\n"
                     + "- If the original base class is `ThreeDScene`, fix camera or 3D issues inside `ThreeDScene` instead of downgrading to `Scene`.\n";
 
     /** Opacity hierarchy for visual layering, applicable to all output targets. */

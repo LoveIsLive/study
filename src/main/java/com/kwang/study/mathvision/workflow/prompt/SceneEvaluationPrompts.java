@@ -35,7 +35,7 @@ public final class SceneEvaluationPrompts {
                     + "For offscreen world-coordinate geometry, first expand the Manim `Axes`/`NumberPlane` `x_range`/`y_range` and keep placements mapped through `axes.c2p(...)`; preserve one uniform x/y unit scale, and keep storyboard radii/metric lengths converted through that same scale. Use translation/recentering or uniform scaling only when the element is a fixed overlay or the coordinate view would become unreadable.\n"
                     + "If a reported element is dependency-driven or derived, do not fix it by assigning direct coordinates copied from rendered bounds or storyboard placement; adjust upstream dependency objects, the whole constrained group, camera/layout, or the attachment expression so the dependency remains true.\n"
                     + "Also correct semantically wrong geometric attachments you notice, especially angle markers that are drawn on the wrong side or detached from their true vertex.\n"
-                    + "Preserve valid voiceover structure and Chinese learner-facing strings while fixing layout issues.\n\n"
+                    + "Preserve valid voiceover structure, `EdgeTTSService` imported from `mathvision_edge_tts`, and Chinese learner-facing strings while fixing layout issues. Migrate legacy `GTTSService` usage to `EdgeTTSService`.\n\n"
                     + "Scene evaluation repair requirements:\n"
                     + "1. First identify the affected code scene(s), reported elements, `storyboard_dependency_refs`, and matching entries in `storyboard_dependency_context_by_object_id` supplied in the evaluation report.\n"
                     + "2. When a layout issue is detected in a sampled frame, do not assume the problem only exists at that sampled instant. Trace each reported element back to where it is first created, positioned, attached, or updated, then repair the earliest responsible placement, attachment, updater, camera framing, or group layout so it remains valid for all frames after it appears.\n"
@@ -129,7 +129,7 @@ public final class SceneEvaluationPrompts {
                 .append("Scene evaluation report excerpt:\n```json\n").append(sceneEvaluationJson).append("\n```\n")
                 .append("When an offscreen issue affects storyboard world-coordinate geometry, repair by expanding the `Axes`/`NumberPlane` coordinate ranges first and keep object placement through the axes coordinate mapping. Do not solve this first by rewriting storyboard coordinates into raw Manim frame positions.\n")
                 .append("Preserve the original `class MainScene(...)` base class exactly; do not switch between `Scene`, `VoiceoverScene`, and `ThreeDScene` while applying the layout repair.\n")
-                .append("Preserve valid voiceover structure and Chinese learner-facing strings while applying the layout repair.\n");
+                .append("Preserve valid voiceover structure, `EdgeTTSService` imported from `mathvision_edge_tts`, and Chinese learner-facing strings while applying the layout repair; migrate legacy `GTTSService` usage to `EdgeTTSService`.\n");
 
         PromptUtils.appendFixHistory(sb, fixHistory);
         return SystemPrompts.buildCurrentRequestSection(sb.toString());

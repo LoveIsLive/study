@@ -54,7 +54,10 @@ public final class ErrorSummarizer {
             Pattern.compile("(?i)cannot allocate memory"),
             Pattern.compile("(?i)ffmpeg.*not found"),
             Pattern.compile("(?i)latex.*not found"),
-            Pattern.compile("(?i)dvisvgm.*not found")
+            Pattern.compile("(?i)dvisvgm.*not found"),
+            Pattern.compile("(?i)edge tts synthesis failed"),
+            Pattern.compile("(?i)speech\\.platform\\.bing\\.com"),
+            Pattern.compile("(?i)edge_tts\\.exceptions\\.(?:noaudioreceived|websocketerror|unexpectedresponse)")
     );
 
     private static final List<Pattern> GEOGEBRA_ENVIRONMENT_PATTERNS = List.of(

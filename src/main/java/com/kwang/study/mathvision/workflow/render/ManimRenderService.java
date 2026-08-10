@@ -38,6 +38,8 @@ public class ManimRenderService {
     private static final String GEOMETRY_EXPORT_HELPER_FILE = "mathvision_geometry_export.py";
     private static final String GEOMETRY_EXPORT_OUTPUT_FILE = "07_manim_geometry.json";
     private static final String GEOMETRY_EXPORT_HELPER_RESOURCE = "/render/mathvision_geometry_export.py";
+    private static final String EDGE_TTS_HELPER_FILE = "mathvision_edge_tts.py";
+    private static final String EDGE_TTS_HELPER_RESOURCE = "/render/mathvision_edge_tts.py";
     private static final String GEOMETRY_EXPORT_ENV = "MATHVISION_GEOMETRY_PATH";
     private static final String FATAL_STDERR_MESSAGE = "Fatal Manim traceback detected in stderr";
     private static final Pattern PYTHON_EXCEPTION_LINE = Pattern.compile(
@@ -53,6 +55,7 @@ public class ManimRenderService {
     public Attempt render(String manimCode, String sceneName, String quality, Path outputDir) {
         Instant start = Instant.now();
         Path geometryHelperFile = null;
+        Path edgeTtsHelperFile = null;
         try {
             Files.createDirectories(outputDir);
             Path geometryOutputFile = outputDir.resolve(GEOMETRY_EXPORT_OUTPUT_FILE);
@@ -67,6 +70,16 @@ public class ManimRenderService {
                 instrumentedCode = instrumentCodeWithGeometryExport(manimCode, effectiveSceneName);
             } else {
                 log.warn("MathVision 几何导出脚本不可用, 本次渲染不产出几何证据");
+            }
+
+            if (requiresEdgeTtsHelper(manimCode)) {
+                String edgeTtsHelper = loadResourceScript(EDGE_TTS_HELPER_RESOURCE);
+                if (!StringUtils.hasText(edgeTtsHelper)) {
+                    return Attempt.failed("", "MathVision Edge TTS helper is unavailable",
+                            false, secondsSince(start), null);
+                }
+                edgeTtsHelperFile = outputDir.resolve(EDGE_TTS_HELPER_FILE);
+                Files.writeString(edgeTtsHelperFile, edgeTtsHelper, StandardCharsets.UTF_8);
             }
 
             Path codeFile = outputDir.resolve(GENERATED_SCENE_FILE);
@@ -133,6 +146,7 @@ public class ManimRenderService {
             return Attempt.failed("", e.getMessage(), false, secondsSince(start), null);
         } finally {
             deleteQuietly(geometryHelperFile);
+            deleteQuietly(edgeTtsHelperFile);
         }
     }
 
@@ -206,15 +220,25 @@ public class ManimRenderService {
     }
 
     private String loadGeometryExportHelperScript() {
-        try (var in = ManimRenderService.class.getResourceAsStream(GEOMETRY_EXPORT_HELPER_RESOURCE)) {
+        return loadResourceScript(GEOMETRY_EXPORT_HELPER_RESOURCE);
+    }
+
+    private String loadResourceScript(String resourcePath) {
+        try (var in = ManimRenderService.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
                 return "";
             }
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            log.warn("MathVision 读取几何导出脚本失败: {}", e.getMessage());
+            log.warn("MathVision failed to load bundled render helper {}: {}", resourcePath, e.getMessage());
             return "";
         }
+    }
+
+    static boolean requiresEdgeTtsHelper(String manimCode) {
+        return manimCode != null
+                && (manimCode.contains("mathvision_edge_tts")
+                || manimCode.contains("EdgeTTSService"));
     }
 
     private String readGeneratedGeometryPath(Path geometryOutputFile) {

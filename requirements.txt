@@ -13,9 +13,10 @@
 manim==0.20.1
 numpy==2.4.4
 
-# Generated narrated scenes use VoiceoverScene and the Chinese gTTS service.
-manim-voiceover[gtts]==0.3.7
-gTTS==2.5.4
+# Generated narrated scenes use VoiceoverScene and the free Edge online TTS
+# service through the MathVision adapter bundled with the application.
+manim-voiceover==0.3.7
+edge-tts==7.2.8
 
 # Runtime-critical audio packages used by manim-voiceover. `sox` here is the
 # Python wrapper; the native Ubuntu `sox` executable is still required.
@@ -33,7 +34,8 @@ setuptools<81
 # - A LaTeX distribution with dvisvgm: Manim Tex/MathTex rendering.
 # - Cairo/Pango and their native build/runtime libraries: Manim text rendering.
 # - A Chinese font such as Noto Sans CJK SC or Microsoft YaHei.
-# - Outbound HTTPS access for gTTS voice synthesis and configured model APIs.
+# - Outbound HTTPS/WSS access to speech.platform.bing.com for Edge TTS voice
+#   synthesis, plus outbound HTTPS access for configured model APIs.
 # - Playwright Chromium and its Linux libraries for GeoGebra validation.
 # - Outbound HTTPS access to https://www.geogebra.org/apps/ for the GeoGebra
 #   deploy script and web app assets, unless those assets are already cached.

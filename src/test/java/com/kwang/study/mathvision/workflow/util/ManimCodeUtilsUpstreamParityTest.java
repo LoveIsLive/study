@@ -66,6 +66,23 @@ class ManimCodeUtilsUpstreamParityTest {
     }
 
     @Test
+    void migrateLegacyGttsService_rewritesImportAndServiceWithoutDroppingSpeed() {
+        String code = String.join("\n",
+                "from manim_voiceover import VoiceoverScene",
+                "from manim_voiceover.services.gtts import GTTSService",
+                "class MainScene(VoiceoverScene):",
+                "    def construct(self):",
+                "        self.set_speech_service(GTTSService(lang=\"zh-CN\", global_speed=1.5))");
+
+        String migrated = ManimCodeUtils.migrateLegacyGttsService(code);
+
+        assertTrue(migrated.contains("from mathvision_edge_tts import EdgeTTSService"));
+        assertTrue(migrated.contains("EdgeTTSService(lang=\"zh-CN\", global_speed=1.5)"));
+        assertFalse(migrated.contains("manim_voiceover.services.gtts"));
+        assertFalse(migrated.contains("GTTSService"));
+    }
+
+    @Test
     void enforceMainSceneName_preservesOtherSceneBaseClasses() {
         String code = "class FocusScene(MovingCameraScene):\n    def construct(self):\n        pass";
         String enforced = ManimCodeUtils.enforceMainSceneName(code);
@@ -532,4 +549,3 @@ class ManimCodeUtilsUpstreamParityTest {
         assertTrue(warnings.stream().anyMatch(v -> v.contains("MathTex constructor with plain-language content")));
     }
 }
-

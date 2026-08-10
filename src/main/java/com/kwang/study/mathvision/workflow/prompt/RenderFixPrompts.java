@@ -28,7 +28,7 @@ public final class RenderFixPrompts {
                     + SystemPrompts.MANIM_MANUAL_ONLY_RULES
                     + SystemPrompts.COMMON_RENDER_FAILURE_GUARDRAILS
                     + "Do not store mobjects across scene methods via `self`, do not hardcode MathTex numeric indexing.\n"
-                    + "Preserve valid `manim_voiceover` imports, `VoiceoverScene`, `GTTSService`, `set_speech_service`, `with self.voiceover(...)`, Chinese `voiceover_text`, and Chinese visible strings while fixing render failures.\n\n"
+                    + "Preserve valid `manim_voiceover` imports, `VoiceoverScene`, `EdgeTTSService`, `set_speech_service`, `with self.voiceover(...)`, Chinese `voiceover_text`, and Chinese visible strings while fixing render failures. Migrate legacy `GTTSService` usage to `EdgeTTSService` imported from `mathvision_edge_tts`.\n\n"
                     + "Fix strategy:\n"
                     + "Use root-cause-first repair: identify the first causal traceback error, fix it, then sweep structurally similar code paths in the same file.\n"
                     + "Fix the reported root cause systematically, and also correct nearby Python/Manim runtime mistakes.\n"

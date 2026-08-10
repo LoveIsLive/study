@@ -58,6 +58,34 @@ class CodeFixNodeTest {
         assertTrue(result.getFixResult().getFixedGeneratedCode().contains("A = (1, 1)"));
     }
 
+    @Test
+    void migratesLegacyGttsInFixedManimCode() {
+        String legacyCode = String.join("\n",
+                "from manim import *",
+                "from manim_voiceover import VoiceoverScene",
+                "from manim_voiceover.services.gtts import GTTSService",
+                "class MainScene(VoiceoverScene):",
+                "    def construct(self):",
+                "        self.set_speech_service(GTTSService(lang=\"zh-CN\", global_speed=1.5))",
+                "        self.wait(1)");
+        CodeFixRequest request = new CodeFixRequest();
+        request.setSource(CodeFixSource.CODE_RENDER);
+        request.setOutputTarget("manim");
+        request.setGeneratedCode(legacyCode);
+        request.setErrorReason("Voice synthesis failed");
+
+        MathVisionTask task = new MathVisionTask();
+        task.setId(9L);
+
+        CodeFixNode.Result result = new CodeFixNode(new FakeAiChatService(legacyCode))
+                .run(task, request, null);
+
+        assertTrue(result.getFixResult().isApplied());
+        assertTrue(result.getFixResult().getFixedGeneratedCode()
+                .contains("from mathvision_edge_tts import EdgeTTSService"));
+        assertFalse(result.getFixResult().getFixedGeneratedCode().contains("GTTSService"));
+    }
+
     private static String coordinateBrokenCode() {
         return String.join("\n",
                 "from manim import *",

@@ -93,6 +93,21 @@ public final class ManimCodeUtils {
                 .replaceFirst("class MainScene($1)");
     }
 
+    /**
+     * Migrates generated artifacts that still reference gTTS to the bundled
+     * Edge TTS adapter. The adapter accepts the legacy {@code lang} argument,
+     * so existing constructor calls remain valid after this narrow rewrite.
+     */
+    public static String migrateLegacyGttsService(String manimCode) {
+        if (manimCode == null || manimCode.isBlank() || !manimCode.contains("GTTSService")) {
+            return manimCode;
+        }
+        return manimCode
+                .replace("from manim_voiceover.services.gtts import GTTSService",
+                        "from mathvision_edge_tts import EdgeTTSService")
+                .replace("GTTSService", "EdgeTTSService");
+    }
+
     public static String expectedSceneName() {
         return EXPECTED_SCENE_NAME;
     }

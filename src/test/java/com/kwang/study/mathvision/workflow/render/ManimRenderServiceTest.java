@@ -65,6 +65,16 @@ class ManimRenderServiceTest {
     }
 
     @Test
+    void edgeTtsHelperDetectionMatchesGeneratedImport() {
+        assertTrue(ManimRenderService.requiresEdgeTtsHelper(
+                "from mathvision_edge_tts import EdgeTTSService"));
+        assertTrue(ManimRenderService.requiresEdgeTtsHelper(
+                "self.set_speech_service(EdgeTTSService())"));
+        assertFalse(ManimRenderService.requiresEdgeTtsHelper(
+                "from manim import *\nclass MainScene(Scene):\n    pass"));
+    }
+
+    @Test
     void fatalTracebackOnStderrTerminatesRenderBeforeTimeout() {
         BlockingProcess process = new BlockingProcess(String.join("\n",
                 "Animation 7: FadeIn(Text('AQ')):   0%|          | 0/12 [00:00<?, ?it/s]",

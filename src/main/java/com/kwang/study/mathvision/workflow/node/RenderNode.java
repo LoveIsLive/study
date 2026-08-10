@@ -66,8 +66,9 @@ public class RenderNode {
                                      int maxRenderRetries,
                                      Path outputDir) {
         Instant start = Instant.now();
-        String currentCode = ManimCodeUtils.enforceMainSceneName(
-                ManimCodeUtils.extractCode(codeResult.getGeneratedCode()));
+        String currentCode = ManimCodeUtils.migrateLegacyGttsService(
+                ManimCodeUtils.enforceMainSceneName(
+                        ManimCodeUtils.extractCode(codeResult.getGeneratedCode())));
         codeResult.setGeneratedCode(currentCode);
         String sceneName = ManimCodeUtils.EXPECTED_SCENE_NAME;
         codeResult.setSceneName(sceneName);
