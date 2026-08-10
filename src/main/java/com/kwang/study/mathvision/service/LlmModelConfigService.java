@@ -183,7 +183,9 @@ public class LlmModelConfigService {
 
         String apiKey = cipher.decrypt(cfg.getApiKeyEncrypted());
         String baseUrl = isCustom(cfg) ? cfg.getBaseUrl() : provider.getBaseUrl();
-        ProviderProbeResult probe = adapter.testCredential(apiKey, baseUrl);
+        ProviderProbeResult probe = isCustom(cfg)
+                ? adapter.testModel(apiKey, baseUrl, cfg.getModelName())
+                : adapter.testCredential(apiKey, baseUrl);
 
         String status = probe.isSuccess() ? "enabled" : "invalid";
         cfg.setStatus(status);

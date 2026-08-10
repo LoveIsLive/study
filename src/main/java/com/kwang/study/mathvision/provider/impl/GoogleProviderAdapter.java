@@ -29,6 +29,37 @@ public class GoogleProviderAdapter extends AbstractHttpProviderAdapter {
     }
 
     @Override
+    public ProviderProbeResult testModel(String apiKey, String baseUrl, String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return ProviderProbeResult.fail("模型名称不能为空");
+        }
+        try {
+            String base = resolveBaseUrl(baseUrl);
+            String path = base.endsWith("/models")
+                    ? base + "/" + modelName.trim() + ":generateContent"
+                    : base + "/models/" + modelName.trim() + ":generateContent";
+            String url = path + "?key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
+            String body = MAPPER.createObjectNode()
+                    .set("contents", MAPPER.createArrayNode()
+                            .add(MAPPER.createObjectNode()
+                                    .set("parts", MAPPER.createArrayNode()
+                                            .add(MAPPER.createObjectNode().put("text", "你好")))))
+                    .toString();
+            HttpResponse<String> resp = postJson(url, body, new String[]{});
+            if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                if (hasNonEmptyArray(resp.body(), "candidates")) {
+                    return ProviderProbeResult.ok("API Key 和模型可用");
+                }
+                return ProviderProbeResult.fail("模型接口响应缺少 candidates 字段");
+            }
+            return ProviderProbeResult.fail(briefError(resp.statusCode(), resp.body()));
+        } catch (Exception e) {
+            log.warn("Google model probe failed: {}", e.getMessage());
+            return ProviderProbeResult.fail(e.getMessage());
+        }
+    }
+
+    @Override
     public ProviderProbeResult listModels(String apiKey, String baseUrl) {
         try {
             String url = resolveBaseUrl(baseUrl) + "/models?key="

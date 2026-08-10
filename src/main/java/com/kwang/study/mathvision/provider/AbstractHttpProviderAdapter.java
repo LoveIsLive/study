@@ -100,4 +100,16 @@ public abstract class AbstractHttpProviderAdapter implements LlmProviderAdapter 
         }
         return "HTTP " + statusCode + (b.isEmpty() ? "" : ": " + b);
     }
+
+    protected boolean hasNonEmptyArray(String body, String fieldName) {
+        if (body == null || body.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode value = MAPPER.readTree(body).path(fieldName);
+            return value.isArray() && !value.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }
