@@ -16,6 +16,8 @@ public class MathVisionStageExecutionResult {
     private String changeSummary;
     private String finalArtifactPath;
     private String finalArtifactType;
+    /** Always pause after this stage so the user can run or skip the optional quality review. */
+    private boolean waitForUserDecision;
     /** 阶段已产出诊断结果, 但业务上应停在 failed 状态。 */
     private boolean failed;
     private String errorType;

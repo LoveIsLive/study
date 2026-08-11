@@ -29,6 +29,8 @@ import com.kwang.study.mathvision.dto.StageAutoEditRequestDTO;
 import com.kwang.study.mathvision.dto.StageContentSaveRequestDTO;
 import com.kwang.study.mathvision.dto.StageDataVO;
 import com.kwang.study.mathvision.dto.StageOperationResultVO;
+import com.kwang.study.mathvision.dto.StageQualityReviewRequestDTO;
+import com.kwang.study.mathvision.engine.MathVisionStageQualityReview;
 import com.kwang.study.mathvision.enums.StageEnum;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
 import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
@@ -624,7 +626,10 @@ public class MathVisionTaskService {
                 && "auto".equals(mode)
                 && !"auto".equals(task.getMode());
         if (switchedToAuto && "waiting_confirm".equals(task.getStatus())) {
-            return startTask(taskId);
+            StageEnum waitingStage = StageEnum.fromCode(task.getCurrentStage());
+            if (!MathVisionStageQualityReview.supports(waitingStage)) {
+                return startTask(taskId);
+            }
         }
 
         taskNotifier.notifyTaskChanged(task.getId(), "runtime_settings_updated");
@@ -670,6 +675,15 @@ public class MathVisionTaskService {
         boolean canRegenerate = hasArtifact
                 && !running
                 && !Boolean.TRUE.equals(task.getCancelRequested());
+        String qualityReviewStatus = MathVisionStageQualityReview.resolveStatus(
+                objectMapper, stage, payload.resultJson);
+        boolean qualityReviewSupported = MathVisionStageQualityReview.supports(stage);
+        boolean canRunQualityReview = qualityReviewSupported
+                && hasArtifact
+                && isCurrentStage
+                && "waiting_confirm".equals(task.getStatus())
+                && MathVisionStageQualityReview.STATUS_PENDING.equals(qualityReviewStatus)
+                && !Boolean.TRUE.equals(task.getCancelRequested());
         return StageDataVO.builder()
                 .taskId(task.getId())
                 .sessionId(task.getSessionId())
@@ -684,6 +698,10 @@ public class MathVisionTaskService {
                 .canConfirm(hasArtifact && isCurrentStage && "waiting_confirm".equals(task.getStatus()))
                 .canRegenerate(canRegenerate)
                 .canAutoEdit(canAutoEdit)
+                .qualityReviewSupported(qualityReviewSupported)
+                .qualityReviewStatus(qualityReviewStatus)
+                .qualityReviewNode(MathVisionStageQualityReview.nodeName(stage))
+                .canRunQualityReview(canRunQualityReview)
                 .build();
     }
 
@@ -739,6 +757,8 @@ public class MathVisionTaskService {
                     .build();
             artifactMapper.updateArtifactJson(update);
         }
+
+        resetQualityReviewState(task, stage, savedStageVersion);
 
         String lastConfirmedStage = previousStageCode(stage);
         taskMapper.updateManualEditState(task.getId(), "waiting_confirm", stage.getCode(), lastConfirmedStage);
@@ -873,6 +893,57 @@ public class MathVisionTaskService {
                 "确认阶段 " + stage.getCode() + "，阶段版本 V" + stageVersion
                         + (StringUtils.hasText(request.getComment()) ? "：" + request.getComment().trim() : ""));
         return startTask(taskId);
+    }
+
+    @Transactional
+    public MathVisionTaskDetailVO requestStageQualityReview(
+            Long taskId,
+            String stageCode,
+            StageQualityReviewRequestDTO request) {
+        Long userId = AuthenticationUserUtil.getCurrentUserId();
+        MathVisionTask task = findOwnedTask(taskId, userId);
+        StageEnum stage = StageEnum.fromCode(stageCode);
+        if (!MathVisionStageQualityReview.supports(stage)) {
+            throw new IllegalArgumentException("当前阶段不支持智能检查: " + stageCode);
+        }
+        if (!"waiting_confirm".equals(task.getStatus()) || !stage.getCode().equals(task.getCurrentStage())) {
+            throw new IllegalArgumentException("只能对当前待确认阶段执行智能检查");
+        }
+        MathVisionVersion version = currentVersion(task);
+        Integer stageVersion = version != null ? stageVersionOf(version, stage.getCode()) : null;
+        if (stageVersion == null || !stageVersion.equals(request.getVersion())) {
+            throw new IllegalArgumentException("阶段版本已变化，请刷新后再执行智能检查");
+        }
+        MathVisionArtifact artifact = artifactMapper.findByTaskStageVersion(
+                task.getId(), stage.getCode(), stageVersion);
+        if (artifact == null || !StringUtils.hasText(artifact.getArtifactJson())) {
+            throw new IllegalArgumentException("阶段产物不存在，不能执行智能检查");
+        }
+        MathVisionStageResult stageResult = stageResultMapper.findByTaskStageVersion(
+                task.getId(), stage.getCode(), stageVersion);
+        if (stageResult == null) {
+            throw new IllegalArgumentException("阶段执行结果不存在，请重新生成当前阶段");
+        }
+        String reviewStatus = MathVisionStageQualityReview.resolveStatus(
+                objectMapper, stage, stageResult.getResultJson());
+        if (MathVisionStageQualityReview.STATUS_COMPLETED.equals(reviewStatus)) {
+            throw new IllegalArgumentException("当前阶段已经完成智能检查");
+        }
+        stageResult.setResultJson(MathVisionStageQualityReview.updateStatus(
+                objectMapper,
+                stage,
+                stageResult.getResultJson(),
+                MathVisionStageQualityReview.STATUS_REQUESTED));
+        stageResultMapper.updateResultJson(stageResult);
+
+        int updated = taskMapper.queueTaskForRun(task.getId(), userId, stage.getCode(), null);
+        if (updated == 0) {
+            throw new IllegalArgumentException("任务状态已变化，请刷新后重试");
+        }
+        saveVisibleMemory(task.getSessionId(), task.getUserId(),
+                "执行阶段 " + stage.getCode() + " 智能检查，阶段版本 V" + stageVersion);
+        taskNotifier.notifyTaskChanged(task.getId(), "queued");
+        return getTaskDetail(taskId);
     }
 
     /** 当前用户手动启动/继续任务; 每次只提交一个用户可见阶段。 */
@@ -1625,6 +1696,39 @@ public class MathVisionTaskService {
         MathVisionArtifact artifact = artifactMapper.findByTaskStageVersion(
                 taskId, stage.getCode(), stageVersion);
         return artifact != null ? artifact.getArtifactJson() : null;
+    }
+
+    private void resetQualityReviewState(MathVisionTask task,
+                                         StageEnum stage,
+                                         Integer stageVersion) {
+        if (!MathVisionStageQualityReview.supports(stage) || stageVersion == null) {
+            return;
+        }
+        MathVisionArtifact artifact = artifactMapper.findByTaskStageVersion(
+                task.getId(), stage.getCode(), stageVersion);
+        if (artifact == null || artifact.getId() == null) {
+            return;
+        }
+        MathVisionStageResult result = stageResultMapper.findByArtifactId(artifact.getId());
+        String resultJson = MathVisionStageQualityReview.updateStatus(
+                objectMapper,
+                stage,
+                result != null ? result.getResultJson() : null,
+                MathVisionStageQualityReview.STATUS_PENDING);
+        if (result != null) {
+            result.setResultJson(resultJson);
+            stageResultMapper.updateResultJson(result);
+            return;
+        }
+        stageResultMapper.insert(MathVisionStageResult.builder()
+                .taskId(task.getId())
+                .artifactId(artifact.getId())
+                .sessionId(task.getSessionId())
+                .userId(task.getUserId())
+                .stage(stage.getCode())
+                .version(stageVersion)
+                .resultJson(resultJson)
+                .build());
     }
 
     private JsonNode resultJson(Long taskId, StageEnum stage, Integer stageVersion) {

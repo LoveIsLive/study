@@ -18,6 +18,8 @@ public class MathVisionStageExecutionContext {
     private Integer baseStageVersion;
     private String instruction;
     private String existingArtifactJson;
+    private String existingStageResultJson;
+    private boolean qualityReviewRequested;
     private boolean stopAfterStage;
 
     public void checkCanceled() {

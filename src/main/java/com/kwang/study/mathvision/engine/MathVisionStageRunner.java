@@ -72,7 +72,14 @@ public class MathVisionStageRunner {
             checkCanceled(taskId);
             MathVisionStageExecutor executor = executorRegistry.find(stage)
                     .orElseThrow(() -> new IllegalStateException("阶段执行器尚未接入: " + stage.getCode()));
-            UserRevisionContext revisionContext = resolveUserRevisionContext(task, stage);
+            String existingStageResultJson = currentStageResultJson(task, stage);
+            boolean qualityReviewRequested = MathVisionStageQualityReview.isRequested(
+                    stage, existingStageResultJson);
+            // A review resumes the already persisted stage artifact. It must not be treated as
+            // another user-revision generation just because the task version originated there.
+            UserRevisionContext revisionContext = qualityReviewRequested
+                    ? null
+                    : resolveUserRevisionContext(task, stage);
             log.info("MathVision 阶段开始执行, taskId={}, stage={}, mode={}, currentVersion={}",
                     taskId, stage.getCode(), task.getMode(), task.getCurrentVersion());
             MathVisionStageExecutionContext context = MathVisionStageExecutionContext.builder()
@@ -85,6 +92,8 @@ public class MathVisionStageRunner {
                     .baseStageVersion(revisionContext != null ? revisionContext.baseStageVersion : null)
                     .instruction(revisionContext != null ? revisionContext.instruction : null)
                     .existingArtifactJson(revisionContext != null ? revisionContext.existingArtifactJson : null)
+                    .existingStageResultJson(existingStageResultJson)
+                    .qualityReviewRequested(qualityReviewRequested)
                     .stopAfterStage(revisionContext != null)
                     .build();
             MathVisionStageExecutionResult result = executor.execute(context);
@@ -113,7 +122,7 @@ public class MathVisionStageRunner {
                 taskNotifier.notifyTaskChanged(taskId, "failed");
                 return;
             }
-            advanceAfterStage(task, stage, context);
+            advanceAfterStage(task, stage, context, result);
             refreshWorkflowSummary(taskId);
         } catch (MathVisionTaskCanceledException e) {
             log.info("MathVision 任务已取消, taskId={}, stage={}", taskId, stage.getCode());
@@ -217,7 +226,15 @@ public class MathVisionStageRunner {
 
     private void advanceAfterStage(MathVisionTask task,
                                    StageEnum stage,
-                                   MathVisionStageExecutionContext context) {
+                                   MathVisionStageExecutionContext context,
+                                   MathVisionStageExecutionResult result) {
+        if (result != null && result.isWaitForUserDecision()) {
+            log.info("MathVision 阶段等待用户选择是否执行智能检查, taskId={}, stage={}",
+                    task.getId(), stage.getCode());
+            taskMapper.markWaitingConfirm(task.getId(), stage.getCode());
+            taskNotifier.notifyTaskChanged(task.getId(), "waiting_confirm");
+            return;
+        }
         if (context.isUserRevision() && context.isStopAfterStage()) {
             log.info("MathVision 自动编辑完成并等待确认, taskId={}, stage={}, baseStageVersion={}",
                     task.getId(), stage.getCode(), context.getBaseStageVersion());
@@ -309,6 +326,16 @@ public class MathVisionStageRunner {
             return null;
         }
         return stageVersionOf(version, stage);
+    }
+
+    private String currentStageResultJson(MathVisionTask task, StageEnum stage) {
+        Integer stageVersion = currentStageVersion(task, stage);
+        if (stageVersion == null) {
+            return null;
+        }
+        MathVisionStageResult result = stageResultMapper.findByTaskStageVersion(
+                task.getId(), stage.getCode(), stageVersion);
+        return result != null ? result.getResultJson() : null;
     }
 
     private Integer stageVersionOf(MathVisionVersion version, StageEnum stage) {

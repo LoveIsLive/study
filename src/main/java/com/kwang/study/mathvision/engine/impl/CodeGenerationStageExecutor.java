@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionContext;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionResult;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutor;
+import com.kwang.study.mathvision.engine.MathVisionStageQualityReview;
 import com.kwang.study.mathvision.enums.StageEnum;
 import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
@@ -80,6 +81,11 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         MathVisionTask task = context.getTask();
         ProblemBundle bundle = load(task, StageEnum.PROBLEM_NORMALIZATION, ProblemBundle.class);
         Narrative narrative = load(task, StageEnum.VISUAL_STORYBOARD, Narrative.class);
+        if (context.isQualityReviewRequested()) {
+            CodeResult existingCode = load(task, StageEnum.CODE_GENERATION, CodeResult.class);
+            return executeQualityReview(task, bundle, narrative, existingCode, context);
+        }
+
         StageGenerationRequest<CodeResult> generationRequest = context.isUserRevision()
                 ? StageGenerationRequest.<CodeResult>builder()
                         .mode(StageGenerationMode.USER_REVISION)
@@ -92,8 +98,41 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
                 task, bundle, narrative, generationRequest, context);
         CodeGenerationNode.Result nodeResult = generationRun.result;
         CodeResult codeResult = nodeResult.getCodeResult();
-        int apiCalls = nodeResult.getApiCalls();
+        codeResult.setToolCalls(nodeResult.getApiCalls());
+        ObjectNode resultJson = objectMapper.createObjectNode();
+        resultJson.put("apiCalls", nodeResult.getApiCalls());
+        resultJson.put("codeGenerationApiCalls", nodeResult.getApiCalls());
+        resultJson.put("codeGenerationAttempts", generationRun.attempts);
+        ArrayNode generationFailures = resultJson.putArray("codeGenerationRetryFailures");
+        for (String failure : generationRun.failures) {
+            generationFailures.add(failure);
+        }
+        resultJson.put("lineCount", codeResult != null ? codeResult.codeLineCount() : 0);
+        resultJson.put("sceneName", codeResult != null ? codeResult.getSceneName() : null);
+        resultJson.put("artifactName", codeResult != null ? codeResult.getArtifactName() : null);
+        resultJson.put("artifactFormat", codeResult != null ? codeResult.getArtifactFormat() : null);
+        resultJson.put("outputTarget", codeResult != null ? codeResult.getOutputTarget() : null);
+        MathVisionStageQualityReview.writeState(
+                resultJson, stage(), MathVisionStageQualityReview.STATUS_PENDING);
 
+        return MathVisionStageExecutionResult.builder()
+                .artifactJson(toPrettyJson(codeResult))
+                .resultJson(toPrettyJson(resultJson))
+                .changeSource(context.isUserRevision() ? "user_revision" : "initial_generation")
+                .changeSummary(context.isUserRevision()
+                        ? "regenerate complete backend code from user feedback; evaluation pending"
+                        : "generate backend code; evaluation pending")
+                .waitForUserDecision(true)
+                .failed(false)
+                .build();
+    }
+
+    private MathVisionStageExecutionResult executeQualityReview(MathVisionTask task,
+                                                                ProblemBundle bundle,
+                                                                Narrative narrative,
+                                                                CodeResult codeResult,
+                                                                MathVisionStageExecutionContext context) {
+        int reviewApiCalls = 0;
         List<CodeEvaluationResult> evaluationAttempts = new ArrayList<>();
         List<CodeFixResult> fixTrace = new ArrayList<>();
         List<AiMessage> codeFixConversation = new ArrayList<>();
@@ -121,7 +160,7 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
                     CodeEvaluationNode.Result::getApiCalls);
             latestEvaluation = evaluationNodeResult.getEvaluationResult();
             evaluationAttempts.add(latestEvaluation);
-            apiCalls += evaluationNodeResult.getApiCalls();
+            reviewApiCalls += evaluationNodeResult.getApiCalls();
             if (latestEvaluation.isApprovedForRender()) {
                 break;
             }
@@ -144,7 +183,7 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
                     fixResult != null ? fixResult.getCurrentRequestPrompt() : null,
                     fixNodeResult.getAssistantTranscript(),
                     codeFixConversationRounds());
-            apiCalls += fixNodeResult.getApiCalls();
+            reviewApiCalls += fixNodeResult.getApiCalls();
             if (fixResult == null || !fixResult.isApplied()
                     || !StringUtils.hasText(fixResult.getFixedGeneratedCode())) {
                 break;
@@ -152,24 +191,21 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
             codeResult.setGeneratedCode(fixResult.getFixedGeneratedCode());
             revisedCodeApplied = true;
         }
-        codeResult.setToolCalls(apiCalls);
 
+        ObjectNode resultJson = previousResult(context);
+        int previousApiCalls = resultJson.path("apiCalls").asInt(0);
+        int totalApiCalls = previousApiCalls + reviewApiCalls;
+        codeResult.setToolCalls(totalApiCalls);
         boolean approved = latestEvaluation != null && latestEvaluation.isApprovedForRender();
-        ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", apiCalls);
-        resultJson.put("codeGenerationApiCalls", nodeResult.getApiCalls());
-        resultJson.put("codeGenerationAttempts", generationRun.attempts);
+        resultJson.put("apiCalls", totalApiCalls);
+        resultJson.put("codeEvaluationApiCalls", reviewApiCalls);
         resultJson.put("codeEvaluationMaxRetries", maxCodeEvaluationFixAttempts);
         resultJson.put("codeFixConversationRounds", codeFixConversationRounds());
-        ArrayNode generationFailures = resultJson.putArray("codeGenerationRetryFailures");
-        for (String failure : generationRun.failures) {
-            generationFailures.add(failure);
-        }
-        resultJson.put("lineCount", codeResult != null ? codeResult.codeLineCount() : 0);
-        resultJson.put("sceneName", codeResult != null ? codeResult.getSceneName() : null);
-        resultJson.put("artifactName", codeResult != null ? codeResult.getArtifactName() : null);
-        resultJson.put("artifactFormat", codeResult != null ? codeResult.getArtifactFormat() : null);
-        resultJson.put("outputTarget", codeResult != null ? codeResult.getOutputTarget() : null);
+        resultJson.put("lineCount", codeResult.codeLineCount());
+        resultJson.put("sceneName", codeResult.getSceneName());
+        resultJson.put("artifactName", codeResult.getArtifactName());
+        resultJson.put("artifactFormat", codeResult.getArtifactFormat());
+        resultJson.put("outputTarget", codeResult.getOutputTarget());
         resultJson.put("codeEvaluationApproved", approved);
         resultJson.put("codeEvaluationWarning", !approved);
         resultJson.put("codeEvaluationGateReason", latestEvaluation != null ? latestEvaluation.getGateReason() : "");
@@ -182,19 +218,34 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         for (CodeFixResult fixResult : fixTrace) {
             fixTraceNode.add(objectMapper.valueToTree(fixResult));
         }
+        MathVisionStageQualityReview.writeState(
+                resultJson, stage(), MathVisionStageQualityReview.STATUS_COMPLETED);
 
         return MathVisionStageExecutionResult.builder()
                 .artifactJson(toPrettyJson(codeResult))
                 .resultJson(toPrettyJson(resultJson))
-                .changeSource(context.isUserRevision() ? "user_revision" : "initial_generation")
-                .changeSummary(context.isUserRevision()
-                        ? "regenerate complete backend code and run code evaluation from user feedback"
-                        : approved
-                        ? "generate backend code and run code evaluation"
-                        : "generate backend code; code evaluation still recommends revisions before render")
-                // Match math-vision: exhausting code-review fixes does not block the Render node.
+                .changeSource("quality_review")
+                .changeSummary(approved
+                        ? "code evaluation completed"
+                        : "code evaluation completed with remaining recommendations")
+                .waitForUserDecision(true)
                 .failed(false)
                 .build();
+    }
+
+    private ObjectNode previousResult(MathVisionStageExecutionContext context) {
+        if (!StringUtils.hasText(context.getExistingStageResultJson())) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode parsed =
+                    objectMapper.readTree(context.getExistingStageResultJson());
+            return parsed != null && parsed.isObject()
+                    ? (ObjectNode) parsed.deepCopy()
+                    : objectMapper.createObjectNode();
+        } catch (Exception ignored) {
+            return objectMapper.createObjectNode();
+        }
     }
 
     private GenerationRun runCodeGenerationWithRetry(MathVisionTask task,

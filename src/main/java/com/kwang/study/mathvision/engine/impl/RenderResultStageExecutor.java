@@ -1,11 +1,13 @@
 package com.kwang.study.mathvision.engine.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionContext;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionResult;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutor;
+import com.kwang.study.mathvision.engine.MathVisionStageQualityReview;
 import com.kwang.study.mathvision.enums.StageEnum;
 import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
@@ -43,6 +45,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -119,15 +122,37 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         CodeResult codeResult = load(task, StageEnum.CODE_GENERATION, CodeResult.class);
         context.checkCanceled();
 
-        RenderResult renderResult = null;
-        RenderResult successfulRenderResult = null;
+        boolean qualityReviewRequested = context.isQualityReviewRequested();
+        RenderResult renderResult = qualityReviewRequested
+                ? load(task, StageEnum.RENDER_RESULT, RenderResult.class)
+                : null;
+        RenderResult successfulRenderResult = qualityReviewRequested ? renderResult : null;
         SceneEvaluationResult sceneEvaluationResult = null;
         List<CodeFixResult> fixTrace = new ArrayList<>();
         List<AiMessage> renderFixConversation = new ArrayList<>();
         List<String> sceneFixHistory = new ArrayList<>();
         RenderNode.RenderRetryState renderRetryState = new RenderNode.RenderRetryState();
-        int apiCalls = 0;
+        int apiCalls = previousApiCalls(context);
         int sceneFixAttempts = 0;
+        boolean evaluateExistingRender = qualityReviewRequested;
+        boolean successfulRenderNeedsStorage = false;
+        JsonNode latestGeometryReport = qualityReviewRequested
+                ? geometryReportFromResult(context)
+                : null;
+        if (qualityReviewRequested) {
+            if (renderResult == null || !renderResult.isSuccess()) {
+                throw new IllegalStateException("Successful render artifact is required for scene evaluation");
+            }
+            if (latestGeometryReport == null || latestGeometryReport.isNull()) {
+                // Older persisted results did not keep the geometry checkpoint. Re-render once so
+                // SceneEvaluationNode receives the same runtime evidence as the original workflow.
+                evaluateExistingRender = false;
+                successfulRenderResult = null;
+                renderResult = null;
+            } else {
+                restoreGeometryReport(renderResult, latestGeometryReport, renderOutputDir);
+            }
+        }
         String renderQuality = renderQuality();
         int renderMaxRetries = renderMaxRetries();
         int sceneEvaluationMaxRetries = sceneEvaluationMaxRetries();
@@ -153,34 +178,41 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     renderRetryState.getFixToolCalls(),
                     sceneFixAttempts,
                     countNonBlankLines(codeResult.getGeneratedCode()));
-            RenderNode.Result renderNodeResult = NodeExecutionLogger.execute(
-                    task.getId(),
-                    stage().getCode(),
-                    "RenderNode",
-                    "iteration=" + (iteration + 1),
-                    () -> renderNode.run(
-                            task,
-                            codeResult,
-                            narrative,
-                            renderRetryState,
-                            renderQuality,
-                            renderMaxRetries,
-                            renderOutputDir,
-                            context),
-                    RenderNode.Result::getApiCalls);
-            renderResult = renderNodeResult.getRenderResult();
-            apiCalls += renderNodeResult.getApiCalls();
-            log.debug("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
-                            + "executionSeconds={}, artifactPath={}, geometryPath={}, requestFix={}, errorSignature={}",
-                    task.getId(),
-                    iteration + 1,
-                    renderResult.isSuccess(),
-                    renderResult.getAttempts(),
-                    renderResult.getExecutionTimeSeconds(),
-                    renderResult.getArtifactPath(),
-                    renderResult.getGeometryPath(),
-                    renderRetryState.isRequestFix(),
-                    errorSignature(renderResult.getLastError()));
+            boolean evaluatingStoredRender = evaluateExistingRender;
+            if (evaluatingStoredRender) {
+                evaluateExistingRender = false;
+                log.debug("MathVision scene evaluation reuses stored render, taskId={}, iteration={}, artifactPath={}",
+                        task.getId(), iteration + 1, renderResult.getArtifactPath());
+            } else {
+                RenderNode.Result renderNodeResult = NodeExecutionLogger.execute(
+                        task.getId(),
+                        stage().getCode(),
+                        "RenderNode",
+                        "iteration=" + (iteration + 1),
+                        () -> renderNode.run(
+                                task,
+                                codeResult,
+                                narrative,
+                                renderRetryState,
+                                renderQuality,
+                                renderMaxRetries,
+                                renderOutputDir,
+                                context),
+                        RenderNode.Result::getApiCalls);
+                renderResult = renderNodeResult.getRenderResult();
+                apiCalls += renderNodeResult.getApiCalls();
+                log.debug("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
+                                + "executionSeconds={}, artifactPath={}, geometryPath={}, requestFix={}, errorSignature={}",
+                        task.getId(),
+                        iteration + 1,
+                        renderResult.isSuccess(),
+                        renderResult.getAttempts(),
+                        renderResult.getExecutionTimeSeconds(),
+                        renderResult.getArtifactPath(),
+                        renderResult.getGeometryPath(),
+                        renderRetryState.isRequestFix(),
+                        errorSignature(renderResult.getLastError()));
+            }
 
             if (!renderResult.isSuccess()) {
                 cleanupRenderWorkspace(renderOutputDir, artifactPath(successfulRenderResult));
@@ -245,6 +277,24 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 continue;
             }
 
+            if (!qualityReviewRequested) {
+                boolean successfulArtifactRetained = true;
+                try {
+                    retainSuccessfulArtifact(renderResult, renderOutputDir);
+                } catch (Exception e) {
+                    successfulArtifactRetained = false;
+                    log.warn("MathVision successful render retention failed, taskId={}, artifactPath={}, error={}",
+                            task.getId(), renderResult.getArtifactPath(), e.getMessage(), e);
+                }
+                successfulRenderResult = renderResult;
+                successfulRenderNeedsStorage = true;
+                latestGeometryReport = readGeometryReport(renderResult);
+                if (successfulArtifactRetained) {
+                    cleanupRenderWorkspace(renderOutputDir, artifactPath(successfulRenderResult));
+                }
+                break;
+            }
+
             RenderResult currentRenderResult = renderResult;
             int currentSceneFixAttempts = sceneFixAttempts;
             SceneEvaluationNode.Result sceneNodeResult = NodeExecutionLogger.execute(
@@ -276,21 +326,21 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     abbreviate(sceneEvaluationResult != null ? sceneEvaluationResult.getGateReason() : null, 500));
 
             boolean successfulArtifactRetained = true;
-            try {
-                retainSuccessfulArtifact(renderResult, renderOutputDir);
-            } catch (Exception e) {
-                successfulArtifactRetained = false;
-                log.warn("MathVision successful render retention failed, taskId={}, artifactPath={}, error={}",
-                        task.getId(), renderResult.getArtifactPath(), e.getMessage(), e);
+            if (!evaluatingStoredRender) {
+                try {
+                    retainSuccessfulArtifact(renderResult, renderOutputDir);
+                } catch (Exception e) {
+                    successfulArtifactRetained = false;
+                    log.warn("MathVision successful render retention failed, taskId={}, artifactPath={}, error={}",
+                            task.getId(), renderResult.getArtifactPath(), e.getMessage(), e);
+                }
+                successfulRenderNeedsStorage = true;
+                latestGeometryReport = readGeometryReport(renderResult);
             }
             // Keep the latest successful artifact even if a later scene-layout fix breaks rendering.
             successfulRenderResult = renderResult;
             if (successfulArtifactRetained) {
                 cleanupRenderWorkspace(renderOutputDir, artifactPath(successfulRenderResult));
-                renderResult.setGeometryPath(null);
-                if (sceneEvaluationResult != null) {
-                    sceneEvaluationResult.setGeometryPath(null);
-                }
             }
 
             if (sceneEvaluationResult.isApproved()) {
@@ -369,14 +419,16 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         if (renderSuccess) {
             renderResult = successfulRenderResult;
         }
-        boolean sceneApproved = sceneEvaluationResult == null || sceneEvaluationResult.isApproved();
-        boolean sceneEvaluationWarning = renderSuccess && !sceneApproved;
+        boolean sceneApproved = qualityReviewRequested
+                && sceneEvaluationResult != null
+                && sceneEvaluationResult.isApproved();
+        boolean sceneEvaluationWarning = qualityReviewRequested && renderSuccess && !sceneApproved;
         boolean stageSuccess = renderSuccess;
         String storageError = null;
         String finalCodeWritebackError = null;
         MathVisionFinalCodeArtifactService.WritebackResult finalCodeWriteback = null;
 
-        if (renderSuccess) {
+        if (renderSuccess && successfulRenderNeedsStorage) {
             try {
                 finalCodeWriteback = finalCodeArtifactService.persistFinalCode(task, renderResult);
             } catch (Exception e) {
@@ -411,7 +463,14 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             }
         }
 
-        ObjectNode resultJson = objectMapper.createObjectNode();
+        if (renderResult != null) {
+            renderResult.setGeometryPath(null);
+        }
+        if (sceneEvaluationResult != null) {
+            sceneEvaluationResult.setGeometryPath(null);
+        }
+
+        ObjectNode resultJson = previousResult(context);
         resultJson.put("apiCalls", apiCalls);
         resultJson.put("renderQuality", renderQuality);
         resultJson.put("renderMaxRetries", renderMaxRetries);
@@ -446,6 +505,19 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         for (CodeFixResult fixResult : fixTrace) {
             fixTraceNode.add(objectMapper.valueToTree(fixResult));
         }
+        ObjectNode internalCheckpoints = resultJson.has("internalCheckpoints")
+                && resultJson.get("internalCheckpoints").isObject()
+                ? (ObjectNode) resultJson.get("internalCheckpoints")
+                : resultJson.putObject("internalCheckpoints");
+        if (latestGeometryReport != null && !latestGeometryReport.isNull()) {
+            internalCheckpoints.set("geometryReport", latestGeometryReport);
+        }
+        MathVisionStageQualityReview.writeState(
+                resultJson,
+                stage(),
+                qualityReviewRequested
+                        ? MathVisionStageQualityReview.STATUS_COMPLETED
+                        : MathVisionStageQualityReview.STATUS_PENDING);
 
         String errorType = !stageSuccess ? "render_error" : null;
         String errorMessage = !stageSuccess ? buildRenderFailureMessage(renderResult, fixTrace) : null;
@@ -468,19 +540,22 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         return MathVisionStageExecutionResult.builder()
                 .artifactJson(toPrettyJson(renderResult))
                 .resultJson(toPrettyJson(resultJson))
-                .changeSource("initial_generation")
+                .changeSource(qualityReviewRequested ? "quality_review" : "initial_generation")
                 .changeSummary(stageSuccess
                         ? StringUtils.hasText(storageError)
                         ? "rendered final artifact; platform storage archive reported a warning"
                         : sceneEvaluationWarning
                         ? "rendered final artifact with scene layout warning"
-                        : "rendered and evaluated final artifact"
+                        : qualityReviewRequested
+                        ? "evaluated final artifact"
+                        : "rendered final artifact"
                         : "render or final artifact storage failed")
                 .finalArtifactPath(stageSuccess && renderResult != null ? renderResult.getArtifactPath() : null)
                 .finalArtifactType(stageSuccess && renderResult != null ? renderResult.getArtifactType() : null)
                 .failed(!stageSuccess)
                 .errorType(stageSuccess ? null : errorType)
                 .errorMessage(stageSuccess ? null : errorMessage)
+                .waitForUserDecision(stageSuccess)
                 .build();
     }
 
@@ -491,6 +566,69 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         }
         codeResult.setGeneratedCode(fixResult.getFixedGeneratedCode());
         return true;
+    }
+
+    private int previousApiCalls(MathVisionStageExecutionContext context) {
+        JsonNode root = parsePreviousResult(context);
+        return root.path("apiCalls").asInt(0);
+    }
+
+    private ObjectNode previousResult(MathVisionStageExecutionContext context) {
+        JsonNode root = parsePreviousResult(context);
+        return root.isObject() ? (ObjectNode) root.deepCopy() : objectMapper.createObjectNode();
+    }
+
+    private JsonNode geometryReportFromResult(MathVisionStageExecutionContext context) {
+        JsonNode report = parsePreviousResult(context)
+                .path("internalCheckpoints")
+                .path("geometryReport");
+        return report.isMissingNode() || report.isNull() ? null : report.deepCopy();
+    }
+
+    private JsonNode parsePreviousResult(MathVisionStageExecutionContext context) {
+        if (context == null || !StringUtils.hasText(context.getExistingStageResultJson())) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(context.getExistingStageResultJson());
+            return root != null ? root : objectMapper.createObjectNode();
+        } catch (Exception ignored) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private JsonNode readGeometryReport(RenderResult renderResult) {
+        if (renderResult == null || !StringUtils.hasText(renderResult.getGeometryPath())) {
+            return null;
+        }
+        try {
+            Path path = Paths.get(renderResult.getGeometryPath()).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(path)) {
+                return null;
+            }
+            return objectMapper.readTree(Files.readString(path, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            log.warn("MathVision geometry checkpoint could not be read, geometryPath={}, error={}",
+                    renderResult.getGeometryPath(), e.getMessage());
+            return null;
+        }
+    }
+
+    private void restoreGeometryReport(RenderResult renderResult,
+                                       JsonNode geometryReport,
+                                       Path renderOutputDir) {
+        try {
+            Files.createDirectories(renderOutputDir);
+            Path geometryPath = renderOutputDir.resolve("review_geometry.json").toAbsolutePath().normalize();
+            Files.writeString(
+                    geometryPath,
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(geometryReport),
+                    StandardCharsets.UTF_8);
+            renderResult.setGeometryPath(geometryPath.toString());
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to restore render geometry for scene evaluation: "
+                    + e.getMessage(), e);
+        }
     }
 
     private void appendFixConversation(List<AiMessage> conversation,

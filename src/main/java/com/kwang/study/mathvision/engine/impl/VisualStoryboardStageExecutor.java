@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionContext;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionResult;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutor;
+import com.kwang.study.mathvision.engine.MathVisionStageQualityReview;
 import com.kwang.study.mathvision.enums.StageEnum;
 import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
 import com.kwang.study.mathvision.mapper.MathVisionVersionMapper;
@@ -54,6 +55,9 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         ProblemBundle bundle = loadProblemBundle(task);
         bundle.setOutputTarget(task.getOutputTarget());
         KnowledgeGraph graph = loadKnowledgeGraph(task);
+        if (context.isQualityReviewRequested()) {
+            return executeQualityReview(task, bundle, graph, context);
+        }
 
         VisualDesignNode.Result designResult = NodeExecutionLogger.execute(
                 task.getId(),
@@ -76,6 +80,34 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         Narrative narrative = designResult.getNarrative();
         com.fasterxml.jackson.databind.JsonNode visualDesignCheckpoint =
                 objectMapper.valueToTree(narrative).deepCopy();
+        ObjectNode resultJson = objectMapper.createObjectNode();
+        resultJson.put("apiCalls", designResult.getApiCalls());
+        resultJson.put("visualDesignApiCalls", designResult.getApiCalls());
+        resultJson.put("sceneCount", narrative.getStoryboard().getScenes().size());
+        resultJson.put("objectCount", narrative.getStoryboard().getObjectRegistry().size());
+        resultJson.put("validationCompleted", false);
+        resultJson.put("sceneMode", designResult.getSceneMode());
+        ObjectNode checkpoints = resultJson.putObject("internalCheckpoints");
+        checkpoints.set("visualDesign", visualDesignCheckpoint);
+        MathVisionStageQualityReview.writeState(
+                resultJson, stage(), MathVisionStageQualityReview.STATUS_PENDING);
+
+        return MathVisionStageExecutionResult.builder()
+                .artifactJson(toPrettyJson(narrative))
+                .resultJson(toPrettyJson(resultJson))
+                .changeSource(context.isUserRevision() ? "user_revision" : "initial_generation")
+                .changeSummary(context.isUserRevision()
+                        ? "regenerate complete visual storyboard from user feedback; validation pending"
+                        : "complete visual storyboard design; validation pending")
+                .waitForUserDecision(true)
+                .build();
+    }
+
+    private MathVisionStageExecutionResult executeQualityReview(MathVisionTask task,
+                                                                ProblemBundle bundle,
+                                                                KnowledgeGraph graph,
+                                                                MathVisionStageExecutionContext context) {
+        Narrative narrative = loadCurrentNarrative(task);
         StoryboardValidationNode.Result validationResult = NodeExecutionLogger.execute(
                 task.getId(),
                 stage().getCode(),
@@ -85,25 +117,29 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         Narrative validatedNarrative = validationResult.getNarrative() != null
                 ? validationResult.getNarrative()
                 : narrative;
+        int previousApiCalls = previousApiCalls(context);
 
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", designResult.getApiCalls() + validationResult.getApiCalls());
+        resultJson.put("apiCalls", previousApiCalls + validationResult.getApiCalls());
+        resultJson.put("visualDesignApiCalls", previousApiCalls);
+        resultJson.put("storyboardValidationApiCalls", validationResult.getApiCalls());
         resultJson.put("sceneCount", validatedNarrative.getStoryboard().getScenes().size());
         resultJson.put("objectCount", validatedNarrative.getStoryboard().getObjectRegistry().size());
         resultJson.put("validationCompleted", true);
-        resultJson.put("sceneMode", designResult.getSceneMode());
+        resultJson.put("sceneMode", bundle.getSceneMode());
         resultJson.set("validationReport", objectMapper.valueToTree(validationResult.getReport()));
         ObjectNode checkpoints = resultJson.putObject("internalCheckpoints");
-        checkpoints.set("visualDesign", visualDesignCheckpoint);
+        checkpoints.set("visualDesign", objectMapper.valueToTree(narrative));
         checkpoints.set("validatedStoryboard", objectMapper.valueToTree(validatedNarrative));
+        MathVisionStageQualityReview.writeState(
+                resultJson, stage(), MathVisionStageQualityReview.STATUS_COMPLETED);
 
         return MathVisionStageExecutionResult.builder()
                 .artifactJson(toPrettyJson(validatedNarrative))
                 .resultJson(toPrettyJson(resultJson))
-                .changeSource(context.isUserRevision() ? "user_revision" : "initial_generation")
-                .changeSummary(context.isUserRevision()
-                        ? "regenerate complete visual storyboard design and validation from user feedback"
-                        : "complete visual storyboard design and validation")
+                .changeSource("quality_review")
+                .changeSummary("validated visual storyboard")
+                .waitForUserDecision(true)
                 .build();
     }
 
@@ -112,6 +148,36 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
             return objectMapper.readValue(context.getExistingArtifactJson(), Narrative.class);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse user-revision storyboard: " + e.getMessage(), e);
+        }
+    }
+
+    private Narrative loadCurrentNarrative(MathVisionTask task) {
+        MathVisionVersion version = currentVersion(task);
+        if (version == null || version.getVsVersion() == null) {
+            throw new IllegalStateException("Missing visual storyboard artifact for quality review");
+        }
+        MathVisionArtifact artifact = artifactMapper.findByTaskStageVersion(
+                task.getId(), StageEnum.VISUAL_STORYBOARD.getCode(), version.getVsVersion());
+        if (artifact == null || !StringUtils.hasText(artifact.getArtifactJson())) {
+            throw new IllegalStateException("Visual storyboard artifact is empty for quality review");
+        }
+        try {
+            return objectMapper.readValue(artifact.getArtifactJson(), Narrative.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse visual storyboard for quality review: "
+                    + e.getMessage(), e);
+        }
+    }
+
+    private int previousApiCalls(MathVisionStageExecutionContext context) {
+        if (!StringUtils.hasText(context.getExistingStageResultJson())) {
+            return 0;
+        }
+        try {
+            return Math.max(objectMapper.readTree(context.getExistingStageResultJson())
+                    .path("apiCalls").asInt(0), 0);
+        } catch (Exception ignored) {
+            return 0;
         }
     }
 

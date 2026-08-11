@@ -217,6 +217,69 @@ class MathVisionStageRunnerTest {
     }
 
     @Test
+    void qualityReviewResumesCurrentArtifactEvenWhenTaskVersionCameFromUserRevision() {
+        MathVisionTask task = MathVisionTask.builder()
+                .id(85L)
+                .sessionId("session-85")
+                .userId(9L)
+                .mode("auto")
+                .status("running")
+                .currentStage("visual_storyboard")
+                .currentVersion(6)
+                .cancelRequested(false)
+                .build();
+        MathVisionVersion version = MathVisionVersion.builder()
+                .taskId(85L)
+                .version(6)
+                .vsVersion(8)
+                .branchStage("visual_storyboard")
+                .changeSource("user_revision")
+                .changeInstruction("修正轨迹")
+                .build();
+        MathVisionArtifact artifact = MathVisionArtifact.builder()
+                .id(86L)
+                .taskId(85L)
+                .stage("visual_storyboard")
+                .version(8)
+                .artifactJson("{\"storyboard\":{}}")
+                .build();
+        MathVisionStageResult stageResult = MathVisionStageResult.builder()
+                .id(87L)
+                .artifactId(86L)
+                .taskId(85L)
+                .stage("visual_storyboard")
+                .version(8)
+                .resultJson("{\"qualityReview\":{\"status\":\"requested\"}}")
+                .build();
+        when(taskMapper.findById(85L)).thenReturn(task);
+        when(versionMapper.findByTaskVersion(85L, 6)).thenReturn(version);
+        when(stageResultMapper.findByTaskStageVersion(85L, "visual_storyboard", 8))
+                .thenReturn(stageResult);
+        when(artifactMapper.findByTaskStageVersion(85L, "visual_storyboard", 8))
+                .thenReturn(artifact);
+        when(stageResultMapper.findByArtifactId(86L)).thenReturn(stageResult);
+        when(executorRegistry.find(StageEnum.VISUAL_STORYBOARD)).thenReturn(Optional.of(executor));
+        when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
+                .artifactJson("{\"storyboard\":{\"validated\":true}}")
+                .resultJson("{\"qualityReview\":{\"status\":\"completed\"}}")
+                .waitForUserDecision(true)
+                .build());
+
+        runner.runOneVisibleStage(85L);
+
+        ArgumentCaptor<MathVisionStageExecutionContext> contextCaptor =
+                ArgumentCaptor.forClass(MathVisionStageExecutionContext.class);
+        verify(executor).execute(contextCaptor.capture());
+        assertTrue(contextCaptor.getValue().isQualityReviewRequested());
+        assertTrue(!contextCaptor.getValue().isUserRevision());
+        verify(artifactMapper).updateArtifactJson(artifact);
+        verify(artifactMapper, never()).insert(any());
+        verify(stageResultMapper).updateResultJson(stageResult);
+        verify(taskMapper).markWaitingConfirm(85L, "visual_storyboard");
+        verify(taskMapper, never()).queueNextStage(any(), any());
+    }
+
+    @Test
     void modeChangedToManualDuringStageStopsBeforeNextStage() {
         MathVisionTask runningAuto = MathVisionTask.builder()
                 .id(84L)

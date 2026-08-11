@@ -12,6 +12,7 @@ import com.kwang.study.mathvision.dto.MathVisionVersionDetailVO;
 import com.kwang.study.mathvision.dto.MathVisionVersionItemVO;
 import com.kwang.study.mathvision.dto.PageResultVO;
 import com.kwang.study.mathvision.dto.StageConfirmRequestDTO;
+import com.kwang.study.mathvision.dto.StageQualityReviewRequestDTO;
 import com.kwang.study.mathvision.dto.StageAutoEditRequestDTO;
 import com.kwang.study.mathvision.dto.StageContentSaveRequestDTO;
 import com.kwang.study.mathvision.dto.StageDataVO;
@@ -143,6 +144,15 @@ public class MathVisionTaskController {
             @PathVariable String stage,
             @Valid @RequestBody StageConfirmRequestDTO request) {
         return ResponseEntity.ok(R.success(taskService.confirmStage(taskId, stage, request)));
+    }
+
+    @PostMapping("/{taskId}/stages/{stage}/quality-review")
+    public ResponseEntity<R<MathVisionTaskDetailVO>> requestQualityReview(
+            @PathVariable Long taskId,
+            @PathVariable String stage,
+            @Valid @RequestBody StageQualityReviewRequestDTO request) {
+        return ResponseEntity.ok(R.success(
+                taskService.requestStageQualityReview(taskId, stage, request)));
     }
 
     @PostMapping("/{taskId}/stages/{stage}/retry")

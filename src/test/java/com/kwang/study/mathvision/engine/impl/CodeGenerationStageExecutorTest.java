@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
 class CodeGenerationStageExecutorTest {
 
     @Test
-    void continuesToRenderWhenCodeEvaluationFixBudgetIsExhausted() throws Exception {
+    void waitsAfterGenerationThenRunsEvaluationAndFixWithoutAnotherUserPause() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         MathVisionArtifactMapper artifactMapper = mock(MathVisionArtifactMapper.class);
         MathVisionVersionMapper versionMapper = mock(MathVisionVersionMapper.class);
@@ -78,7 +78,7 @@ class CodeGenerationStageExecutorTest {
         evaluation.setSceneName("MainScene");
         evaluation.setGateReason("Code review still recommends revisions");
         when(codeEvaluationNode.run(eq(task), any(ProblemBundle.class), any(Narrative.class),
-                eq(codeResult), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class)))
+                any(CodeResult.class), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class)))
                 .thenReturn(codeEvaluationResult(evaluation, 1));
 
         CodeFixResult fixResult = new CodeFixResult();
@@ -100,24 +100,48 @@ class CodeGenerationStageExecutorTest {
                 codeFixNode,
                 modelCatalog);
 
-        MathVisionStageExecutionResult result = executor.execute(
+        MathVisionStageExecutionResult generationResult = executor.execute(
                 MathVisionStageExecutionContext.builder()
                         .task(task)
                         .stage(StageEnum.CODE_GENERATION)
                         .build());
 
-        assertFalse(result.isFailed());
-        JsonNode resultJson = objectMapper.readTree(result.getResultJson());
+        assertFalse(generationResult.isFailed());
+        assertTrue(generationResult.isWaitForUserDecision());
+        JsonNode generationJson = objectMapper.readTree(generationResult.getResultJson());
+        assertTrue(generationJson.path("codeGenerationAttempts").asInt() == 2);
+        assertTrue(generationJson.path("codeGenerationRetryFailures").size() == 1);
+        assertTrue("pending".equals(generationJson.path("qualityReview").path("status").asText()));
+        verify(codeEvaluationNode, times(0)).run(eq(task), any(ProblemBundle.class), any(Narrative.class),
+                any(CodeResult.class), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class));
+        verify(codeFixNode, times(0)).run(
+                eq(task), any(), any(MathVisionStageExecutionContext.class), anyList());
+
+        version.setCgVersion(1);
+        when(artifactMapper.findByTaskStageVersion(71L, StageEnum.CODE_GENERATION.getCode(), 1))
+                .thenReturn(artifact(generationResult.getArtifactJson()));
+        MathVisionStageExecutionResult reviewResult = executor.execute(
+                MathVisionStageExecutionContext.builder()
+                        .task(task)
+                        .stage(StageEnum.CODE_GENERATION)
+                        .qualityReviewRequested(true)
+                        .existingStageResultJson(generationResult.getResultJson())
+                        .build());
+
+        assertFalse(reviewResult.isFailed());
+        assertTrue(reviewResult.isWaitForUserDecision());
+        JsonNode resultJson = objectMapper.readTree(reviewResult.getResultJson());
         assertFalse(resultJson.path("codeEvaluationApproved").asBoolean());
         assertTrue(resultJson.path("codeEvaluationWarning").asBoolean());
         assertTrue(resultJson.path("codeGenerationAttempts").asInt() == 2);
         assertTrue(resultJson.path("codeGenerationRetryFailures").size() == 1);
         assertTrue(resultJson.path("codeEvaluationMaxRetries").asInt() == 1);
+        assertTrue("completed".equals(resultJson.path("qualityReview").path("status").asText()));
         verify(codeGenerationNode, times(2)).run(
                 eq(task), any(ProblemBundle.class), any(Narrative.class),
                 any(StageGenerationRequest.class), any(MathVisionStageExecutionContext.class));
         verify(codeEvaluationNode, times(2)).run(eq(task), any(ProblemBundle.class), any(Narrative.class),
-                eq(codeResult), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class));
+                any(CodeResult.class), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class));
         verify(codeFixNode, times(1)).run(
                 eq(task), any(), any(MathVisionStageExecutionContext.class), anyList());
     }

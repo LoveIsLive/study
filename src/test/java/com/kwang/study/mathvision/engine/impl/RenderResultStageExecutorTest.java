@@ -65,7 +65,7 @@ class RenderResultStageExecutorTest {
     Path tempDir;
 
     @Test
-    void succeedsAndStoresVideoWhenSceneFixBudgetIsExhausted() throws Exception {
+    void rendersAndStoresVideoBeforeWaitingForOptionalSceneEvaluation() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         MathVisionArtifactMapper artifactMapper = mock(MathVisionArtifactMapper.class);
         MathVisionVersionMapper versionMapper = mock(MathVisionVersionMapper.class);
@@ -166,42 +166,32 @@ class RenderResultStageExecutorTest {
                         .build());
 
         assertFalse(result.isFailed());
+        assertTrue(result.isWaitForUserDecision());
         assertEquals("/mathvision/task-42/v3/final/final.mp4", result.getFinalArtifactPath());
         assertFalse(Files.exists(localVideo));
         assertFalse(Files.exists(renderWorkspace));
-        assertTrue(sceneResult.getGateReason().contains("after 2 fix attempts"));
 
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertTrue(resultJson.path("success").asBoolean());
         assertTrue(resultJson.path("renderSuccess").asBoolean());
         assertFalse(resultJson.path("sceneEvaluationApproved").asBoolean());
-        assertTrue(resultJson.path("sceneEvaluationWarning").asBoolean());
+        assertFalse(resultJson.path("sceneEvaluationWarning").asBoolean());
+        assertEquals("pending", resultJson.path("qualityReview").path("status").asText());
         assertEquals("medium", resultJson.path("renderQuality").asText());
         assertEquals(7, resultJson.path("renderMaxRetries").asInt());
         assertEquals(2, resultJson.path("sceneEvaluationMaxRetries").asInt());
         assertEquals("/mathvision/task-42/v3/final/final.mp4",
                 resultJson.path("artifactPath").asText());
 
-        verify(renderNode, times(3)).run(eq(task), any(CodeResult.class), eq(narrative),
+        verify(renderNode, times(1)).run(eq(task), any(CodeResult.class), eq(narrative),
                 any(RenderNode.RenderRetryState.class), anyString(), anyInt(), any(Path.class),
                 any(MathVisionStageExecutionContext.class));
-        verify(sceneEvaluationNode, times(3)).run(eq(task), eq(narrative), any(CodeResult.class),
-                eq(renderResult), anyInt(), any(MathVisionStageExecutionContext.class));
-        ArgumentCaptor<CodeFixRequest> requestCaptor = ArgumentCaptor.forClass(CodeFixRequest.class);
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        ArgumentCaptor<List<AiMessage>> conversationCaptor =
-                (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
-        verify(codeFixNode, times(2)).run(
-                eq(task), requestCaptor.capture(), any(MathVisionStageExecutionContext.class),
-                conversationCaptor.capture());
-        assertTrue(conversationCaptor.getAllValues().stream().allMatch(List::isEmpty));
-        List<CodeFixRequest> requests = requestCaptor.getAllValues();
-        assertTrue(requests.get(0).getFixHistory().isEmpty());
-        assertEquals(List.of("layout issues"), requests.get(1).getFixHistory());
-        assertEquals(StoryboardJsonBuilder.buildForSceneEvaluationFix(
-                narrative.getStoryboard(), "manim"), requests.get(0).getStoryboardJson());
+        verify(sceneEvaluationNode, times(0)).run(eq(task), eq(narrative), any(CodeResult.class),
+                any(RenderResult.class), anyInt(), any(MathVisionStageExecutionContext.class));
+        verify(codeFixNode, times(0)).run(
+                eq(task), any(), any(MathVisionStageExecutionContext.class), anyList());
         assertEquals(0, resultJson.path("sceneFixConversationMessages").asInt());
-        assertEquals(2, resultJson.path("sceneFixHistoryEntries").asInt());
+        assertEquals(0, resultJson.path("sceneFixHistoryEntries").asInt());
         verify(fileStorageService).updateFileObject(
                 org.mockito.ArgumentMatchers.startsWith("/mathvision/task-42/v3/final/upload-"),
                 eq("final.mp4"), isNull(), isNull());
@@ -243,6 +233,7 @@ class RenderResultStageExecutorTest {
                 .pnVersion(1)
                 .vsVersion(1)
                 .cgVersion(1)
+                .rrVersion(1)
                 .build();
         when(versionMapper.findCurrent(43L)).thenReturn(version);
 
@@ -253,21 +244,24 @@ class RenderResultStageExecutorTest {
         codeResult.setGeneratedCode(successfulCode);
         codeResult.setSceneName("MainScene");
         codeResult.setOutputTarget("manim");
-        when(artifactMapper.findByTaskStageVersion(eq(43L), anyString(), eq(1)))
-                .thenAnswer(invocation -> artifactForStage(
-                        invocation.getArgument(1), bundle, narrative, codeResult, objectMapper));
-
-        Path localVideo = tempDir.resolve("retained-MainScene.mp4");
-        Files.writeString(localVideo, "successful-video");
+        String storedVideoPath = "/mathvision/task-43/v4/final/final.mp4";
         RenderResult successfulRender = new RenderResult();
         successfulRender.setSuccess(true);
         successfulRender.setSceneName("MainScene");
         successfulRender.setOutputTarget("manim");
         successfulRender.setArtifactType("mp4");
-        successfulRender.setArtifactPath(localVideo.toString());
-        successfulRender.setVideoPath(localVideo.toString());
+        successfulRender.setArtifactPath(storedVideoPath);
+        successfulRender.setVideoPath(storedVideoPath);
         successfulRender.setFinalGeneratedCode(successfulCode);
         successfulRender.setAttempts(1);
+        when(artifactMapper.findByTaskStageVersion(eq(43L), anyString(), eq(1)))
+                .thenAnswer(invocation -> {
+                    String stage = invocation.getArgument(1);
+                    if (StageEnum.RENDER_RESULT.getCode().equals(stage)) {
+                        return artifact(objectMapper.writeValueAsString(successfulRender));
+                    }
+                    return artifactForStage(stage, bundle, narrative, codeResult, objectMapper);
+                });
 
         RenderResult failedRender = new RenderResult();
         failedRender.setSuccess(false);
@@ -280,7 +274,7 @@ class RenderResultStageExecutorTest {
         when(renderNode.run(eq(task), any(CodeResult.class), eq(narrative),
                 any(RenderNode.RenderRetryState.class), anyString(), anyInt(), any(Path.class),
                 any(MathVisionStageExecutionContext.class)))
-                .thenReturn(renderNodeResult(successfulRender, 0), renderNodeResult(failedRender, 0));
+                .thenReturn(renderNodeResult(failedRender, 0));
 
         SceneEvaluationResult sceneResult = new SceneEvaluationResult();
         sceneResult.setEvaluated(true);
@@ -289,7 +283,7 @@ class RenderResultStageExecutorTest {
         sceneResult.setTotalIssueCount(1);
         sceneResult.setGateReason("layout issue");
         when(sceneEvaluationNode.run(eq(task), eq(narrative), any(CodeResult.class),
-                eq(successfulRender), eq(0), any(MathVisionStageExecutionContext.class)))
+                any(RenderResult.class), eq(0), any(MathVisionStageExecutionContext.class)))
                 .thenReturn(sceneEvaluationNodeResult(sceneResult, 0));
         when(sceneEvaluationNode.buildIssueSummaryForFix(sceneResult)).thenReturn("layout issue");
         when(sceneEvaluationNode.buildFixReportJsonForFix(sceneResult, narrative)).thenReturn("{}");
@@ -317,18 +311,24 @@ class RenderResultStageExecutorTest {
                 MathVisionStageExecutionContext.builder()
                         .task(task)
                         .stage(StageEnum.RENDER_RESULT)
+                        .qualityReviewRequested(true)
+                        .existingStageResultJson("{\"apiCalls\":0,\"internalCheckpoints\":"
+                                + "{\"geometryReport\":{\"samples\":[]}},\"qualityReview\":"
+                                + "{\"status\":\"requested\"}}")
                         .build());
 
         assertFalse(result.isFailed());
-        assertEquals("/mathvision/task-43/v4/final/final.mp4", result.getFinalArtifactPath());
+        assertTrue(result.isWaitForUserDecision());
+        assertEquals(storedVideoPath, result.getFinalArtifactPath());
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertTrue(resultJson.path("renderEverSucceeded").asBoolean());
         assertFalse(resultJson.path("renderFinalSuccess").asBoolean());
         assertTrue(resultJson.path("renderResult").path("success").asBoolean());
         assertFalse(resultJson.path("lastRenderResult").path("success").asBoolean());
-        assertEquals("successful-video", uploadedVideo.get());
-        verify(finalCodeArtifactService).persistFinalCode(task, successfulRender);
-        verify(renderNode, times(2)).run(eq(task), any(CodeResult.class), eq(narrative),
+        assertEquals("completed", resultJson.path("qualityReview").path("status").asText());
+        assertEquals(null, uploadedVideo.get());
+        verify(finalCodeArtifactService, times(0)).persistFinalCode(eq(task), any(RenderResult.class));
+        verify(renderNode, times(1)).run(eq(task), any(CodeResult.class), eq(narrative),
                 any(RenderNode.RenderRetryState.class), anyString(), anyInt(), any(Path.class),
                 any(MathVisionStageExecutionContext.class));
     }
@@ -533,6 +533,10 @@ class RenderResultStageExecutorTest {
         return MathVisionArtifact.builder()
                 .artifactJson(objectMapper.writeValueAsString(value))
                 .build();
+    }
+
+    private static MathVisionArtifact artifact(String json) {
+        return MathVisionArtifact.builder().artifactJson(json).build();
     }
 
     private static MimeTypeIdResult supportedMime() {

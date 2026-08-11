@@ -19,4 +19,8 @@ public class StageDataVO {
     private boolean canConfirm;
     private boolean canRegenerate;
     private boolean canAutoEdit;
+    private boolean qualityReviewSupported;
+    private String qualityReviewStatus;
+    private String qualityReviewNode;
+    private boolean canRunQualityReview;
 }
