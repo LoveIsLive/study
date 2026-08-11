@@ -186,6 +186,10 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
             reviewApiCalls += fixNodeResult.getApiCalls();
             if (fixResult == null || !fixResult.isApplied()
                     || !StringUtils.hasText(fixResult.getFixedGeneratedCode())) {
+                if (fixResult != null
+                        && fixResult.getOutcome() == CodeFixResult.FixOutcome.REJECTED_CONTRACT) {
+                    continue;
+                }
                 break;
             }
             codeResult.setGeneratedCode(fixResult.getFixedGeneratedCode());

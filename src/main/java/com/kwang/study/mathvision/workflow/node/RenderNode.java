@@ -73,7 +73,7 @@ public class RenderNode {
         String sceneName = ManimCodeUtils.EXPECTED_SCENE_NAME;
         codeResult.setSceneName(sceneName);
         int attemptNumber = retryState.getAttempts() + 1;
-        List<String> preflightIssues = ManimCodeUtils.validateFull(currentCode);
+        List<String> preflightIssues = ManimCodeUtils.validateRenderBlockers(currentCode);
         if (!preflightIssues.isEmpty() && canRequestFix(attemptNumber, maxRenderRetries)) {
             retryState.setAttempts(attemptNumber);
             retryState.setRequestFix(true);
@@ -159,7 +159,7 @@ public class RenderNode {
         int attemptNumber = retryState.getAttempts() + 1;
         RenderResult result = baseResult(codeResult, "geogebra", "html",
                 sceneName);
-        List<String> preflightIssues = GeoGebraCodeUtils.validateFull(currentCode);
+        List<String> preflightIssues = GeoGebraCodeUtils.validateRenderBlockers(currentCode);
         if (!preflightIssues.isEmpty() && canRequestFix(attemptNumber, maxRenderRetries)) {
             retryState.setAttempts(attemptNumber);
             retryState.setRequestFix(true);
@@ -280,6 +280,10 @@ public class RenderNode {
                         break;
                     case UNCHANGED:
                         outcome = "code unchanged";
+                        break;
+                    case REJECTED_CONTRACT:
+                        outcome = "candidate rejected by artifact contract: "
+                                + result.getFailureReason();
                         break;
                     case INPUT_CORRUPTED:
                         outcome = "input text had encoding issues";

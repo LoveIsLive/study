@@ -29,6 +29,7 @@ public final class SceneEvaluationPrompts {
                     + SystemPrompts.MANIM_VOICEOVER_RULES
                     + SystemPrompts.MANIM_CHINESE_TEXT_RENDERING_RULES
                     + SystemPrompts.MANIM_CODE_FIX_CLASS_INHERITANCE_RULES
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + "Use the rendered geometry report as authority for observed layout problems, and use storyboard object_registry dependency facts as semantic authority for how affected geometry must be constructed.\n"
                     + MANIM_LAYOUT_FIX_API_RULES
                     + "Prefer adjusting positioning, scaling, grouping, and spacing over deleting explanatory content.\n"
@@ -56,6 +57,7 @@ public final class SceneEvaluationPrompts {
                     + "Preserve the teaching goal, visual intent, and construction meaning.\n"
                     + SystemPrompts.STORYBOARD_REPAIR_AUTHORITY_RULES
                     + SystemPrompts.VISIBLE_CHINESE_TEXT_RULES
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + "Use the rendered geometry report as authority for observed layout problems, and use storyboard object_registry dependency facts as semantic authority for how affected geometry must be constructed.\n"
                     + "Prefer adjusting label placement, text positioning, coordinate spacing, and whole-construction scale over removing explanatory content.\n"
                     + "Initial-view readability is mandatory; fix offscreen, underfilled, clustered, text-on-text, and text-on-geometry issues without relying on user zooming.\n"

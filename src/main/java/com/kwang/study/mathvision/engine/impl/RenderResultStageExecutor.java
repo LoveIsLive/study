@@ -270,6 +270,9 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                             iteration + 1,
                             fixResult != null ? fixResult.getOutcome() : null,
                             abbreviate(fixResult != null ? fixResult.getFailureReason() : null, 500));
+                    if (isContractRejected(fixResult)) {
+                        continue;
+                    }
                     break;
                 }
                 log.debug("MathVision render CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
@@ -399,6 +402,12 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     fixResult != null ? fixResult.getPostFixStaticAuditIssueCount() : 0,
                     abbreviate(fixResult != null ? fixResult.getFailureReason() : null, 500));
             if (!applyFix(codeResult, fixResult)) {
+                if (isContractRejected(fixResult)) {
+                    sceneEvaluationResult.setGateReason(
+                            "Scene layout repair candidate violated the existing artifact contract; retrying");
+                    evaluateExistingRender = true;
+                    continue;
+                }
                 sceneEvaluationResult.setGateReason(
                         "Scene layout repair stopped because CodeFix did not apply a change; "
                                 + "final rendered artifact retained");
@@ -566,6 +575,11 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         }
         codeResult.setGeneratedCode(fixResult.getFixedGeneratedCode());
         return true;
+    }
+
+    private boolean isContractRejected(CodeFixResult fixResult) {
+        return fixResult != null
+                && fixResult.getOutcome() == CodeFixResult.FixOutcome.REJECTED_CONTRACT;
     }
 
     private int previousApiCalls(MathVisionStageExecutionContext context) {

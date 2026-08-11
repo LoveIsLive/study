@@ -236,6 +236,31 @@ public final class ManimCodeUtils {
         return violations;
     }
 
+    /**
+     * High-confidence checks that are safe to use as a render gate.
+     *
+     * <p>Heuristic quality rules such as brittle MathTex indexing, undocumented
+     * APIs, constructor keyword compatibility, and coordinate-style guidance
+     * remain available through {@link #validateFull(String)} for the optional
+     * code-evaluation stage. They must not trigger an automatic rewrite before
+     * the renderer has demonstrated an actual failure.</p>
+     */
+    public static List<String> validateRenderBlockers(String manimCode) {
+        List<String> blockers = new ArrayList<>();
+        blockers.addAll(validateStructure(manimCode));
+        for (String evidence : findAllAnimateMethodAssignments(manimCode)) {
+            blockers.add(PYTHON_SYNTAX_PREFIX
+                    + ": use `mobject.animate.method(...)`, not `mobject.animate.method = ...`"
+                    + " (" + evidence + ")");
+        }
+        for (String evidence : findAllRawStringTrailingBackslashes(manimCode)) {
+            blockers.add(PYTHON_SYNTAX_PREFIX
+                    + ": raw string literal cannot end with a single backslash"
+                    + " (" + evidence + ")");
+        }
+        return blockers;
+    }
+
     public static List<String> validateFullWarnings(String manimCode) {
         return validateManimApiWhitelistWarnings(manimCode);
     }
@@ -528,13 +553,13 @@ public final class ManimCodeUtils {
     }
 
     private static ConstructorContext innermostConstructor(List<ConstructorContext> parenStack) {
-        for (int i = parenStack.size() - 1; i >= 0; i--) {
-            ConstructorContext context = parenStack.get(i);
-            if (context != null) {
-                return context;
-            }
+        if (parenStack.isEmpty()) {
+            return null;
         }
-        return null;
+        // A null top entry represents a normal nested call such as
+        // `mob.animate.set_fill(..., opacity=...)`. Looking through that call
+        // would incorrectly attribute its keyword to an outer constructor.
+        return parenStack.get(parenStack.size() - 1);
     }
 
     private static final class ConstructorContext {

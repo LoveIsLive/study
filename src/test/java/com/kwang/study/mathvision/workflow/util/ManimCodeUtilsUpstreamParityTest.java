@@ -246,6 +246,40 @@ class ManimCodeUtilsUpstreamParityTest {
     }
 
     @Test
+    void validateManimRules_allowsSetterKeywordInsideNestedConstructorArgument() {
+        String code = String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        triangle = Triangle()",
+                "        self.play(AnimationGroup(",
+                "            triangle.animate.set_fill(\"#FACC15\", opacity=0.18),",
+                "            lag_ratio=0.1,",
+                "        ))");
+
+        List<String> violations = ManimCodeUtils.validateManimRules(code);
+
+        assertTrue(violations.stream().noneMatch(v -> v.contains("constructor opacity keyword")),
+                () -> String.join("\n", violations));
+    }
+
+    @Test
+    void renderBlockersExcludeHeuristicQualityRulesButKeepCertainSyntaxErrors() {
+        String heuristicCode = String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        line = Line(LEFT, RIGHT, opacity=0.5)",
+                "        path = VMobject()",
+                "        path.set_points([LEFT, RIGHT])");
+        assertTrue(ManimCodeUtils.validateRenderBlockers(heuristicCode).isEmpty());
+
+        String invalidCode = heuristicCode + "\n        self.play(line.animate.set_color = RED)";
+        assertTrue(ManimCodeUtils.validateRenderBlockers(invalidCode).stream()
+                .anyMatch(issue -> issue.contains("invalid Python syntax")));
+    }
+
+    @Test
     void validateFullDetectsAnimateMethodAssignment() {
         String code = String.join("\n",
                 "from manim import *",

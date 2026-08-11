@@ -126,6 +126,7 @@ public final class CodeEvaluationPrompts {
                     + SystemPrompts.MANIM_CHINESE_TEXT_RENDERING_RULES
                     + SystemPrompts.STORYBOARD_FIELD_GUIDE_MANIM + "\n"
                     + SystemPrompts.MANIM_CODE_FIX_CLASS_INHERITANCE_RULES
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + SystemPrompts.MANIM_MANUAL_ONLY_RULES
                     + SystemPrompts.COMMON_RENDER_FAILURE_GUARDRAILS
                     + "Preserve valid `VoiceoverScene`, `EdgeTTSService`, `self.voiceover(...)`, Chinese `voiceover_text`, and Chinese visible strings while revising; migrate legacy `GTTSService` usage to `EdgeTTSService`.\n"
@@ -140,6 +141,7 @@ public final class CodeEvaluationPrompts {
                     + SystemPrompts.STORYBOARD_REPAIR_AUTHORITY_RULES
                     + SystemPrompts.VISIBLE_CHINESE_TEXT_RULES
                     + SystemPrompts.STORYBOARD_FIELD_GUIDE_GEOGEBRA + "\n"
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + SystemPrompts.GEOGEBRA_MANUAL_ONLY_RULES
                     + SystemPrompts.GEOGEBRA_ANGLE_MARKER_RULES
                     + SystemPrompts.GEOGEBRA_VIEWPORT_RULES

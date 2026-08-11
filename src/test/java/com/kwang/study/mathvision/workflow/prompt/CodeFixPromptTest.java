@@ -29,6 +29,8 @@ class CodeFixPromptTest {
         assertTrue(rules.contains("one uniform screen scale"));
         assertTrue(rules.contains("Circle"));
         assertTrue(rules.contains("Arc"));
+        assertTrue(rules.contains("Complete-artifact code-fix preservation rules"));
+        assertTrue(rules.contains("never a sample, placeholder, title-only program"));
         assertTrue(current.contains("Static preflight findings"));
         assertTrue(current.contains("summary_signature"));
         assertTrue(current.contains("Previous fix attempts"));

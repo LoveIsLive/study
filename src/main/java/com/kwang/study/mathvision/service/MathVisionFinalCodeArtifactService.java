@@ -12,7 +12,9 @@ import com.kwang.study.mathvision.pojo.MathVisionStageResult;
 import com.kwang.study.mathvision.pojo.MathVisionTask;
 import com.kwang.study.mathvision.pojo.MathVisionVersion;
 import com.kwang.study.mathvision.workflow.model.CodeResult;
+import com.kwang.study.mathvision.workflow.model.CodeFixSource;
 import com.kwang.study.mathvision.workflow.model.RenderResult;
+import com.kwang.study.mathvision.workflow.util.CodeFixAcceptanceValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -63,6 +65,17 @@ public class MathVisionFinalCodeArtifactService {
         CodeResult finalCodeResult = readCodeResult(currentArtifact.getArtifactJson());
         if (finalCode.equals(finalCodeResult.getGeneratedCode())) {
             return WritebackResult.unchanged(currentCodeVersion);
+        }
+        CodeFixAcceptanceValidator.Decision acceptance = CodeFixAcceptanceValidator.evaluate(
+                finalCodeResult.getGeneratedCode(),
+                finalCode,
+                StringUtils.hasText(renderResult.getOutputTarget())
+                        ? renderResult.getOutputTarget()
+                        : finalCodeResult.getOutputTarget(),
+                CodeFixSource.CODE_RENDER);
+        if (!acceptance.isAccepted()) {
+            throw new IllegalStateException("Final rendered code was not written back because it violates the "
+                    + "accepted code artifact contract: " + acceptance.summarizeIssues());
         }
         finalCodeResult.setGeneratedCode(finalCode);
         if (StringUtils.hasText(renderResult.getSceneName())) {

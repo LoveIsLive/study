@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -79,7 +80,8 @@ class MathVisionFinalCodeArtifactServiceTest {
         renderResult.setSuccess(true);
         renderResult.setSceneName("MainScene");
         renderResult.setOutputTarget("manim");
-        renderResult.setFinalGeneratedCode("from manim import *\nclass MainScene(Scene):\n    pass\n");
+        renderResult.setFinalGeneratedCode("from manim import *\nclass MainScene(Scene):\n"
+                + "    def construct(self):\n        self.wait(1)\n");
 
         MathVisionFinalCodeArtifactService.WritebackResult result =
                 service.persistFinalCode(task, renderResult);
@@ -105,5 +107,65 @@ class MathVisionFinalCodeArtifactServiceTest {
         verify(stageResultMapper, never()).insert(any(MathVisionStageResult.class));
         verify(versionMapper, never()).updateStagePointer(
                 any(Long.class), any(Integer.class), any(String.class), any(Integer.class));
+    }
+
+    @Test
+    void refusesToOverwriteCurrentCodeWhenRenderedCandidateDropsScenes() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        MathVisionArtifactMapper artifactMapper = mock(MathVisionArtifactMapper.class);
+        MathVisionStageResultMapper stageResultMapper = mock(MathVisionStageResultMapper.class);
+        MathVisionVersionMapper versionMapper = mock(MathVisionVersionMapper.class);
+        MathVisionFinalCodeArtifactService service = new MathVisionFinalCodeArtifactService(
+                artifactMapper, stageResultMapper, versionMapper, objectMapper);
+
+        MathVisionTask task = MathVisionTask.builder()
+                .id(92L)
+                .sessionId("session-92")
+                .userId(9L)
+                .currentVersion(4)
+                .build();
+        when(versionMapper.findByTaskVersion(92L, 4)).thenReturn(MathVisionVersion.builder()
+                .taskId(92L)
+                .version(4)
+                .cgVersion(2)
+                .build());
+
+        CodeResult originalCode = new CodeResult();
+        originalCode.setOutputTarget("manim");
+        originalCode.setGeneratedCode(String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        self.scene_1()",
+                "        self.scene_2()",
+                "    def scene_1(self):",
+                "        self.wait(1)",
+                "    def scene_2(self):",
+                "        self.wait(1)"));
+        MathVisionArtifact currentArtifact = MathVisionArtifact.builder()
+                .id(102L)
+                .taskId(92L)
+                .stage(StageEnum.CODE_GENERATION.getCode())
+                .version(2)
+                .artifactJson(objectMapper.writeValueAsString(originalCode))
+                .build();
+        when(artifactMapper.findByTaskStageVersion(92L, StageEnum.CODE_GENERATION.getCode(), 2))
+                .thenReturn(currentArtifact);
+
+        RenderResult renderResult = new RenderResult();
+        renderResult.setSuccess(true);
+        renderResult.setOutputTarget("manim");
+        renderResult.setFinalGeneratedCode(String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        self.wait(1)"));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> service.persistFinalCode(task, renderResult));
+
+        assertTrue(error.getMessage().contains("scene_1"));
+        verify(artifactMapper, never()).updateArtifactJson(any(MathVisionArtifact.class));
     }
 }

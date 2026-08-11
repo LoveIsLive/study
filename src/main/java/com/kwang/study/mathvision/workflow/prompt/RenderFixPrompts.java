@@ -21,6 +21,7 @@ public final class RenderFixPrompts {
                     + SystemPrompts.MANIM_VOICEOVER_RULES
                     + SystemPrompts.MANIM_CHINESE_TEXT_RENDERING_RULES
                     + SystemPrompts.MANIM_CODE_FIX_CLASS_INHERITANCE_RULES
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + "Keep implemented mathematical constructions internally consistent while fixing render issues.\n"
                     + "Treat storyboard scene placement as preferred layout input for non-derived objects, but adjust it when needed to fix runtime failures, offscreen/overlap risk, readability, or internal consistency while preserving structured constraints.\n"
                     + "Treat storyboard `coordinate_bounds` as the authoritative storyboard world-coordinate range: preserve given storyboard coordinates and map them through `Axes`/`NumberPlane` with `axes.c2p(x, y)` or the provided helper. Keep x/y storyboard world units on one uniform screen scale so equal lengths render equally; convert storyboard radii/metric lengths through that same scale before passing them to `Circle`, `Arc`, sectors, braces, or similar geometry. Do not rewrite storyboard coordinates to fit the frame; if content falls outside, prefer widening `coordinate_bounds` or the coordinate mapping. Derived points stay computed from their dependencies.\n"
@@ -41,6 +42,7 @@ public final class RenderFixPrompts {
                     + "Preserve the intended construction meaning and object dependency chain where they are useful and valid.\n"
                     + SystemPrompts.STORYBOARD_REPAIR_REFERENCE_RULES
                     + SystemPrompts.VISIBLE_CHINESE_TEXT_RULES
+                    + SystemPrompts.CODE_FIX_ARTIFACT_PRESERVATION_RULES
                     + "Keep implemented geometric relationships internally consistent while fixing command failures.\n"
                     + "GeoGebra interactivity is mandatory: preserve storyboard-required movable/draggable objects while fixing runtime failures.\n"
                     + "For storyboard objects with `moves_on_object`, `moves_along_range`, `follows_path`, `slider_driven`, or explicit movable/draggable semantics, preserve the intended interaction affordance.\n"

@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
@@ -14,6 +17,7 @@ public class CodeFixResult {
         FIXED,
         APPLIED_WITH_ISSUES,
         UNCHANGED,
+        REJECTED_CONTRACT,
         INPUT_CORRUPTED,
         RATE_LIMIT_BLOCKED,
         FAILED
@@ -51,6 +55,12 @@ public class CodeFixResult {
 
     @JsonProperty("postFixStaticAuditSummary")
     private String postFixStaticAuditSummary;
+
+    @JsonProperty("acceptanceIssues")
+    private List<String> acceptanceIssues = new ArrayList<>();
+
+    @JsonProperty("acceptanceWarnings")
+    private List<String> acceptanceWarnings = new ArrayList<>();
 
     @JsonProperty("applied")
     private boolean applied;

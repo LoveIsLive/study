@@ -86,6 +86,39 @@ class CodeFixNodeTest {
         assertFalse(result.getFixResult().getFixedGeneratedCode().contains("GTTSService"));
     }
 
+    @Test
+    void rejectsCandidateThatDropsGeneratedScenesWithoutApplyingIt() {
+        String original = String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        self.scene_1()",
+                "        self.scene_2()",
+                "    def scene_1(self):",
+                "        self.play(Write(Text(\"第一场景\")))",
+                "    def scene_2(self):",
+                "        self.play(Write(Text(\"第二场景\")))");
+        String shortened = String.join("\n",
+                "from manim import *",
+                "class MainScene(Scene):",
+                "    def construct(self):",
+                "        self.play(Write(Text(\"演示\")))");
+        CodeFixRequest request = new CodeFixRequest();
+        request.setSource(CodeFixSource.CODE_RENDER);
+        request.setOutputTarget("manim");
+        request.setGeneratedCode(original);
+        request.setErrorReason("Render failed");
+
+        MathVisionTask task = new MathVisionTask();
+        task.setId(10L);
+        CodeFixNode.Result result = new CodeFixNode(new FakeAiChatService(shortened))
+                .run(task, request, null);
+
+        assertFalse(result.getFixResult().isApplied());
+        assertEquals(CodeFixResult.FixOutcome.REJECTED_CONTRACT, result.getFixResult().getOutcome());
+        assertTrue(result.getFixResult().getFailureReason().contains("scene_1"));
+    }
+
     private static String coordinateBrokenCode() {
         return String.join("\n",
                 "from manim import *",

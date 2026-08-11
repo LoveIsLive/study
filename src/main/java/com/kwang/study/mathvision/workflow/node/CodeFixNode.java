@@ -9,6 +9,7 @@ import com.kwang.study.mathvision.workflow.model.CodeFixRequest;
 import com.kwang.study.mathvision.workflow.model.CodeFixResult;
 import com.kwang.study.mathvision.workflow.prompt.CodeFixPrompts;
 import com.kwang.study.mathvision.workflow.prompt.ToolSchemas;
+import com.kwang.study.mathvision.workflow.util.CodeFixAcceptanceValidator;
 import com.kwang.study.mathvision.workflow.util.GeoGebraCodeUtils;
 import com.kwang.study.mathvision.workflow.util.ManimCodeUtils;
 import com.kwang.study.mathvision.workflow.util.TextHealthDiagnostics;
@@ -135,6 +136,18 @@ public class CodeFixNode {
         if (!hasCodeChanged(request.getGeneratedCode(), fixedCode)) {
             result.setOutcome(CodeFixResult.FixOutcome.UNCHANGED);
             result.setFailureReason("Code fix returned code identical to source code");
+            return finish(task, result, response.getApiCalls(), start, response.getAssistantText());
+        }
+
+        CodeFixAcceptanceValidator.Decision acceptance = CodeFixAcceptanceValidator.evaluate(
+                request.getGeneratedCode(), fixedCode, outputTarget, request.getSource());
+        result.setAcceptanceIssues(new ArrayList<>(acceptance.getIssues()));
+        result.setAcceptanceWarnings(new ArrayList<>(acceptance.getWarnings()));
+        if (!acceptance.isAccepted()) {
+            result.setFixedGeneratedCode(fixedCode);
+            result.setOutcome(CodeFixResult.FixOutcome.REJECTED_CONTRACT);
+            result.setFailureReason("Code fix candidate rejected by artifact contract: "
+                    + acceptance.summarizeIssues());
             return finish(task, result, response.getApiCalls(), start, response.getAssistantText());
         }
 

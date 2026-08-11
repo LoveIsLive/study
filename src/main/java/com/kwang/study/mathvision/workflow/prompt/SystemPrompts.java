@@ -342,6 +342,14 @@ public final class SystemPrompts {
                     + "- If the original base class is `VoiceoverScene`, preserve the `manim_voiceover` imports, `EdgeTTSService` imported from `mathvision_edge_tts`, `set_speech_service(...)`, and `self.voiceover(...)` blocks; migrate legacy `GTTSService` usage to `EdgeTTSService`, and fix runtime, layout, or pacing issues inside that structure instead of downgrading to `Scene`.\n"
                     + "- If the original base class is `ThreeDScene`, fix camera or 3D issues inside `ThreeDScene` instead of downgrading to `Scene`.\n";
 
+    /** Target-neutral preservation rules for full-artifact code-fix passes. */
+    public static final String CODE_FIX_ARTIFACT_PRESERVATION_RULES =
+            "Complete-artifact code-fix preservation rules:\n"
+                    + "- Return the complete executable artifact, never a sample, placeholder, title-only program, partial scene, or patch.\n"
+                    + "- Preserve established scene ids/methods, their execution order, and unrelated teaching behavior. You may add helper methods or make substantial local edits when they are necessary to resolve the supplied evidence.\n"
+                    + "- Do not remove every narration/voiceover block from an artifact that already contains narration; repair the failing narration structure instead.\n"
+                    + "- Keep unrelated valid sections intact. The repair may simplify implementation details, but it must not replace the teaching artifact with a smaller different artifact.\n";
+
     /** Opacity hierarchy for visual layering, applicable to all output targets. */
     public static final String OPACITY_LEVELS =
             "Opacity hierarchy:\n"

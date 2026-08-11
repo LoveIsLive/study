@@ -237,6 +237,14 @@ public final class GeoGebraCodeUtils {
         return violations;
     }
 
+    /**
+     * GeoGebra's current deterministic rules describe command-stream parsing
+     * failures, so they are also appropriate as render blockers.
+     */
+    public static List<String> validateRenderBlockers(String geoGebraCode) {
+        return validateFull(geoGebraCode);
+    }
+
     public static List<String> validateFullWarnings(String geoGebraCode) {
         return validateGeoGebraApiWhitelistWarnings(geoGebraCode);
     }
