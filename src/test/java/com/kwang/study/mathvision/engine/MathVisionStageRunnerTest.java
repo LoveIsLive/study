@@ -37,6 +37,7 @@ class MathVisionStageRunnerTest {
     @Mock private MathVisionStageExecutorRegistry executorRegistry;
     @Mock private MathVisionTaskNotifier taskNotifier;
     @Mock private MathVisionWorkflowSummaryService workflowSummaryService;
+    @Mock private MathVisionTaskExecutionRegistry executionRegistry;
     @Mock private MathVisionStageExecutor executor;
 
     private MathVisionStageRunner runner;
@@ -50,7 +51,8 @@ class MathVisionStageRunnerTest {
                 versionMapper,
                 executorRegistry,
                 taskNotifier,
-                workflowSummaryService);
+                workflowSummaryService,
+                executionRegistry);
     }
 
     @Test

@@ -31,6 +31,7 @@ import com.kwang.study.mathvision.dto.StageDataVO;
 import com.kwang.study.mathvision.dto.StageOperationResultVO;
 import com.kwang.study.mathvision.dto.StageQualityReviewRequestDTO;
 import com.kwang.study.mathvision.engine.MathVisionStageQualityReview;
+import com.kwang.study.mathvision.engine.MathVisionTaskExecutionRegistry;
 import com.kwang.study.mathvision.enums.StageEnum;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
 import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
@@ -95,6 +96,7 @@ public class MathVisionTaskService {
     private final FileStorageService fileStorageService;
     private final MathVisionFileUploadController uploadController;
     private final MathVisionTaskNotifier taskNotifier;
+    private final MathVisionTaskExecutionRegistry executionRegistry;
     private final ObjectMapper objectMapper;
     private final Path renderOutputRoot;
 
@@ -109,6 +111,7 @@ public class MathVisionTaskService {
                                  FileStorageService fileStorageService,
                                  MathVisionFileUploadController uploadController,
                                  MathVisionTaskNotifier taskNotifier,
+                                 MathVisionTaskExecutionRegistry executionRegistry,
                                  ObjectMapper objectMapper,
                                  @Value("${mathvision.render.output-root:mathvision-runs}") String renderOutputRoot) {
         this.chatSessionMapper = chatSessionMapper;
@@ -122,6 +125,7 @@ public class MathVisionTaskService {
         this.fileStorageService = fileStorageService;
         this.uploadController = uploadController;
         this.taskNotifier = taskNotifier;
+        this.executionRegistry = executionRegistry;
         this.objectMapper = objectMapper;
         this.renderOutputRoot = Paths.get(renderOutputRoot).toAbsolutePath().normalize();
     }
@@ -1129,6 +1133,7 @@ public class MathVisionTaskService {
         if (updated == 0) {
             updated = taskMapper.requestCancelRunning(taskId, userId);
             if (updated > 0) {
+                interruptRunningTaskAfterCommit(taskId);
                 taskNotifier.notifyTaskChanged(taskId, "cancel_requested");
             }
         } else {
@@ -1138,6 +1143,20 @@ public class MathVisionTaskService {
             throw new IllegalArgumentException("当前任务状态不可取消");
         }
         return getTaskDetail(taskId);
+    }
+
+    private void interruptRunningTaskAfterCommit(Long taskId) {
+        Runnable interrupt = () -> executionRegistry.interrupt(taskId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            interrupt.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                interrupt.run();
+            }
+        });
     }
 
     /** 将空闲任务移入回收站。排队中或运行中的任务必须先取消。 */

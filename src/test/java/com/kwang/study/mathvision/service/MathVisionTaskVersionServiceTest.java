@@ -22,6 +22,7 @@ import com.kwang.study.mathvision.mapper.MathVisionArtifactMapper;
 import com.kwang.study.mathvision.mapper.MathVisionStageResultMapper;
 import com.kwang.study.mathvision.mapper.MathVisionTaskMapper;
 import com.kwang.study.mathvision.mapper.MathVisionVersionMapper;
+import com.kwang.study.mathvision.engine.MathVisionTaskExecutionRegistry;
 import com.kwang.study.mathvision.pojo.MathVisionArtifact;
 import com.kwang.study.mathvision.pojo.LlmModelConfig;
 import com.kwang.study.mathvision.pojo.MathVisionTask;
@@ -95,6 +96,7 @@ class MathVisionTaskVersionServiceTest {
                 fileStorageService,
                 uploadController,
                 taskNotifier,
+                new MathVisionTaskExecutionRegistry(),
                 new ObjectMapper(),
                 renderOutputRoot.toString());
     }

@@ -6,6 +6,8 @@ import com.kwang.study.mathvision.workflow.model.StageGenerationMode;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.function.Consumer;
+
 @Data
 @Builder
 public class MathVisionStageExecutionContext {
@@ -13,6 +15,8 @@ public class MathVisionStageExecutionContext {
     private MathVisionTask task;
     private StageEnum stage;
     private Runnable cancellationCheck;
+    private Consumer<Runnable> cancellationHookRegistrar;
+    private Consumer<Runnable> cancellationHookClearer;
     @Builder.Default
     private StageGenerationMode generationMode = StageGenerationMode.INITIAL_GENERATION;
     private Integer baseStageVersion;
@@ -25,6 +29,18 @@ public class MathVisionStageExecutionContext {
     public void checkCanceled() {
         if (cancellationCheck != null) {
             cancellationCheck.run();
+        }
+    }
+
+    public void registerCancellationHook(Runnable hook) {
+        if (cancellationHookRegistrar != null && hook != null) {
+            cancellationHookRegistrar.accept(hook);
+        }
+    }
+
+    public void clearCancellationHook(Runnable hook) {
+        if (cancellationHookClearer != null && hook != null) {
+            cancellationHookClearer.accept(hook);
         }
     }
 

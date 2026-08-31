@@ -39,6 +39,7 @@ public class MathVisionStageRunner {
     private final MathVisionStageExecutorRegistry executorRegistry;
     private final MathVisionTaskNotifier taskNotifier;
     private final MathVisionWorkflowSummaryService workflowSummaryService;
+    private final MathVisionTaskExecutionRegistry executionRegistry;
 
     public MathVisionStageRunner(MathVisionTaskMapper taskMapper,
                                  MathVisionArtifactMapper artifactMapper,
@@ -46,7 +47,8 @@ public class MathVisionStageRunner {
                                  MathVisionVersionMapper versionMapper,
                                  MathVisionStageExecutorRegistry executorRegistry,
                                  MathVisionTaskNotifier taskNotifier,
-                                 MathVisionWorkflowSummaryService workflowSummaryService) {
+                                 MathVisionWorkflowSummaryService workflowSummaryService,
+                                 MathVisionTaskExecutionRegistry executionRegistry) {
         this.taskMapper = taskMapper;
         this.artifactMapper = artifactMapper;
         this.stageResultMapper = stageResultMapper;
@@ -54,6 +56,7 @@ public class MathVisionStageRunner {
         this.executorRegistry = executorRegistry;
         this.taskNotifier = taskNotifier;
         this.workflowSummaryService = workflowSummaryService;
+        this.executionRegistry = executionRegistry;
     }
 
     public void runOneVisibleStage(Long taskId) {
@@ -86,6 +89,8 @@ public class MathVisionStageRunner {
                     .task(task)
                     .stage(stage)
                     .cancellationCheck(() -> checkCanceled(taskId))
+                    .cancellationHookRegistrar(hook -> executionRegistry.registerCancellationHook(taskId, hook))
+                    .cancellationHookClearer(hook -> executionRegistry.unregisterCancellationHook(taskId, hook))
                     .generationMode(revisionContext != null
                             ? StageGenerationMode.USER_REVISION
                             : StageGenerationMode.INITIAL_GENERATION)
@@ -130,6 +135,14 @@ public class MathVisionStageRunner {
             refreshWorkflowSummary(taskId);
             taskNotifier.notifyTaskChanged(taskId, "canceled");
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted()) {
+                log.info("MathVision 任务取消中断已收敛, taskId={}, stage={}", taskId, stage.getCode());
+                taskMapper.markCanceled(taskId);
+                refreshWorkflowSummary(taskId);
+                taskNotifier.notifyTaskChanged(taskId, "canceled");
+                Thread.interrupted();
+                return;
+            }
             log.warn("MathVision 阶段执行失败, taskId={}, stage={}: {}", taskId, stage.getCode(), e.getMessage(), e);
             taskMapper.markFailed(taskId, stage.getCode(), resolveErrorType(stage), trimMessage(e.getMessage()));
             refreshWorkflowSummary(taskId);

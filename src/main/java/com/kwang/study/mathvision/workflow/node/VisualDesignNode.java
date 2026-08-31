@@ -29,7 +29,6 @@ import com.kwang.study.mathvision.workflow.prompt.VisualDesignPrompts;
 import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
 import com.kwang.study.mathvision.workflow.util.StoryboardConstraintUtils;
 import com.kwang.study.mathvision.workflow.util.StoryboardNormalizer;
-import com.kwang.study.mathvision.workflow.util.StoryboardGeometricMarkerValidator;
 import com.kwang.study.mathvision.workflow.util.TargetDescriptionBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -166,11 +165,6 @@ public class VisualDesignNode {
         preserveRevisionSceneStructure(baseline.getStoryboard(), revisedStoryboard, expectedScenes);
         normalizeStoryboard(revisedStoryboard);
         Narrative revisedNarrative = new Narrative(baseline.getTargetDescription(), revisedStoryboard);
-        List<String> issues = basicValidate(revisedNarrative, expectedScenes);
-        if (!issues.isEmpty()) {
-            throw new IllegalStateException(
-                    "Complete storyboard revision returned an invalid artifact: " + String.join("; ", issues));
-        }
         return new Result(revisedNarrative, 1, expectedScenes, sceneMode);
     }
 
@@ -271,14 +265,11 @@ public class VisualDesignNode {
                                                     int index,
                                                     DesignState state) {
         RuntimeException lastError = null;
-        String rejectionFeedback = null;
         int apiCalls = 0;
         int maxSceneRetries = maxSceneRetries();
         for (int attempt = 0; attempt <= maxSceneRetries; attempt++) {
             String userPrompt = baseUserPrompt;
-            if (rejectionFeedback != null) {
-                userPrompt += "\n\n" + rejectionFeedback;
-            } else if (attempt > 0) {
+            if (attempt > 0) {
                 userPrompt += "\n\nPrevious attempt failed to produce a usable scene. Return the full scene and new_objects again.";
             }
             try {
@@ -296,22 +287,9 @@ public class VisualDesignNode {
                 parsed.apiCalls = apiCalls;
                 parsed.payload = payload;
                 parsed.userPrompt = userPrompt;
-
-                if (parsed.scene != null) {
-                    List<String> markerIssues = StoryboardGeometricMarkerValidator.validateSceneDesign(
-                            parsed.scene,
-                            parsed.newObjects,
-                            new ArrayList<>(state.visibleObjectsSnapshot.values()),
-                            new ArrayList<>(state.objectRegistry));
-                    if (!markerIssues.isEmpty() && attempt < maxSceneRetries) {
-                        rejectionFeedback = buildSceneRejectionRetryBlock(markerIssues, parsed);
-                        continue;
-                    }
-                }
                 return parsed;
             } catch (RuntimeException e) {
                 lastError = e;
-                rejectionFeedback = null;
             }
         }
         throw new IllegalStateException("Visual storyboard scene generation failed: " + node.getStep()
@@ -324,33 +302,6 @@ public class VisualDesignNode {
             return DEFAULT_MAX_SCENE_RETRIES;
         }
         return Math.max(modelCatalog.getWorkflow().getVisualDesignSceneMaxRetries(), 0);
-    }
-
-    private String buildSceneRejectionRetryBlock(List<String> issues, SceneDesignResult rejectedResult) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Previous scene design was rejected by local geometric-marker validation.\n");
-        sb.append("Regenerate the FULL `scene` and `new_objects` response for the same knowledge node; do not return a partial patch.\n");
-        sb.append("Fix these issues exactly:\n");
-        for (String issue : issues) {
-            sb.append("- ").append(issue).append("\n");
-        }
-        sb.append("Geometric marker repair requirements:\n");
-        sb.append("- `angle_marker` objects need `marker/angle_between` with marker, vertex, ordered start/end boundaries, and sector.\n");
-        sb.append("- `arc` or `arc_marker` objects need `marker/arc_sweep` with marker/arc, center/anchor/vertex, start_boundary, end_boundary, direction, and sector.\n");
-        sb.append("- `right_angle_marker` objects need `marker/right_angle_at` with marker, vertex, start_boundary, end_boundary, and side_of_reference.\n");
-        sb.append("- Object refs must name existing registry ids or ids introduced in this response; never put object ids in parameters.\n");
-        if (rejectedResult != null) {
-            try {
-                sb.append("Rejected response for reference:\n");
-                Map<String, Object> reference = new LinkedHashMap<>();
-                reference.put("scene", rejectedResult.scene);
-                reference.put("new_objects", rejectedResult.newObjects);
-                sb.append(toPrettyJson(reference));
-            } catch (RuntimeException ignored) {
-                // reference block is best-effort
-            }
-        }
-        return sb.toString();
     }
 
     private SceneDesignResult parseSceneDesign(JsonNode payload,
@@ -594,62 +545,6 @@ public class VisualDesignNode {
                 "",
                 state.outputTarget);
         return new Narrative(targetDescription, storyboard);
-    }
-
-    private List<String> basicValidate(Narrative narrative, int expectedScenes) {
-        List<String> issues = new ArrayList<>();
-        if (narrative == null || narrative.getStoryboard() == null) {
-            issues.add("Storyboard is missing");
-            return issues;
-        }
-        Storyboard storyboard = narrative.getStoryboard();
-        if (storyboard.getScenes() == null || storyboard.getScenes().isEmpty()) {
-            issues.add("Storyboard has no scenes");
-            return issues;
-        }
-        if (storyboard.getScenes().size() != expectedScenes) {
-            issues.add("Scene count mismatch: expected " + expectedScenes + " but got " + storyboard.getScenes().size());
-        }
-        Set<String> registryIds = new LinkedHashSet<>();
-        for (StoryboardObject object : safeList(storyboard.getObjectRegistry())) {
-            String id = objectId(object);
-            if (!StringUtils.hasText(id)) {
-                issues.add("Object registry contains object without id");
-                continue;
-            }
-            if (!registryIds.add(id)) {
-                issues.add("Duplicate object id in registry: " + id);
-            }
-        }
-        for (StoryboardScene scene : storyboard.getScenes()) {
-            String label = StringUtils.hasText(scene.getSceneId()) ? scene.getSceneId() : "unknown scene";
-            validatePatchRefs(label, "entering_objects", scene.getEnteringObjects(), registryIds, issues);
-            validatePatchRefs(label, "persistent_objects", scene.getPersistentObjects(), registryIds, issues);
-            validatePatchRefs(label, "exiting_objects", scene.getExitingObjects(), registryIds, issues);
-            for (StoryboardAction action : safeList(scene.getActions())) {
-                for (String target : safeList(action.getTargets())) {
-                    if (StringUtils.hasText(target) && !registryIds.contains(target)) {
-                        issues.add(label + " action target not in registry: " + target);
-                    }
-                }
-            }
-        }
-        return issues;
-    }
-
-    private void validatePatchRefs(String sceneLabel,
-                                   String field,
-                                   List<StoryboardObject> patches,
-                                   Set<String> registryIds,
-                                   List<String> issues) {
-        for (StoryboardObject patch : safeList(patches)) {
-            String id = objectId(patch);
-            if (!StringUtils.hasText(id)) {
-                issues.add(sceneLabel + " " + field + " contains patch without id");
-            } else if (!registryIds.contains(id)) {
-                issues.add(sceneLabel + " " + field + " references object not in registry: " + id);
-            }
-        }
     }
 
     private String buildScenePrompt(KnowledgeGraph graph,

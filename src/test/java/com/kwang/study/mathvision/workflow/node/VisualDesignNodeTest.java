@@ -182,6 +182,43 @@ class VisualDesignNodeTest {
     }
 
     @Test
+    void userRevisionDefersRegistryReferenceValidationToStoryboardValidationNode() {
+        KnowledgeGraph graph = graph(
+                new KnowledgeNode("step_1", "Show the initial diagram", 0),
+                new KnowledgeNode("step_2", "Add the auxiliary construction", 1));
+        Narrative existing = existingNarrative();
+        VisualDesignRequest request = VisualDesignRequest.builder()
+                .mode(VisualDesignMode.USER_REVISION)
+                .existingNarrative(existing)
+                .instruction("Add point C to the second scene.")
+                .baseStageVersion(4)
+                .build();
+
+        ObjectNode revisedPayload = objectMapper.valueToTree(existing.getStoryboard());
+        ArrayNode scenes = (ArrayNode) revisedPayload.get("scenes");
+        ((ArrayNode) scenes.get(1).get("entering_objects")).add(objectPatchJson("C"));
+        ObjectNode action = ((ArrayNode) scenes.get(1).get("actions")).addObject();
+        action.put("order", 1);
+        action.put("type", "create");
+        action.putArray("targets").add("C");
+        action.put("description", "Create point C");
+        when(aiChatService.requestJson(eq(task), anyList(), anyString()))
+                .thenReturn(revisedPayload);
+
+        VisualDesignNode.Result result = node.run(task, bundle, graph, request, context);
+
+        assertEquals(1, result.getApiCalls());
+        Storyboard revised = result.getNarrative().getStoryboard();
+        assertTrue(revised.getObjectRegistry().stream()
+                .noneMatch(object -> "C".equals(object.getId())));
+        assertTrue(revised.getScenes().get(1).getEnteringObjects().stream()
+                .anyMatch(object -> "C".equals(object.getId())));
+        assertTrue(revised.getScenes().get(1).getActions().stream()
+                .flatMap(item -> item.getTargets().stream())
+                .anyMatch("C"::equals));
+    }
+
+    @Test
     void carriesAcceptedRetryPromptAndRegistryConstraintsIntoNextScene() {
         KnowledgeGraph graph = graph(
                 new KnowledgeNode("step_1", "Introduce point A", 0),
@@ -212,6 +249,25 @@ class VisualDesignNodeTest {
         assertTrue(currentPrompt.contains("constraints="));
         assertTrue(currentPrompt.contains("lies_on"));
         assertTrue(currentPrompt.contains("re-enters the scene"));
+    }
+
+    @Test
+    void initialGenerationDefersGeometricMarkerValidationWithoutRetrying() {
+        KnowledgeGraph graph = graph("step_1", "Show an angle marker");
+        ObjectNode payload = scenePayload(
+                "Angle scene", List.of(), List.of("angleP"), Map.of("angleP", "Angle P"));
+        ObjectNode marker = (ObjectNode) payload.withArray("new_objects").get(0);
+        marker.put("kind", "angle_marker");
+        marker.putArray("constraints");
+        when(aiChatService.requestJson(eq(task), anyList(), anyString()))
+                .thenReturn(payload);
+
+        VisualDesignNode.Result result = node.run(task, bundle, graph, context);
+
+        assertEquals(1, result.getApiCalls());
+        assertEquals("angle_marker", result.getNarrative().getStoryboard()
+                .getObjectRegistry().get(0).getKind());
+        verify(aiChatService, times(1)).requestJson(eq(task), anyList(), anyString());
     }
 
     @Test

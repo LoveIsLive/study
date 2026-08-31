@@ -32,6 +32,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -105,6 +106,14 @@ public class GeoGebraRenderService {
     public RenderAttemptResult render(String commandScript,
                                       String figureName,
                                       Path outputDir) {
+        return render(commandScript, figureName, outputDir, null, null);
+    }
+
+    public RenderAttemptResult render(String commandScript,
+                                      String figureName,
+                                      Path outputDir,
+                                      Consumer<Runnable> cancellationHookRegistrar,
+                                      Consumer<Runnable> cancellationHookClearer) {
         if (outputDir == null) {
             return new RenderAttemptResult(false, null, null, "Output directory is unavailable");
         }
@@ -132,8 +141,16 @@ public class GeoGebraRenderService {
                 ViewBounds previousViewBounds = activeViewBounds;
                 activeViewBounds = viewBounds;
                 try {
-                    report = validateWithHeadlessBrowser(previewPath, safeFigureName, commands,
-                            sceneDirectives, geometryPath);
+                    if (cancellationHookRegistrar == null && cancellationHookClearer == null) {
+                        // Preserve the protected extension point used by tests and local adapters.
+                        report = validateWithHeadlessBrowser(previewPath, safeFigureName, commands,
+                                sceneDirectives, geometryPath);
+                    } else {
+                        report = validateWithHeadlessBrowser(previewPath, safeFigureName, commands,
+                                sceneDirectives, geometryPath,
+                                activeViewBounds != null ? activeViewBounds : ViewBounds.defaults(),
+                                cancellationHookRegistrar, cancellationHookClearer);
+                    }
                 } finally {
                     activeViewBounds = previousViewBounds;
                 }
@@ -213,7 +230,9 @@ public class GeoGebraRenderService {
                 commands,
                 sceneDirectives,
                 geometryPath,
-                activeViewBounds != null ? activeViewBounds : ViewBounds.defaults());
+                activeViewBounds != null ? activeViewBounds : ViewBounds.defaults(),
+                null,
+                null);
     }
 
     private ValidationReport validateWithHeadlessBrowser(Path previewPath,
@@ -221,7 +240,9 @@ public class GeoGebraRenderService {
                                                            List<String> commands,
                                                            List<GeoGebraCodeUtils.SceneDirective> sceneDirectives,
                                                            Path geometryPath,
-                                                           ViewBounds viewBounds) {
+                                                           ViewBounds viewBounds,
+                                                           Consumer<Runnable> cancellationHookRegistrar,
+                                                           Consumer<Runnable> cancellationHookClearer) {
         ValidationReport fallback = newValidationReport(figureName, commands);
         fallback.browserExecutable = PLAYWRIGHT_BUNDLED_CHROMIUM;
 
@@ -233,9 +254,15 @@ public class GeoGebraRenderService {
         List<String> consoleMessages = new ArrayList<>();
         List<String> pageErrors = new ArrayList<>();
         List<String> requestFailures = new ArrayList<>();
+        Runnable cancellationHook = null;
 
         try {
             playwright = Playwright.create();
+            Playwright activePlaywright = playwright;
+            cancellationHook = () -> safeClose(activePlaywright);
+            if (cancellationHookRegistrar != null) {
+                cancellationHookRegistrar.accept(cancellationHook);
+            }
             BrowserType chromium = playwright.chromium();
             String browserDescriptor = resolveBrowserDescriptor(chromium);
             fallback.browserExecutable = browserDescriptor;
@@ -308,6 +335,9 @@ public class GeoGebraRenderService {
             appendDiagnostics(fallback, consoleMessages, pageErrors, requestFailures);
             return fallback;
         } finally {
+            if (cancellationHookClearer != null && cancellationHook != null) {
+                cancellationHookClearer.accept(cancellationHook);
+            }
             safeClose(validationServer);
             safeClose(page);
             safeClose(context);

@@ -106,7 +106,13 @@ public class ManimRenderService {
                     () -> readStream(process.getErrorStream(), "stderr", true,
                             process, fatalStderrDetected, fatalStderrLine)
             );
-            boolean finished = process.waitFor(timeoutBudget.timeoutMinutes(), TimeUnit.MINUTES);
+            boolean finished;
+            try {
+                finished = process.waitFor(timeoutBudget.timeoutMinutes(), TimeUnit.MINUTES);
+            } catch (InterruptedException e) {
+                terminateProcessTree(process, "Render canceled by task request");
+                throw e;
+            }
             if (!finished) {
                 terminateProcessTree(process, "Render timed out after " + timeoutBudget.timeoutMinutes() + " minutes");
                 process.waitFor(5, TimeUnit.SECONDS);

@@ -50,7 +50,7 @@ public class RenderNode {
         RenderRetryState effectiveRetryState = retryState != null ? retryState : new RenderRetryState();
         effectiveRetryState.prepareAttempt();
         RenderResult renderResult = codeResult.isGeoGebraTarget()
-                ? renderGeoGebraPreview(codeResult, narrative, effectiveRetryState, maxRenderRetries, outputDir)
+                ? renderGeoGebraPreview(codeResult, narrative, effectiveRetryState, maxRenderRetries, outputDir, context)
                 : renderManim(codeResult, effectiveRetryState, renderQuality, maxRenderRetries, outputDir);
         if (context != null) {
             context.checkCanceled();
@@ -146,7 +146,8 @@ public class RenderNode {
                                                Narrative narrative,
                                                RenderRetryState retryState,
                                                int maxRenderRetries,
-                                               Path outputDir) {
+                                               Path outputDir,
+                                               MathVisionStageExecutionContext context) {
         Instant start = Instant.now();
         String currentCode = GeoGebraCodeUtils.enrichWithSceneButtons(
                 codeResult.getGeneratedCode(),
@@ -170,7 +171,11 @@ public class RenderNode {
         }
 
         GeoGebraRenderService.RenderAttemptResult attempt = geoGebraRenderService.render(
-                currentCode, sceneName, outputDir);
+                currentCode,
+                sceneName,
+                outputDir,
+                context != null ? context::registerCancellationHook : null,
+                context != null ? context::clearCancellationHook : null);
         result.setSuccess(attempt.isSuccess());
         result.setFinalGeneratedCode(currentCode);
         result.setArtifactPath(attempt.getPreviewPath());

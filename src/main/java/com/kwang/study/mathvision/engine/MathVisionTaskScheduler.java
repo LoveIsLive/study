@@ -32,6 +32,7 @@ public class MathVisionTaskScheduler {
     private final MathVisionTaskMapper taskMapper;
     private final MathVisionStageRunner stageRunner;
     private final MathVisionTaskNotifier taskNotifier;
+    private final MathVisionTaskExecutionRegistry executionRegistry;
     private final Executor executor;
     private final boolean enabled;
     private final int batchSize;
@@ -39,12 +40,14 @@ public class MathVisionTaskScheduler {
     public MathVisionTaskScheduler(MathVisionTaskMapper taskMapper,
                                    MathVisionStageRunner stageRunner,
                                    MathVisionTaskNotifier taskNotifier,
+                                   MathVisionTaskExecutionRegistry executionRegistry,
                                    @Qualifier("mathVisionTaskExecutor") Executor executor,
                                    @Value("${mathvision.scheduler.enabled:true}") boolean enabled,
                                    @Value("${mathvision.scheduler.batch-size:2}") int batchSize) {
         this.taskMapper = taskMapper;
         this.stageRunner = stageRunner;
         this.taskNotifier = taskNotifier;
+        this.executionRegistry = executionRegistry;
         this.executor = executor;
         this.enabled = enabled;
         this.batchSize = batchSize;
@@ -72,7 +75,16 @@ public class MathVisionTaskScheduler {
             }
             log.debug("MathVision 任务已领取执行, taskId={}, stage={}", task.getId(), task.getCurrentStage());
             taskNotifier.notifyTaskChanged(task.getId(), "running");
-            executor.execute(() -> stageRunner.runOneVisibleStage(task.getId()));
+            executor.execute(() -> {
+                executionRegistry.register(task.getId());
+                try {
+                    stageRunner.runOneVisibleStage(task.getId());
+                } finally {
+                    executionRegistry.unregister(task.getId());
+                    // Pool threads are reused; do not leak the cancellation flag to the next task.
+                    Thread.interrupted();
+                }
+            });
         }
     }
 }

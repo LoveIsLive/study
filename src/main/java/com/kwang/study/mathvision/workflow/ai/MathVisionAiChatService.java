@@ -863,6 +863,7 @@ public class MathVisionAiChatService {
                                        int timeoutSeconds) {
         int requestAttempt = transientAttempt + rateLimitAttempt + timeoutAttempt + 1;
         try {
+            throwIfInterrupted();
             if (aiTraceEnabled()) {
                 MathVisionAiTraceLogger.logRequest(
                         runtime.taskId, runtime.providerCode, runtime.model, url,
@@ -876,6 +877,7 @@ public class MathVisionAiChatService {
             HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(jsonBody)).build();
             NodeExecutionLogger.recordHttpAttempt();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            throwIfInterrupted();
             if (aiTraceEnabled()) {
                 MathVisionAiTraceLogger.logResponse(
                         runtime.taskId, runtime.providerCode, runtime.model,
@@ -910,17 +912,26 @@ public class MathVisionAiChatService {
                 MathVisionAiTraceLogger.logFailure(
                         runtime.taskId, runtime.providerCode, runtime.model, requestAttempt, e);
             }
+            if (e instanceof InterruptedException) {
+                // HttpClient.send clears the interrupt flag when it is interrupted.
+                // Restore it so StageRunner can classify this as task cancellation.
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("AI request canceled", e);
+            }
             if (isTimeoutFailure(e) && timeoutAttempt < timeoutRetryAttempts(runtime)) {
+                throwIfInterrupted();
                 int nextTimeoutSeconds = nextTimeoutSeconds(runtime, timeoutSeconds);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt, rateLimitAttempt, timeoutAttempt + 1, nextTimeoutSeconds);
             }
             if (isRateLimitFailure(e) && rateLimitAttempt < rateLimitRetries(runtime)) {
+                throwIfInterrupted();
                 sleep(rateLimitDelayMillis(runtime, rateLimitAttempt, Optional.empty()));
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt, rateLimitAttempt + 1, timeoutAttempt, timeoutSeconds);
             }
             if (isRetryableTransportFailure(e) && transientAttempt < transientFailureRetries(runtime)) {
+                throwIfInterrupted();
                 sleep(transientRetryDelayMillis(runtime, transientAttempt));
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt + 1, rateLimitAttempt, timeoutAttempt, timeoutSeconds);
@@ -1534,6 +1545,12 @@ public class MathVisionAiChatService {
 
     private boolean isUsableObject(JsonNode node) {
         return node != null && node.isObject() && node.size() > 0;
+    }
+
+    private void throwIfInterrupted() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("AI request canceled");
+        }
     }
 
     private boolean aiTraceEnabled() {

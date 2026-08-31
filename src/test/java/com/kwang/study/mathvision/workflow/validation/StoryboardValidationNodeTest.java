@@ -11,6 +11,7 @@ import com.kwang.study.mathvision.workflow.model.AiMessage;
 import com.kwang.study.mathvision.workflow.model.KnowledgeGraph;
 import com.kwang.study.mathvision.workflow.model.Narrative;
 import com.kwang.study.mathvision.workflow.model.Narrative.Storyboard;
+import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardAction;
 import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardConstraint;
 import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardCoordinateBounds;
 import com.kwang.study.mathvision.workflow.model.Narrative.StoryboardCoordinateBoundsAxis;
@@ -130,6 +131,54 @@ class StoryboardValidationNodeTest {
         String summary = (String) summaryMethod.invoke(node, null, storyboard);
         assertTrue(summary.contains("goal: Explain scene_1"));
         assertTrue(summary.contains("layout: Keep labels readable"));
+    }
+
+    @Test
+    void reportsUnknownRegistryReferencesDuringStoryboardValidation() throws Exception {
+        StoryboardValidationNode node = new StoryboardValidationNode(
+                mock(MathVisionAiChatService.class), new ObjectMapper(), new MathVisionModelCatalog());
+        Storyboard storyboard = storyboard("scene_1");
+        StoryboardObject unknownPatch = new StoryboardObject();
+        unknownPatch.setId("C");
+        StoryboardAction action = new StoryboardAction();
+        action.setOrder(1);
+        action.setType("create");
+        action.setTargets(List.of("C"));
+        storyboard.getScenes().get(0).setEnteringObjects(List.of(unknownPatch));
+        storyboard.getScenes().get(0).setActions(List.of(action));
+
+        Method method = StoryboardValidationNode.class.getDeclaredMethod(
+                "validateStoryboardObjectStructure", Storyboard.class);
+        method.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> issues = (List<String>) method.invoke(node, storyboard);
+
+        assertTrue(issues.stream().anyMatch(issue ->
+                issue.contains("entering_objects") && issue.contains("unknown object_registry id 'C'")));
+        assertTrue(issues.stream().anyMatch(issue ->
+                issue.contains("actions[0]") && issue.contains("unknown object id 'C'")));
+    }
+
+    @Test
+    void reportsGeometricMarkerIssuesDuringStoryboardValidation() throws Exception {
+        StoryboardValidationNode node = new StoryboardValidationNode(
+                mock(MathVisionAiChatService.class), new ObjectMapper(), new MathVisionModelCatalog());
+        Storyboard storyboard = storyboard("scene_1");
+        StoryboardObject marker = new StoryboardObject();
+        marker.setId("angleP");
+        marker.setKind("angle_marker");
+        marker.setContent("angle P");
+        marker.setConstraints(new ArrayList<>());
+        storyboard.setObjectRegistry(List.of(marker));
+
+        Method method = StoryboardValidationNode.class.getDeclaredMethod(
+                "validateGeometricMarkerDefinitions", Storyboard.class);
+        method.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> issues = (List<String>) method.invoke(node, storyboard);
+
+        assertTrue(issues.stream().anyMatch(issue ->
+                issue.contains("angle marker 'angleP'") && issue.contains("angle_between")));
     }
 
     private Storyboard storyboard(String... sceneIds) {
