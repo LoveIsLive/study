@@ -37,10 +37,52 @@ public class MathVisionModelCatalog {
     /** 模型未显式声明时使用的 Nacos 全局默认值。 */
     private ModelDefaultsCatalog modelDefaults = new ModelDefaultsCatalog();
 
+    private DistributedCatalog distributed = new DistributedCatalog();
+
+    private static final Object WORKFLOW_SNAPSHOT = new Object();
+    private static final Object PROVIDERS_SNAPSHOT = new Object();
+    private static final Object DEFAULTS_SNAPSHOT = new Object();
+    private static final com.fasterxml.jackson.databind.ObjectMapper SNAPSHOT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    public WorkflowCatalog getWorkflow() {
+        return snapshot(WORKFLOW_SNAPSHOT, workflow, WorkflowCatalog.class);
+    }
+    public ModelDefaultsCatalog getModelDefaults() {
+        return snapshot(DEFAULTS_SNAPSHOT, modelDefaults, ModelDefaultsCatalog.class);
+    }
+    public List<ProviderCatalog> getModelProviders() {
+        if (!com.kwang.study.mathvision.engine.MathVisionExecutionScope.active()) return modelProviders;
+        return com.kwang.study.mathvision.engine.MathVisionExecutionScope.once(PROVIDERS_SNAPSHOT,
+                () -> SNAPSHOT_MAPPER.convertValue(modelProviders, new com.fasterxml.jackson.core.type.TypeReference<List<ProviderCatalog>>() { }));
+    }
+    private <T> T snapshot(Object key, T value, Class<T> type) {
+        return !com.kwang.study.mathvision.engine.MathVisionExecutionScope.active() ? value
+                : com.kwang.study.mathvision.engine.MathVisionExecutionScope.once(key, () -> SNAPSHOT_MAPPER.convertValue(value, type));
+    }
+
+    @Data
+    public static class DistributedCatalog {
+        private int leaseSeconds = 120;
+        private int heartbeatSeconds = 30;
+        private int cancelPollMillis = 1000;
+        private int recoveryLimit = 2;
+        private int concurrency = 2;
+        private int pollMinMillis = 500;
+        private int pollMaxMillis = 5000;
+        private int uploadChunkBytes = 8 * 1024 * 1024;
+        private long maxArtifactBytes = 1024L * 1024 * 1024;
+        private int uploadAttempts = 3;
+        private int retentionHours = 24;
+        private String masterUrl = "http://127.0.0.1:8080";
+        private String transferRoot = "mathvision-transfer";
+        @ToString.Exclude
+        private String serviceSecret;
+    }
+
     /** 返回启用的供应商 */
     public List<ProviderCatalog> enabledProviders() {
         List<ProviderCatalog> list = new ArrayList<>();
-        for (ProviderCatalog p : modelProviders) {
+        for (ProviderCatalog p : getModelProviders()) {
             if (Boolean.TRUE.equals(p.getEnabled())) {
                 list.add(p);
             }
@@ -53,7 +95,7 @@ public class MathVisionModelCatalog {
         if (code == null) {
             return null;
         }
-        for (ProviderCatalog p : modelProviders) {
+        for (ProviderCatalog p : getModelProviders()) {
             if (code.equalsIgnoreCase(p.getCode()) && Boolean.TRUE.equals(p.getEnabled())) {
                 return p;
             }

@@ -75,6 +75,8 @@ class MathVisionFinalCodeArtifactServiceTest {
                 .resultJson("{\"codeEvaluationApproved\":false,\"codeEvaluationWarning\":true}")
                 .build();
         when(stageResultMapper.findByArtifactId(101L)).thenReturn(currentResult);
+        doAnswer(invocation -> { invocation.getArgument(0, MathVisionArtifact.class).setId(202L); return null; })
+                .when(artifactMapper).insert(any());
 
         RenderResult renderResult = new RenderResult();
         renderResult.setSuccess(true);
@@ -88,25 +90,24 @@ class MathVisionFinalCodeArtifactServiceTest {
 
         assertTrue(result.isUpdated());
         assertEquals(2, result.getPreviousVersion());
-        assertEquals(2, result.getFinalVersion());
+        assertEquals(3, result.getFinalVersion());
 
         ArgumentCaptor<MathVisionArtifact> artifactCaptor = ArgumentCaptor.forClass(MathVisionArtifact.class);
-        verify(artifactMapper).updateArtifactJson(artifactCaptor.capture());
+        verify(artifactMapper).insert(artifactCaptor.capture());
         MathVisionArtifact updatedArtifact = artifactCaptor.getValue();
-        assertEquals(2, updatedArtifact.getVersion());
+        assertEquals(3, updatedArtifact.getVersion());
         assertEquals("auto_fix", updatedArtifact.getChangeSource());
         CodeResult insertedCode = objectMapper.readValue(updatedArtifact.getArtifactJson(), CodeResult.class);
         assertEquals(renderResult.getFinalGeneratedCode(), insertedCode.getGeneratedCode());
 
-        verify(stageResultMapper).updateResultJson(currentResult);
-        JsonNode copiedResult = objectMapper.readTree(currentResult.getResultJson());
+        ArgumentCaptor<MathVisionStageResult> resultCaptor = ArgumentCaptor.forClass(MathVisionStageResult.class);
+        verify(stageResultMapper).insert(resultCaptor.capture());
+        JsonNode copiedResult = objectMapper.readTree(resultCaptor.getValue().getResultJson());
         assertTrue(copiedResult.path("codeEvaluationWarning").asBoolean());
         assertTrue(copiedResult.path("finalCodeUpdatedFromRender").asBoolean());
-        assertEquals(2, copiedResult.path("finalCodeStageVersion").asInt());
-        verify(artifactMapper, never()).insert(any(MathVisionArtifact.class));
-        verify(stageResultMapper, never()).insert(any(MathVisionStageResult.class));
-        verify(versionMapper, never()).updateStagePointer(
-                any(Long.class), any(Integer.class), any(String.class), any(Integer.class));
+        assertEquals(3, copiedResult.path("finalCodeStageVersion").asInt());
+        verify(artifactMapper, never()).updateArtifactJson(any());
+        verify(versionMapper).updateStagePointer(91L, 4, "code_generation", 3);
     }
 
     @Test

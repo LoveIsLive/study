@@ -40,6 +40,15 @@ public class MathVisionStageRunner {
     private final MathVisionTaskNotifier taskNotifier;
     private final MathVisionWorkflowSummaryService workflowSummaryService;
     private final MathVisionTaskExecutionRegistry executionRegistry;
+    private final MathVisionStageCommitService commits;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kwang.study.mathvision.service.MathVisionFinalCodeArtifactService finalCodeService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kwang.study.mathvision.transfer.MathVisionArtifactReceipt receipts;
+    @org.springframework.beans.factory.annotation.Autowired
+    private MathVisionCommitRetry commitRetry;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper resultMapper;
 
     public MathVisionStageRunner(MathVisionTaskMapper taskMapper,
                                  MathVisionArtifactMapper artifactMapper,
@@ -48,7 +57,8 @@ public class MathVisionStageRunner {
                                  MathVisionStageExecutorRegistry executorRegistry,
                                  MathVisionTaskNotifier taskNotifier,
                                  MathVisionWorkflowSummaryService workflowSummaryService,
-                                 MathVisionTaskExecutionRegistry executionRegistry) {
+                                 MathVisionTaskExecutionRegistry executionRegistry,
+                                 MathVisionStageCommitService commits) {
         this.taskMapper = taskMapper;
         this.artifactMapper = artifactMapper;
         this.stageResultMapper = stageResultMapper;
@@ -57,22 +67,27 @@ public class MathVisionStageRunner {
         this.taskNotifier = taskNotifier;
         this.workflowSummaryService = workflowSummaryService;
         this.executionRegistry = executionRegistry;
+        this.commits = commits;
     }
 
     public void runOneVisibleStage(Long taskId) {
         MathVisionTask task = taskMapper.findById(taskId);
+        runOneVisibleStage(task);
+    }
+
+    public void runOneVisibleStage(MathVisionTask task) {
         if (task == null) {
             return;
         }
+        Long taskId = task.getId();
         StageEnum stage = StageEnum.fromCode(task.getCurrentStage());
         if (!VISIBLE_STAGES.contains(stage)) {
             log.warn("MathVision 阶段不可运行, taskId={}, stage={}", taskId, task.getCurrentStage());
-            taskMapper.markFailed(taskId, task.getCurrentStage(), "workflow_error", "当前阶段不可运行");
-            taskNotifier.notifyTaskChanged(taskId, "failed");
+            finishFailure(task, "workflow_error", "当前阶段不可运行");
             return;
         }
         try {
-            checkCanceled(taskId);
+            commits.check(task);
             MathVisionStageExecutor executor = executorRegistry.find(stage)
                     .orElseThrow(() -> new IllegalStateException("阶段执行器尚未接入: " + stage.getCode()));
             String existingStageResultJson = currentStageResultJson(task, stage);
@@ -88,9 +103,9 @@ public class MathVisionStageRunner {
             MathVisionStageExecutionContext context = MathVisionStageExecutionContext.builder()
                     .task(task)
                     .stage(stage)
-                    .cancellationCheck(() -> checkCanceled(taskId))
-                    .cancellationHookRegistrar(hook -> executionRegistry.registerCancellationHook(taskId, hook))
-                    .cancellationHookClearer(hook -> executionRegistry.unregisterCancellationHook(taskId, hook))
+                    .cancellationCheck(() -> commits.check(task))
+                    .cancellationHookRegistrar(hook -> executionRegistry.registerCancellationHook(taskId, task.getLockToken(), hook))
+                    .cancellationHookClearer(hook -> executionRegistry.unregisterCancellationHook(taskId, task.getLockToken(), hook))
                     .generationMode(revisionContext != null
                             ? StageGenerationMode.USER_REVISION
                             : StageGenerationMode.INITIAL_GENERATION)
@@ -102,52 +117,72 @@ public class MathVisionStageRunner {
                     .stopAfterStage(revisionContext != null)
                     .build();
             MathVisionStageExecutionResult result = executor.execute(context);
-            checkCanceled(taskId);
-            boolean failed = result != null && result.isFailed();
-            if (!failed || !context.isUserRevision()) {
-                persistStageResult(task, stage, result, context);
-                log.debug("MathVision 阶段结果已持久化, taskId={}, stage={}, hasArtifact={}, hasResult={}, finalArtifactPath={}",
-                        taskId,
-                        stage.getCode(),
-                        result != null && StringUtils.hasText(result.getArtifactJson()),
-                        result != null && StringUtils.hasText(result.getResultJson()),
-                        result == null ? null : result.getFinalArtifactPath());
-            }
-            if (failed) {
-                String errorType = StringUtils.hasText(result.getErrorType())
-                        ? result.getErrorType()
-                        : resolveErrorType(stage);
-                String errorMessage = StringUtils.hasText(result.getErrorMessage())
-                        ? result.getErrorMessage()
-                        : "阶段执行失败";
-                log.warn("MathVision 阶段产出失败结果, taskId={}, stage={}, errorType={}, errorMessage={}",
-                        taskId, stage.getCode(), errorType, trimMessage(errorMessage));
-                taskMapper.markFailed(taskId, stage.getCode(), errorType, trimMessage(errorMessage));
+            commits.check(task);
+            Runnable writes = () -> {
+                if (result != null && result.getFinalRenderedCode() != null) {
+                    receipts.verify(task, result.getFinalRenderedCode().getArtifactReceipt(),
+                            result.getFinalArtifactPath());
+                    var writeback = finalCodeService.persistFinalCode(task, result.getFinalRenderedCode());
+                    try {
+                        var metadata = (com.fasterxml.jackson.databind.node.ObjectNode) resultMapper.readTree(result.getResultJson());
+                        metadata.put("finalCodeWritebackUpdated", writeback.isUpdated());
+                        metadata.put("finalCodePreviousStageVersion", writeback.getPreviousVersion());
+                        metadata.put("finalCodeStageVersion", writeback.getFinalVersion());
+                        result.setResultJson(metadata.toString());
+                    } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid render result metadata", invalid); }
+                }
+                boolean failed = result != null && result.isFailed();
+                if (!failed || !context.isUserRevision()) persistStageResult(task, stage, result, context);
+                if (failed) {
+                    taskMapper.markFailed(taskId, stage.getCode(),
+                            StringUtils.hasText(result.getErrorType()) ? result.getErrorType() : resolveErrorType(stage),
+                            trimMessage(result.getErrorMessage()));
+                    taskNotifier.notifyTaskChanged(taskId, "failed");
+                } else {
+                    advanceAfterStage(task, stage, context, result);
+                }
                 refreshWorkflowSummary(taskId);
-                taskNotifier.notifyTaskChanged(taskId, "failed");
-                return;
+            };
+            if (commitRetry != null) commitRetry.commit(task, writes); else commits.commit(task, false, writes);
+            if (result != null && result.getCommittedCleanup() != null) {
+                try { result.getCommittedCleanup().run(); }
+                catch (Exception cleanup) { log.warn("MathVision committed workspace cleanup failed, taskId={}", taskId); }
             }
-            advanceAfterStage(task, stage, context, result);
-            refreshWorkflowSummary(taskId);
-        } catch (MathVisionTaskCanceledException e) {
-            log.info("MathVision 任务已取消, taskId={}, stage={}", taskId, stage.getCode());
-            taskMapper.markCanceled(taskId);
-            refreshWorkflowSummary(taskId);
-            taskNotifier.notifyTaskChanged(taskId, "canceled");
+        } catch (MathVisionLeaseLostException e) {
+            log.info("MathVision stale execution discarded, taskId={}, stage={}", taskId, stage.getCode());
         } catch (Exception e) {
-            if (Thread.currentThread().isInterrupted()) {
-                log.info("MathVision 任务取消中断已收敛, taskId={}, stage={}", taskId, stage.getCode());
-                taskMapper.markCanceled(taskId);
-                refreshWorkflowSummary(taskId);
-                taskNotifier.notifyTaskChanged(taskId, "canceled");
-                Thread.interrupted();
-                return;
+            // An interrupt can mean shutdown, lost lease, or cancellation. Read the database first.
+            boolean interrupted = Thread.interrupted();
+            try {
+                commits.check(task);
+                if (interrupted) return; // shutdown/monitor failure: leave the lease for safe takeover
+                finishFailure(task, resolveErrorType(stage), trimMessage(e.getMessage()));
+            } catch (MathVisionTaskCanceledException canceled) {
+                try {
+                    commits.commit(task, true, () -> {
+                        taskMapper.markCanceled(taskId);
+                        refreshWorkflowSummary(taskId);
+                        taskNotifier.notifyTaskChanged(taskId, "canceled");
+                    });
+                } catch (MathVisionLeaseLostException ignored) {
+                    log.info("MathVision canceled execution already superseded, taskId={}", taskId);
+                }
+            } catch (MathVisionLeaseLostException lost) {
+                log.info("MathVision failed execution already superseded, taskId={}", taskId);
+            } catch (Exception unavailable) {
+                log.warn("MathVision result cannot be committed; lease will expire, taskId={}: {}", taskId, unavailable.getMessage());
             }
-            log.warn("MathVision 阶段执行失败, taskId={}, stage={}: {}", taskId, stage.getCode(), e.getMessage(), e);
-            taskMapper.markFailed(taskId, stage.getCode(), resolveErrorType(stage), trimMessage(e.getMessage()));
-            refreshWorkflowSummary(taskId);
-            taskNotifier.notifyTaskChanged(taskId, "failed");
         }
+    }
+
+    private void finishFailure(MathVisionTask task, String errorType, String message) {
+        commits.commit(task, false, () -> {
+            taskMapper.markFailed(task.getId(), task.getCurrentStage(), errorType, message);
+            refreshWorkflowSummary(task.getId());
+            taskNotifier.notifyTaskChanged(task.getId(), "failed");
+        });
+        log.warn("MathVision stage failed, taskId={}, stage={}, errorType={}, reason={}",
+                task.getId(), task.getCurrentStage(), errorType, message);
     }
 
     private void refreshWorkflowSummary(Long taskId) {
@@ -179,7 +214,8 @@ public class MathVisionStageRunner {
             String changeSummary = context.isUserRevision()
                     ? revisionSummary(context.getInstruction())
                     : result.getChangeSummary();
-            if (artifact != null && !context.isUserRevision()) {
+            if (artifact != null && !context.isUserRevision()
+                    && versionMapper.countStageReferences(task.getId(), stage.getCode(), currentStageVersion) <= 1) {
                 artifact.setArtifactJson(result.getArtifactJson());
                 artifact.setChangeSource(changeSource);
                 artifact.setChangeSummary(changeSummary);
@@ -293,13 +329,6 @@ public class MathVisionStageRunner {
             return StageEnum.COMPLETED;
         }
         return VISIBLE_STAGES.get(idx + 1);
-    }
-
-    private void checkCanceled(Long taskId) {
-        MathVisionTask latest = taskMapper.findById(taskId);
-        if (latest == null || Boolean.TRUE.equals(latest.getCancelRequested())) {
-            throw new MathVisionTaskCanceledException();
-        }
     }
 
     private UserRevisionContext resolveUserRevisionContext(MathVisionTask task, StageEnum stage) {

@@ -58,6 +58,22 @@ class MathVisionTaskVersionServiceTest {
 
     private static final Long USER_ID = 9L;
 
+    @Test void rejectsStaleEditorBeforeNormalizingOrWritingContent() {
+        MathVisionTask task = MathVisionTask.builder().id(202L).userId(USER_ID).currentVersion(1)
+                .currentStage("code_generation").status("waiting_confirm").build();
+        when(taskMapper.findById(202L)).thenReturn(task);
+        when(versionMapper.findByTaskVersion(202L, 1)).thenReturn(MathVisionVersion.builder().taskId(202L).version(1).cgVersion(2).build());
+        when(artifactMapper.findByTaskStageVersion(202L, "code_generation", 2)).thenReturn(
+                MathVisionArtifact.builder().artifactJson("{\"generatedCode\":\"newer\"}").build());
+        var request = new com.kwang.study.mathvision.dto.StageContentSaveRequestDTO();
+        request.setVersion(2); request.setBaseEtag(com.kwang.study.mathvision.util.MathVisionContentTag.of("old content"));
+        request.setContent(new ObjectMapper().createObjectNode().put("generatedCode", "old edit"));
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> service.saveStageContent(202L, "code_generation", request));
+        assertTrue(error.getMessage().contains("刷新"));
+        verify(artifactMapper, never()).updateArtifactJson(org.mockito.ArgumentMatchers.any());
+        verify(artifactMapper, never()).insert(org.mockito.ArgumentMatchers.any());
+    }
+
     @Mock private ChatSessionMapper chatSessionMapper;
     @Mock private ChatMemoryMapper chatMemoryMapper;
     @Mock private MathVisionTaskMapper taskMapper;

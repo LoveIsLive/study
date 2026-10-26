@@ -15,4 +15,7 @@ public class StageContentSaveRequestDTO {
     private JsonNode content;
 
     private String comment;
+
+    @javax.validation.constraints.NotBlank(message = "请刷新阶段后再保存")
+    private String baseEtag;
 }

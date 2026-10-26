@@ -14,6 +14,7 @@ public class StageDataVO {
     private String stage;
     private Integer stageVersion;
     private String artifactJson;
+    private String contentEtag;
     private String resultJson;
     private boolean editable;
     private boolean canConfirm;

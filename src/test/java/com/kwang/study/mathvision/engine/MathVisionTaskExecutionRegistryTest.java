@@ -9,6 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MathVisionTaskExecutionRegistryTest {
 
+    @Test void delayedCancellationDoesNotInterruptReplacementExecution() {
+        MathVisionTaskExecutionRegistry registry = new MathVisionTaskExecutionRegistry();
+        registry.register(42L, "new-token");
+        try {
+            org.junit.jupiter.api.Assertions.assertFalse(registry.interrupt(42L, "old-token"));
+            org.junit.jupiter.api.Assertions.assertFalse(Thread.currentThread().isInterrupted());
+        } finally { registry.unregister(42L, "new-token"); }
+    }
+
     @Test
     void interruptsRegisteredTaskWorker() throws Exception {
         MathVisionTaskExecutionRegistry registry = new MathVisionTaskExecutionRegistry();

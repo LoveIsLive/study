@@ -22,6 +22,9 @@ public class MathVisionStageExecutionResult {
     private boolean failed;
     private String errorType;
     private String errorMessage;
+    /** Deferred until the fenced database transaction has committed. */
+    private com.kwang.study.mathvision.workflow.model.RenderResult finalRenderedCode;
+    private Runnable committedCleanup;
 
     public String resolvedChangeSource() {
         return StringUtils.hasText(changeSource) ? changeSource : "initial_generation";

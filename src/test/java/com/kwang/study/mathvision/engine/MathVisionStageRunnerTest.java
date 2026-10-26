@@ -39,6 +39,7 @@ class MathVisionStageRunnerTest {
     @Mock private MathVisionWorkflowSummaryService workflowSummaryService;
     @Mock private MathVisionTaskExecutionRegistry executionRegistry;
     @Mock private MathVisionStageExecutor executor;
+    @Mock private MathVisionStageCommitService commits;
 
     private MathVisionStageRunner runner;
 
@@ -52,7 +53,10 @@ class MathVisionStageRunnerTest {
                 executorRegistry,
                 taskNotifier,
                 workflowSummaryService,
-                executionRegistry);
+                executionRegistry, commits);
+        org.mockito.Mockito.lenient().doAnswer(invocation -> {
+            invocation.getArgument(2, Runnable.class).run(); return null;
+        }).when(commits).commit(any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
     }
 
     @Test
@@ -302,7 +306,7 @@ class MathVisionStageRunnerTest {
                 .cancelRequested(false)
                 .build();
         when(taskMapper.findById(84L)).thenReturn(
-                runningAuto, runningAuto, runningAuto, latestManual, latestManual);
+                runningAuto, latestManual, latestManual);
         when(executorRegistry.find(StageEnum.REASONING_GRAPH)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder().build());
 

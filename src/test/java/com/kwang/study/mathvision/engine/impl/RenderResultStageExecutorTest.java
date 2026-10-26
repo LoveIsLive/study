@@ -78,8 +78,7 @@ class RenderResultStageExecutorTest {
 
         FSConfig fsConfig = new FSConfig();
         fsConfig.setChunkSize(1024);
-        MathVisionFinalArtifactStorageService storageService =
-                new MathVisionFinalArtifactStorageService(fileStorageService, fsConfig);
+        MathVisionFinalArtifactStorageService storageService = storage(fileStorageService);
 
         MathVisionTask task = MathVisionTask.builder()
                 .id(42L)
@@ -154,7 +153,7 @@ class RenderResultStageExecutorTest {
                 storageService,
                 catalog,
                 tempDir.resolve("runs").toString());
-        Path renderWorkspace = tempDir.resolve("runs/task-42/v3/render");
+        Path renderWorkspace = tempDir.resolve("runs/task-42/v3/run-test/render");
         Path intermediateFile = renderWorkspace.resolve("media/partial/temporary.bin");
         Files.createDirectories(intermediateFile.getParent());
         Files.writeString(intermediateFile, "temporary-render-data");
@@ -169,6 +168,8 @@ class RenderResultStageExecutorTest {
         assertTrue(result.isWaitForUserDecision());
         assertEquals("/mathvision/task-42/v3/final/final.mp4", result.getFinalArtifactPath());
         assertFalse(Files.exists(localVideo));
+        assertTrue(Files.exists(renderWorkspace));
+        result.getCommittedCleanup().run();
         assertFalse(Files.exists(renderWorkspace));
 
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
@@ -192,11 +193,8 @@ class RenderResultStageExecutorTest {
                 eq(task), any(), any(MathVisionStageExecutionContext.class), anyList());
         assertEquals(0, resultJson.path("sceneFixConversationMessages").asInt());
         assertEquals(0, resultJson.path("sceneFixHistoryEntries").asInt());
-        verify(fileStorageService).updateFileObject(
-                org.mockito.ArgumentMatchers.startsWith("/mathvision/task-42/v3/final/upload-"),
-                eq("final.mp4"), isNull(), isNull());
         verify(fileStorageService).createFile(
-                org.mockito.ArgumentMatchers.startsWith("/mathvision/task-42/v3/final/upload-"),
+                eq("/mathvision/task-42/v3/final/final.mp4"),
                 any(InputStream.class), eq("video/mp4"));
     }
 
@@ -220,8 +218,7 @@ class RenderResultStageExecutorTest {
 
         FSConfig fsConfig = new FSConfig();
         fsConfig.setChunkSize(1024);
-        MathVisionFinalArtifactStorageService storageService =
-                new MathVisionFinalArtifactStorageService(fileStorageService, fsConfig);
+        MathVisionFinalArtifactStorageService storageService = storage(fileStorageService);
 
         MathVisionTask task = MathVisionTask.builder()
                 .id(43L)
@@ -334,7 +331,7 @@ class RenderResultStageExecutorTest {
     }
 
     @Test
-    void keepsRenderSuccessfulWhenPlatformStorageArchiveFails() throws Exception {
+    void reportsStorageFailureWithoutPublishingWorkerLocalPath() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         MathVisionArtifactMapper artifactMapper = mock(MathVisionArtifactMapper.class);
         MathVisionVersionMapper versionMapper = mock(MathVisionVersionMapper.class);
@@ -389,7 +386,7 @@ class RenderResultStageExecutorTest {
                 artifactMapper, versionMapper, objectMapper, renderNode, sceneEvaluationNode, codeFixNode,
                 finalCodeArtifactService, storageService, new MathVisionModelCatalog(),
                 tempDir.resolve("runs").toString());
-        Path renderWorkspace = tempDir.resolve("runs/task-44/v5/render");
+        Path renderWorkspace = tempDir.resolve("runs/task-44/v5/run-test/render");
         Path intermediateFile = renderWorkspace.resolve("07_geogebra_validation.json");
         Files.createDirectories(renderWorkspace);
         Files.writeString(intermediateFile, "temporary-validation-data");
@@ -400,16 +397,15 @@ class RenderResultStageExecutorTest {
                         .stage(StageEnum.RENDER_RESULT)
                         .build());
 
-        assertFalse(result.isFailed());
-        assertTrue(String.valueOf(result.getFinalArtifactPath()).endsWith("retained\\final.mp4")
-                || String.valueOf(result.getFinalArtifactPath()).endsWith("retained/final.mp4"));
-        assertTrue(Files.isRegularFile(Path.of(result.getFinalArtifactPath())));
+        assertTrue(result.isFailed());
+        assertEquals("storage_error", result.getErrorType());
+        assertEquals(null, result.getFinalArtifactPath());
         assertFalse(Files.exists(intermediateFile));
         try (java.util.stream.Stream<Path> files = Files.walk(renderWorkspace)) {
             assertEquals(1L, files.filter(Files::isRegularFile).count());
         }
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
-        assertTrue(resultJson.path("success").asBoolean());
+        assertFalse(resultJson.path("success").asBoolean());
         assertEquals("archive unavailable", resultJson.path("artifactStorageWarning").asText());
     }
 
@@ -589,4 +585,16 @@ class RenderResultStageExecutorTest {
         field.setAccessible(true);
         field.set(target, value);
     }
+
+    private MathVisionFinalArtifactStorageService storage(FileStorageService files) throws Exception {
+        var client = mock(com.kwang.study.mathvision.transfer.MathVisionTransferClient.class);
+        when(client.upload(any(), any(), any())).thenAnswer(invocation -> {
+            MathVisionTask task = invocation.getArgument(0); Path path = invocation.getArgument(1);
+            String stored = "/mathvision/task-" + task.getId() + "/v" + task.getCurrentVersion() + "/final/final.mp4";
+            try (InputStream input = Files.newInputStream(path)) { files.createFile(stored, input, "video/mp4"); }
+            return new ObjectMapper().createObjectNode().put("path", stored).put("receipt", "test");
+        });
+        return new MathVisionFinalArtifactStorageService(client);
+    }
+
 }

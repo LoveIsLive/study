@@ -81,7 +81,7 @@ public class MathVisionSquareService {
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionSquareItemVO publishCurrentVersion(Long taskId) {
         Long userId = requireCurrentUserId();
         MathVisionTask task = requireOwnedTask(taskId, userId);
@@ -143,22 +143,25 @@ public class MathVisionSquareService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void unpublish(Long shareId) {
         Long userId = requireCurrentUserId();
+        MathVisionSquarePost post = squarePostMapper.findById(shareId);
+        if (post != null) requireOwnedTask(post.getTaskId(), userId);
         if (squarePostMapper.deleteOwned(shareId, userId) == 0) {
             throw new IllegalArgumentException("创作广场成果不存在或无权取消分享");
         }
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionSquareLoadResultVO loadIntoWorkbench(Long shareId) {
         Long userId = requireCurrentUserId();
         MathVisionSquarePost post = squarePostMapper.findById(shareId);
         if (post == null) {
             throw new IllegalArgumentException("创作广场成果不存在或已取消分享");
         }
-        MathVisionTask sourceTask = taskMapper.findById(post.getTaskId());
+        MathVisionTask sourceTask = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                ? taskMapper.lockById(post.getTaskId()) : taskMapper.findById(post.getTaskId());
         if (sourceTask == null) {
             throw new IllegalArgumentException("来源任务已不可用");
         }
@@ -434,8 +437,9 @@ public class MathVisionSquareService {
     }
 
     private MathVisionTask requireOwnedTask(Long taskId, Long userId) {
-        MathVisionTask task = taskMapper.findById(taskId);
-        if (task == null || !userId.equals(task.getUserId())) {
+        MathVisionTask task = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                ? taskMapper.lockById(taskId) : taskMapper.findById(taskId);
+        if (task == null || Boolean.TRUE.equals(task.getDeleted()) || !userId.equals(task.getUserId())) {
             throw new IllegalArgumentException("任务不存在或无权限访问");
         }
         return task;

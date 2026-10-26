@@ -85,16 +85,22 @@ public class MathVisionFinalCodeArtifactService {
             finalCodeResult.setOutputTarget(renderResult.getOutputTarget());
         }
 
-        currentArtifact.setArtifactJson(writeJson(finalCodeResult));
-        currentArtifact.setChangeSource("auto_fix");
-        currentArtifact.setChangeSummary("adopt final code used by successful render");
-        artifactMapper.updateArtifactJson(currentArtifact);
-        updateStageResult(currentArtifact, finalCodeResult);
+        Integer max = artifactMapper.findMaxVersion(task.getId(), "code_generation");
+        int nextVersion = Math.max(currentCodeVersion, max == null ? 0 : max) + 1;
+        MathVisionArtifact updated = MathVisionArtifact.builder()
+                .taskId(task.getId()).sessionId(task.getSessionId()).userId(task.getUserId())
+                .stage("code_generation").version(nextVersion).baseVersion(currentCodeVersion)
+                .artifactJson(writeJson(finalCodeResult)).changeSource("auto_fix")
+                .changeSummary("adopt final code used by successful render").build();
+        artifactMapper.insert(updated);
+        versionMapper.updateStagePointer(task.getId(), task.getCurrentVersion(), "code_generation", nextVersion);
+        MathVisionStageResult baseline = stageResultMapper.findByArtifactId(currentArtifact.getId());
+        updateStageResult(updated, finalCodeResult, baseline != null ? baseline.getResultJson() : "{}");
 
         log.debug("MathVision final render code written back in place, taskId={}, taskVersion={}, "
                         + "codeVersion={}, codeLines={}",
                 task.getId(), taskVersion.getVersion(), currentCodeVersion, finalCodeResult.codeLineCount());
-        return WritebackResult.updated(currentCodeVersion, currentCodeVersion);
+        return WritebackResult.updated(currentCodeVersion, nextVersion);
     }
 
     private MathVisionVersion resolveTaskVersion(MathVisionTask task) {
@@ -119,13 +125,13 @@ public class MathVisionFinalCodeArtifactService {
     }
 
     private void updateStageResult(MathVisionArtifact currentArtifact,
-                                   CodeResult finalCodeResult) {
+                                   CodeResult finalCodeResult, String baselineResultJson) {
         if (currentArtifact.getId() == null) {
             return;
         }
         MathVisionStageResult currentResult = stageResultMapper.findByArtifactId(currentArtifact.getId());
         String resultJson = updateResultJson(
-                currentResult != null ? currentResult.getResultJson() : "{}",
+                currentResult != null ? currentResult.getResultJson() : baselineResultJson,
                 finalCodeResult,
                 currentArtifact.getVersion());
         if (currentResult != null) {

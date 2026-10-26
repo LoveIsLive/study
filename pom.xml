@@ -216,6 +216,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <mainClass>com.kwang.study.StudyApplication</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -223,6 +224,16 @@
                         </exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>mathvision-worker</id>
+                        <goals><goal>repackage</goal></goals>
+                        <configuration>
+                            <classifier>mathvision-worker</classifier>
+                            <mainClass>com.kwang.mathvision.worker.MathVisionWorkerApplication</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

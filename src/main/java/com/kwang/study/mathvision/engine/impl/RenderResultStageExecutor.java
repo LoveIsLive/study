@@ -73,6 +73,8 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
     private final MathVisionFinalArtifactStorageService finalArtifactStorageService;
     private final MathVisionModelCatalog modelCatalog;
     private final String outputRoot;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kwang.study.mathvision.engine.MathVisionLocalArtifactRecovery recovery;
 
     public RenderResultStageExecutor(MathVisionArtifactMapper artifactMapper,
                                      MathVisionVersionMapper versionMapper,
@@ -120,6 +122,8 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         ProblemBundle bundle = load(task, StageEnum.PROBLEM_NORMALIZATION, ProblemBundle.class);
         Narrative narrative = load(task, StageEnum.VISUAL_STORYBOARD, Narrative.class);
         CodeResult codeResult = load(task, StageEnum.CODE_GENERATION, CodeResult.class);
+        String recoveryFingerprint = com.kwang.study.mathvision.util.MathVisionContentTag.of(
+                toPrettyJson(bundle) + toPrettyJson(narrative) + toPrettyJson(codeResult));
         context.checkCanceled();
 
         boolean qualityReviewRequested = context.isQualityReviewRequested();
@@ -159,6 +163,13 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         // Overall safety guard so alternating render/scene fixes cannot loop unbounded
         // (equivalent to PocketFlow's per-node self-limiting in math-vision).
         int maxTotalIterations = renderMaxRetries + sceneEvaluationMaxRetries + 2;
+        if (!qualityReviewRequested && recovery != null) {
+            var recovered = recovery.restore(task, renderOutputDir, recoveryFingerprint);
+            if (recovered != null) {
+                renderResult = recovered.render; latestGeometryReport = recovered.geometry;
+                successfulRenderResult = renderResult; successfulRenderNeedsStorage = true; evaluateExistingRender = true;
+            }
+        }
 
         log.info("MathVision render stage started, taskId={}, version={}, outputTarget={}, renderQuality={}, "
                         + "initialCodeLines={}, maxIterations={}",
@@ -434,20 +445,15 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         boolean sceneEvaluationWarning = qualityReviewRequested && renderSuccess && !sceneApproved;
         boolean stageSuccess = renderSuccess;
         String storageError = null;
-        String finalCodeWritebackError = null;
-        MathVisionFinalCodeArtifactService.WritebackResult finalCodeWriteback = null;
 
         if (renderSuccess && successfulRenderNeedsStorage) {
-            try {
-                finalCodeWriteback = finalCodeArtifactService.persistFinalCode(task, renderResult);
-            } catch (Exception e) {
-                // Match math-vision output semantics: metadata persistence must not erase render success.
-                finalCodeWritebackError = trim(e.getMessage());
-                log.warn("MathVision final render code writeback failed, taskId={}, error={}",
-                        task.getId(), finalCodeWritebackError, e);
+            if (recovery != null && !qualityReviewRequested) {
+                try { recovery.checkpoint(renderOutputDir, recoveryFingerprint, renderResult, latestGeometryReport); }
+                catch (IOException error) { log.warn("MathVision recovery checkpoint unavailable, taskId={}", task.getId()); }
             }
             try {
                 String localArtifactPath = renderResult.getArtifactPath();
+                localArtifactToPreserve.set(Path.of(localArtifactPath));
                 MathVisionFinalArtifactStorageService.StoredArtifact stored =
                         finalArtifactStorageService.store(task, renderResult);
                 renderResult.setLocalArtifactPath(localArtifactPath);
@@ -496,15 +502,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         resultJson.put("renderFinalSuccess", renderFinalSuccess);
         resultJson.put("sceneEvaluationApproved", sceneApproved);
         resultJson.put("sceneEvaluationWarning", sceneEvaluationWarning);
-        resultJson.put("finalCodeWritebackUpdated",
-                finalCodeWriteback != null && finalCodeWriteback.isUpdated());
-        if (finalCodeWriteback != null) {
-            resultJson.put("finalCodePreviousStageVersion", finalCodeWriteback.getPreviousVersion());
-            resultJson.put("finalCodeStageVersion", finalCodeWriteback.getFinalVersion());
-        }
-        if (StringUtils.hasText(finalCodeWritebackError)) {
-            resultJson.put("finalCodeWritebackError", finalCodeWritebackError);
-        }
+        resultJson.put("finalCodeWritebackUpdated", false); // Set by the fenced stage transaction.
         if (StringUtils.hasText(storageError)) {
             resultJson.put("artifactStorageWarning", storageError);
         }
@@ -528,8 +526,18 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         ? MathVisionStageQualityReview.STATUS_COMPLETED
                         : MathVisionStageQualityReview.STATUS_PENDING);
 
-        String errorType = !stageSuccess ? "render_error" : null;
-        String errorMessage = !stageSuccess ? buildRenderFailureMessage(renderResult, fixTrace) : null;
+        if (StringUtils.hasText(storageError)) {
+            stageSuccess = false;
+            if (renderResult != null) {
+                renderResult.setArtifactPath(null); renderResult.setVideoPath(null); renderResult.setLocalArtifactPath(null);
+                resultJson.set("renderResult", objectMapper.valueToTree(renderResult));
+                if (lastRenderResult == renderResult) resultJson.set("lastRenderResult", objectMapper.valueToTree(renderResult));
+                resultJson.putNull("artifactPath"); resultJson.put("success", false);
+            }
+        }
+        String errorType = StringUtils.hasText(storageError) ? "storage_error" : !stageSuccess ? "render_error" : null;
+        String errorMessage = StringUtils.hasText(storageError) ? storageError : !stageSuccess ? buildRenderFailureMessage(renderResult, fixTrace) : null;
+        Path retainedLocal = localArtifactToPreserve.get();
 
         log.info("MathVision render stage completed, taskId={}, success={}, renderSuccess={}, renderFinalSuccess={}, "
                         + "sceneApproved={}, "
@@ -547,6 +555,12 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 stageSuccess ? null : errorSignature(errorMessage));
 
         return MathVisionStageExecutionResult.builder()
+                .finalRenderedCode(stageSuccess ? renderResult : null)
+                .committedCleanup(stageSuccess && retainedLocal != null ? () -> {
+                    cleanupRenderWorkspace(renderOutputDir, null);
+                    try { Files.deleteIfExists(renderOutputDir.getParent().resolve("local-render.json")); }
+                    catch (IOException ignored) { }
+                } : null)
                 .artifactJson(toPrettyJson(renderResult))
                 .resultJson(toPrettyJson(resultJson))
                 .changeSource(qualityReviewRequested ? "quality_review" : "initial_generation")
@@ -941,7 +955,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
 
     private Path outputDir(MathVisionTask task) {
         return Paths.get(outputRoot, "task-" + task.getId(),
-                "v" + task.getCurrentVersion(), "render").toAbsolutePath().normalize();
+                "v" + task.getCurrentVersion(), "run-" + (task.getLockToken() == null ? "test" : task.getLockToken()), "render").toAbsolutePath().normalize();
     }
 
     private Path artifactPath(RenderResult renderResult) {

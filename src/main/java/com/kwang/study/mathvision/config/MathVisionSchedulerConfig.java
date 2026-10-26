@@ -1,6 +1,5 @@
 package com.kwang.study.mathvision.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -12,18 +11,16 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class MathVisionSchedulerConfig {
 
     @Bean("mathVisionTaskExecutor")
-    public Executor mathVisionTaskExecutor(
-            @Value("${mathvision.scheduler.core-pool-size:1}") int corePoolSize,
-            @Value("${mathvision.scheduler.max-pool-size:2}") int maxPoolSize,
-            @Value("${mathvision.scheduler.queue-capacity:20}") int queueCapacity) {
+    public Executor mathVisionTaskExecutor(MathVisionModelCatalog catalog) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(corePoolSize);
-        executor.setMaxPoolSize(maxPoolSize);
-        executor.setQueueCapacity(queueCapacity);
+        int concurrency = Math.max(1, catalog.getDistributed().getConcurrency());
+        executor.setCorePoolSize(concurrency);
+        executor.setMaxPoolSize(concurrency);
+        executor.setQueueCapacity(0);
         executor.setKeepAliveSeconds(30);
         executor.setThreadNamePrefix("mathvision-worker-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
         executor.initialize();
         return executor;
     }

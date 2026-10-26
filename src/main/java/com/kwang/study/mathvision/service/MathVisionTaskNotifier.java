@@ -28,6 +28,8 @@ public class MathVisionTaskNotifier {
     private final MathVisionTaskMapper taskMapper;
     private final ChatSessionMapper chatSessionMapper;
     private final UserMapper userMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.kwang.study.mathvision.engine.MathVisionRedisEventBus eventBus;
 
     public MathVisionTaskNotifier(SimpMessagingTemplate messagingTemplate,
                                   MathVisionTaskMapper taskMapper,
@@ -43,7 +45,10 @@ public class MathVisionTaskNotifier {
         if (taskId == null) {
             return;
         }
-        Runnable sender = () -> sendNow(taskId, event);
+        Runnable sender = () -> {
+            sendNow(taskId, event);
+            if ("cancel_requested".equals(event) && eventBus != null) eventBus.publish(taskId, event);
+        };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -72,6 +77,8 @@ public class MathVisionTaskNotifier {
                     taskId, event, e.getMessage());
         }
     }
+
+    public void deliverRemote(Long taskId, String event) { sendNow(taskId, event); }
 
     private MathVisionTaskEventVO toEvent(MathVisionTask task, String event) {
         ChatSession session = StringUtils.hasText(task.getSessionId())

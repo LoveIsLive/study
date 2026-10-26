@@ -113,8 +113,9 @@ class MathVisionTaskDeletionServiceTest {
     @Test
     void restoresDeletedTaskWithItsPreviousState() {
         MathVisionTask deleted = task(13L, "failed");
+        deleted.setDeleted(true);
         when(taskMapper.findDeletedById(13L, USER_ID)).thenReturn(deleted);
-        when(taskMapper.restore(13L, USER_ID)).thenReturn(1);
+        when(taskMapper.restore(13L, USER_ID)).thenAnswer(invocation -> { deleted.setDeleted(false); return 1; });
         when(taskMapper.findById(13L)).thenReturn(deleted);
 
         assertEquals("failed", service.restoreTask(13L).getStatus());
@@ -129,6 +130,7 @@ class MathVisionTaskDeletionServiceTest {
         MathVisionTask deleted = task(14L, "completed");
         deleted.setInputAssetsJson("[{\"filePath\":\"" + ownedInput + "\"},"
                 + "{\"filePath\":\"/shared/keep.png\"}]");
+        deleted.setDeleted(true);
         when(taskMapper.findDeletedById(14L, USER_ID)).thenReturn(deleted);
         when(taskMapper.hardDelete(14L, USER_ID)).thenReturn(1);
         Path localRenderFile = renderOutputRoot.resolve("task-14/v1/render/output.txt");

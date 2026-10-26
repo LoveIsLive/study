@@ -54,6 +54,10 @@ public class MathVisionTask {
     private Integer autoFixCount;
     /** 运行中取消请求标记 */
     private Boolean cancelRequested;
+    /** A new token is allocated for every stage claim. Never expose it to public APIs. */
+    private String lockToken;
+    private LocalDateTime leaseUntil;
+    private Integer recoveryCount;
     /** 当前版本最终产物路径 */
     private String finalArtifactPath;
     /** mp4/html */

@@ -130,7 +130,7 @@ public class MathVisionTaskService {
         this.renderOutputRoot = Paths.get(renderOutputRoot).toAbsolutePath().normalize();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskCreateResponseDTO createTask(MathVisionTaskCreateRequestDTO request,
                                                       List<MultipartFile> smallFiles) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
@@ -139,6 +139,7 @@ public class MathVisionTaskService {
         if (StringUtils.hasText(request.getRequestId())) {
             MathVisionTask exist = taskMapper.findByRequestId(request.getRequestId());
             if (exist != null) {
+                if (!userId.equals(exist.getUserId())) throw new IllegalArgumentException("requestId 已被使用");
                 return toCreateResponse(exist, exist.getStatus());
             }
         }
@@ -179,7 +180,15 @@ public class MathVisionTaskService {
                 .currentVersion(1)
                 .requestId(request.getRequestId())
                 .build();
-        taskMapper.insert(task);
+        try {
+            taskMapper.insert(task);
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            MathVisionTask existing = StringUtils.hasText(request.getRequestId())
+                    ? taskMapper.findByRequestId(request.getRequestId()) : null;
+            if (existing == null || !userId.equals(existing.getUserId())) throw duplicate;
+            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return toCreateResponse(existing, existing.getStatus());
+        }
 
         // 建 V1 任务版本 (各阶段指针为空, 尚未生成)
         MathVisionVersion v1 = MathVisionVersion.builder()
@@ -495,7 +504,7 @@ public class MathVisionTaskService {
     }
 
     /** 激活历史版本，并同步任务的阶段、状态和最终产物指针。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO activateTaskVersion(Long taskId, Integer versionNumber) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -536,8 +545,9 @@ public class MathVisionTaskService {
     /** 任务详情; 校验归属。 */
     public MathVisionTaskDetailVO getTaskDetail(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
-        MathVisionTask task = taskMapper.findById(taskId);
-        if (task == null || !userId.equals(task.getUserId())) {
+        MathVisionTask task = TransactionSynchronizationManager.isActualTransactionActive()
+                ? taskMapper.lockById(taskId) : taskMapper.findById(taskId);
+        if (task == null || Boolean.TRUE.equals(task.getDeleted()) || !userId.equals(task.getUserId())) {
             throw new IllegalArgumentException("任务不存在或无权限访问");
         }
         ChatSession session = chatSessionMapper.findBySessionId(task.getSessionId());
@@ -584,7 +594,7 @@ public class MathVisionTaskService {
                 : task.getProviderCode();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO updateRuntimeSettings(
             Long taskId,
             MathVisionTaskRuntimeSettingsRequestDTO request) {
@@ -640,7 +650,7 @@ public class MathVisionTaskService {
         return getTaskDetail(taskId);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO updateTaskTitle(
             Long taskId,
             MathVisionTaskTitleUpdateRequestDTO request) {
@@ -696,6 +706,7 @@ public class MathVisionTaskService {
                 .currentVersion(task.getCurrentVersion())
                 .stage(resolvedStage)
                 .stageVersion(payload.version)
+                .contentEtag(com.kwang.study.mathvision.util.MathVisionContentTag.of(payload.artifactJson))
                 .artifactJson(payload.artifactJson)
                 .resultJson(payload.resultJson)
                 .editable(editable)
@@ -709,7 +720,7 @@ public class MathVisionTaskService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public StageOperationResultVO saveStageContent(Long taskId,
                                                    String stageCode,
                                                    StageContentSaveRequestDTO request) {
@@ -740,6 +751,9 @@ public class MathVisionTaskService {
             throw new IllegalArgumentException("阶段产物不存在或为空，不能编辑: " + stage.getCode());
         }
 
+        if (!com.kwang.study.mathvision.util.MathVisionContentTag.of(artifact.getArtifactJson()).equals(request.getBaseEtag())) {
+            throw new IllegalArgumentException("阶段内容已被其他操作修改，请刷新后重试");
+        }
         String artifactJson = normalizeStageContent(task, stage, request.getContent(), artifact);
         String changeSummary = StringUtils.hasText(request.getComment())
                 ? trimSummary(request.getComment())
@@ -784,7 +798,7 @@ public class MathVisionTaskService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public StageOperationResultVO autoEditStage(Long taskId,
                                                 String stageCode,
                                                 StageAutoEditRequestDTO request) {
@@ -867,7 +881,7 @@ public class MathVisionTaskService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO confirmStage(Long taskId,
                                                String stageCode,
                                                StageConfirmRequestDTO request) {
@@ -899,7 +913,7 @@ public class MathVisionTaskService {
         return startTask(taskId);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO requestStageQualityReview(
             Long taskId,
             String stageCode,
@@ -933,6 +947,23 @@ public class MathVisionTaskService {
         if (MathVisionStageQualityReview.STATUS_COMPLETED.equals(reviewStatus)) {
             throw new IllegalArgumentException("当前阶段已经完成智能检查");
         }
+        if (versionMapper.countStageReferences(task.getId(), stage.getCode(), stageVersion) > 1) {
+            Integer max = artifactMapper.findMaxVersion(task.getId(), stage.getCode());
+            int privateVersion = Math.max(stageVersion, max == null ? 0 : max) + 1;
+            MathVisionArtifact privateArtifact = MathVisionArtifact.builder()
+                    .taskId(task.getId()).sessionId(task.getSessionId()).userId(task.getUserId())
+                    .stage(stage.getCode()).version(privateVersion).baseVersion(stageVersion)
+                    .artifactJson(artifact.getArtifactJson()).changeSource("quality_review")
+                    .changeSummary("isolate optional quality review").build();
+            artifactMapper.insert(privateArtifact);
+            MathVisionStageResult privateResult = MathVisionStageResult.builder()
+                    .taskId(task.getId()).sessionId(task.getSessionId()).userId(task.getUserId())
+                    .artifactId(privateArtifact.getId()).stage(stage.getCode()).version(privateVersion)
+                    .resultJson(stageResult.getResultJson()).build();
+            stageResultMapper.insert(privateResult);
+            versionMapper.updateStagePointer(task.getId(), task.getCurrentVersion(), stage.getCode(), privateVersion);
+            stageResult = privateResult;
+        }
         stageResult.setResultJson(MathVisionStageQualityReview.updateStatus(
                 objectMapper,
                 stage,
@@ -951,7 +982,7 @@ public class MathVisionTaskService {
     }
 
     /** 当前用户手动启动/继续任务; 每次只提交一个用户可见阶段。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO startTask(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -1000,7 +1031,7 @@ public class MathVisionTaskService {
         return getTaskDetail(taskId);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO retryTaskStage(Long taskId, String stageCode) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -1010,7 +1041,7 @@ public class MathVisionTaskService {
         return retryFailedTaskStage(taskId, userId, task, stageCode);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO regenerateTaskStage(Long taskId, String stageCode) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -1122,7 +1153,7 @@ public class MathVisionTaskService {
     }
 
     /** 当前用户取消任务。排队/待确认直接取消; 运行中写取消请求, 由执行器在阶段边界收敛。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO cancelTask(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -1133,7 +1164,7 @@ public class MathVisionTaskService {
         if (updated == 0) {
             updated = taskMapper.requestCancelRunning(taskId, userId);
             if (updated > 0) {
-                interruptRunningTaskAfterCommit(taskId);
+                interruptRunningTaskAfterCommit(taskId, task.getLockToken());
                 taskNotifier.notifyTaskChanged(taskId, "cancel_requested");
             }
         } else {
@@ -1145,8 +1176,8 @@ public class MathVisionTaskService {
         return getTaskDetail(taskId);
     }
 
-    private void interruptRunningTaskAfterCommit(Long taskId) {
-        Runnable interrupt = () -> executionRegistry.interrupt(taskId);
+    private void interruptRunningTaskAfterCommit(Long taskId, String token) {
+        Runnable interrupt = () -> executionRegistry.interrupt(taskId, token);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             interrupt.run();
             return;
@@ -1160,7 +1191,7 @@ public class MathVisionTaskService {
     }
 
     /** 将空闲任务移入回收站。排队中或运行中的任务必须先取消。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void deleteTask(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findOwnedTask(taskId, userId);
@@ -1174,7 +1205,7 @@ public class MathVisionTaskService {
     }
 
     /** 从回收站恢复任务，保留删除前的任务状态和全部阶段产物。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MathVisionTaskDetailVO restoreTask(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findDeletedTask(taskId, userId);
@@ -1187,7 +1218,7 @@ public class MathVisionTaskService {
     }
 
     /** 永久删除回收站任务及其版本、阶段产物、对话记录和存储文件。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void permanentlyDeleteTask(Long taskId) {
         Long userId = AuthenticationUserUtil.getCurrentUserId();
         MathVisionTask task = findDeletedTask(taskId, userId);
@@ -1225,16 +1256,18 @@ public class MathVisionTaskService {
     }
 
     private MathVisionTask findOwnedTask(Long taskId, Long userId) {
-        MathVisionTask task = taskMapper.findById(taskId);
-        if (task == null || !userId.equals(task.getUserId())) {
+        MathVisionTask task = TransactionSynchronizationManager.isActualTransactionActive()
+                ? taskMapper.lockById(taskId) : taskMapper.findById(taskId);
+        if (task == null || Boolean.TRUE.equals(task.getDeleted()) || !userId.equals(task.getUserId())) {
             throw new IllegalArgumentException("任务不存在或无权限访问");
         }
         return task;
     }
 
     private MathVisionTask findDeletedTask(Long taskId, Long userId) {
-        MathVisionTask task = taskMapper.findDeletedById(taskId, userId);
-        if (task == null) {
+        MathVisionTask task = TransactionSynchronizationManager.isActualTransactionActive()
+                ? taskMapper.lockById(taskId) : taskMapper.findDeletedById(taskId, userId);
+        if (task == null || !userId.equals(task.getUserId()) || !Boolean.TRUE.equals(task.getDeleted())) {
             throw new IllegalArgumentException("回收站任务不存在或无权限访问");
         }
         return task;

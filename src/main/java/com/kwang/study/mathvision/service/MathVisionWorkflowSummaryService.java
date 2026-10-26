@@ -83,6 +83,8 @@ public class MathVisionWorkflowSummaryService {
         root.put("renderLastError", rr.path("renderResult").path("lastError").asText(""));
         root.put("finalArtifactPath", rr.path("renderResult").path("artifactPath").asText(""));
 
+        JsonNode prior = parse(version.getWorkflowSummaryJson());
+        if (prior.has("executionCommits")) root.set("executionCommits", prior.get("executionCommits"));
         String summary = pretty(root);
         versionMapper.updateWorkflowSummary(task.getId(), version.getVersion(), summary);
         return summary;

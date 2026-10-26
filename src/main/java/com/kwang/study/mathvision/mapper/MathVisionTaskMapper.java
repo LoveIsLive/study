@@ -39,6 +39,9 @@ public interface MathVisionTaskMapper {
             @Result(column = "last_confirmed_stage", property = "lastConfirmedStage"),
             @Result(column = "auto_fix_count", property = "autoFixCount"),
             @Result(column = "cancel_requested", property = "cancelRequested"),
+            @Result(column = "lock_token", property = "lockToken"),
+            @Result(column = "lease_until", property = "leaseUntil"),
+            @Result(column = "recovery_count", property = "recoveryCount"),
             @Result(column = "final_artifact_path", property = "finalArtifactPath"),
             @Result(column = "final_artifact_type", property = "finalArtifactType"),
             @Result(column = "square_share_id", property = "squareShareId"),
@@ -48,6 +51,54 @@ public interface MathVisionTaskMapper {
             @Result(column = "update_time", property = "updateTime")
     })
     MathVisionTask findById(Long id);
+
+    @Select("SELECT * FROM mathvision_tasks WHERE id = #{id} FOR UPDATE")
+    @ResultMap("MathVisionTaskResultMap")
+    MathVisionTask lockById(Long id);
+
+    @Select("SELECT NOW(3)")
+    java.time.LocalDateTime databaseNow();
+
+    @Select("SELECT id FROM mathvision_tasks WHERE deleted = 0 AND cancel_requested = 0 " +
+            "AND (status = 'queued' OR (status = 'running' AND lease_until < NOW(3))) " +
+            "ORDER BY update_time, id LIMIT #{limit}")
+    List<Long> findClaimCandidates(int limit);
+
+    @Update("UPDATE mathvision_tasks SET " +
+            "recovery_count = CASE WHEN status = 'running' THEN recovery_count + 1 ELSE 0 END, " +
+            "status = 'running', lock_token = #{token}, lease_until = TIMESTAMPADD(SECOND, #{seconds}, NOW(3)), " +
+            "failed_stage = NULL, error_type = NULL, error_message = NULL, update_time = NOW() " +
+            "WHERE id = #{id} AND deleted = 0 AND cancel_requested = 0 " +
+            "AND (status = 'queued' OR (status = 'running' AND lease_until < NOW(3) " +
+            "AND recovery_count < #{limit}))")
+    int claimWithLease(@Param("id") Long id, @Param("token") String token,
+                       @Param("seconds") int seconds, @Param("limit") int limit);
+
+    @Update("UPDATE mathvision_tasks SET lease_until = TIMESTAMPADD(SECOND, #{seconds}, NOW(3)) " +
+            "WHERE id = #{id} AND lock_token = #{token} AND status = 'running' " +
+            "AND deleted = 0 AND cancel_requested = 0 AND lease_until > NOW(3)")
+    int renewLease(@Param("id") Long id, @Param("token") String token, @Param("seconds") int seconds);
+
+    @Select("SELECT COUNT(*) FROM mathvision_tasks WHERE id = #{id} AND lock_token = #{token} " +
+            "AND status = 'running' AND deleted = 0 AND lease_until > NOW(3)")
+    int hasLease(@Param("id") Long id, @Param("token") String token);
+
+    @Update("UPDATE mathvision_tasks SET lock_token = NULL, lease_until = NULL, recovery_count = 0 " +
+            "WHERE id = #{id} AND lock_token = #{token} AND lease_until > NOW(3)")
+    int releaseCommittedLease(@Param("id") Long id, @Param("token") String token);
+
+    @Update("UPDATE mathvision_tasks SET status = 'queued', lock_token = NULL, lease_until = NULL " +
+            "WHERE id = #{id} AND lock_token = #{token} AND status = 'running' AND cancel_requested = 0")
+    int releaseUnstartedLease(@Param("id") Long id, @Param("token") String token);
+
+    @Update("UPDATE mathvision_tasks SET status = CASE WHEN cancel_requested = 1 THEN 'canceled' ELSE 'failed' END, " +
+            "failed_stage = CASE WHEN cancel_requested = 1 THEN NULL ELSE current_stage END, " +
+            "error_type = CASE WHEN cancel_requested = 1 THEN NULL ELSE 'workflow_error' END, " +
+            "error_message = CASE WHEN cancel_requested = 1 THEN NULL ELSE '执行节点失联，已达到故障接管上限，请重试' END, " +
+            "lock_token = NULL, lease_until = NULL, cancel_requested = 0, update_time = NOW() " +
+            "WHERE deleted = 0 AND status = 'running' AND lease_until < NOW(3) " +
+            "AND (cancel_requested = 1 OR recovery_count >= #{limit})")
+    int settleExpiredLeases(int limit);
 
     @Select("SELECT * FROM mathvision_tasks WHERE id = #{id} AND user_id = #{userId} AND deleted = 1")
     @ResultMap("MathVisionTaskResultMap")
@@ -133,11 +184,6 @@ public interface MathVisionTaskMapper {
             "update_time = NOW() WHERE id = #{id}")
     void updateStatus(MathVisionTask task);
 
-    @Update("UPDATE mathvision_tasks SET status = 'running', cancel_requested = 0, " +
-            "failed_stage = NULL, error_type = NULL, error_message = NULL, update_time = NOW() " +
-            "WHERE id = #{id} AND deleted = 0 AND status = 'queued' AND cancel_requested = 0")
-    int claimRunnableTask(Long id);
-
     @Update("<script>" +
             "UPDATE mathvision_tasks SET status = 'queued', current_stage = #{currentStage}, " +
             "cancel_requested = 0, failed_stage = NULL, error_type = NULL, error_message = NULL, " +
@@ -221,12 +267,6 @@ public interface MathVisionTaskMapper {
     @Update("UPDATE mathvision_tasks SET cancel_requested = 1, update_time = NOW() " +
             "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND status = 'running'")
     int requestCancelRunning(@Param("id") Long id, @Param("userId") Long userId);
-
-    @Update("UPDATE mathvision_tasks SET status = 'failed', failed_stage = current_stage, " +
-            "error_type = 'workflow_error', error_message = '服务重启导致任务中断, 请重试当前阶段', " +
-            "cancel_requested = 0, update_time = NOW() " +
-            "WHERE deleted = 0 AND status = 'running'")
-    int resetRunningToFailed();
 
     /** 更新当前激活版本 */
     @Update("UPDATE mathvision_tasks SET current_version = #{currentVersion}, update_time = NOW() WHERE id = #{id}")

@@ -37,6 +37,14 @@ public class ProblemNormalizationNode {
     private final MathVisionAiChatService aiChatService;
     private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
+    private final com.kwang.study.mathvision.transfer.MathVisionTransferClient transferClient;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProblemNormalizationNode(MathVisionAiChatService aiChatService,
+            com.kwang.study.mathvision.transfer.MathVisionTransferClient transferClient, ObjectMapper objectMapper) {
+        this.aiChatService = aiChatService; this.transferClient = transferClient;
+        this.objectMapper = objectMapper; this.fileStorageService = null;
+    }
 
     public ProblemNormalizationNode(MathVisionAiChatService aiChatService,
                                     FileStorageService fileStorageService,
@@ -44,6 +52,7 @@ public class ProblemNormalizationNode {
         this.aiChatService = aiChatService;
         this.fileStorageService = fileStorageService;
         this.objectMapper = objectMapper;
+        this.transferClient = null;
     }
 
     public Result run(MathVisionTask task, MathVisionStageExecutionContext context) {
@@ -189,13 +198,13 @@ public class ProblemNormalizationNode {
             sourceAssets.add(sourceAsset);
 
             if (isImage(mimeType)) {
-                byte[] bytes = readFileBytes(asset.getFilePath());
+                byte[] bytes = readFileBytes(task, inputAssets.indexOf(asset), asset.getFilePath());
                 imageParts.add(AiContentPart.image(
                         StringUtils.hasText(mimeType) ? mimeType : "image/png",
                         Base64.getEncoder().encodeToString(bytes)
                 ));
             } else if (textAsset) {
-                appendTextAttachment(text, asset, readFileBytes(asset.getFilePath()));
+                appendTextAttachment(text, asset, readFileBytes(task, inputAssets.indexOf(asset), asset.getFilePath()));
             }
             index++;
         }
@@ -219,8 +228,9 @@ public class ProblemNormalizationNode {
         }
     }
 
-    private byte[] readFileBytes(String path) {
+    private byte[] readFileBytes(MathVisionTask task, int index, String path) {
         try {
+            if (transferClient != null) return transferClient.asset(task, index);
             FileObjectResult fileObject = fileStorageService.getFileObject(path);
             if (fileObject == null || fileObject.getContent() == null) {
                 throw new IllegalArgumentException("Input asset content is unavailable: " + path);

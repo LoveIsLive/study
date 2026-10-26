@@ -35,6 +35,11 @@ public interface MathVisionArtifactMapper {
     @Delete("DELETE FROM mathvision_artifacts WHERE task_id = #{taskId}")
     int deleteByTaskId(Long taskId);
 
+    @Select("SELECT (SELECT COUNT(*) FROM mathvision_tasks WHERE final_artifact_path = #{path}) + " +
+            "(SELECT COUNT(*) FROM mathvision_artifacts WHERE JSON_SEARCH(artifact_json, 'one', #{path}) IS NOT NULL) + " +
+            "(SELECT COUNT(*) FROM mathvision_stage_results WHERE JSON_SEARCH(result_json, 'one', #{path}) IS NOT NULL)")
+    int countPathReferences(String path);
+
     /** 原地更新产物内容 (仅未确认的私有行可用, 见 Copy-on-Write 不变式) */
     @Update("UPDATE mathvision_artifacts SET artifact_json = #{artifactJson}, " +
             "change_source = #{changeSource}, change_summary = #{changeSummary}, update_time = NOW() " +

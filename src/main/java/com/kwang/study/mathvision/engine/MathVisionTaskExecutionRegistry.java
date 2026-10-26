@@ -11,28 +11,33 @@ import java.util.Set;
 @Component
 public class MathVisionTaskExecutionRegistry {
 
-    private final ConcurrentMap<Long, Execution> activeExecutions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Execution> activeExecutions = new ConcurrentHashMap<>();
 
-    public void register(Long taskId) {
+    private static String key(Long taskId, String token) { return taskId + ":" + token; }
+
+    public void register(Long taskId) { register(taskId, null); }
+    public void register(Long taskId, String token) {
         if (taskId != null) {
-            activeExecutions.put(taskId, new Execution(Thread.currentThread()));
+            activeExecutions.put(key(taskId, token), new Execution(Thread.currentThread()));
         }
     }
 
-    public void unregister(Long taskId) {
+    public void unregister(Long taskId) { unregister(taskId, null); }
+    public void unregister(Long taskId, String token) {
         if (taskId != null) {
-            Execution execution = activeExecutions.get(taskId);
+            Execution execution = activeExecutions.get(key(taskId, token));
             if (execution != null && execution.thread == Thread.currentThread()) {
-                activeExecutions.remove(taskId, execution);
+                activeExecutions.remove(key(taskId, token), execution);
             }
         }
     }
 
-    public void registerCancellationHook(Long taskId, Runnable hook) {
+    public void registerCancellationHook(Long taskId, Runnable hook) { registerCancellationHook(taskId, null, hook); }
+    public void registerCancellationHook(Long taskId, String token, Runnable hook) {
         if (taskId == null || hook == null) {
             return;
         }
-        Execution execution = activeExecutions.get(taskId);
+        Execution execution = activeExecutions.get(key(taskId, token));
         if (execution == null) {
             return;
         }
@@ -42,19 +47,24 @@ public class MathVisionTaskExecutionRegistry {
         }
     }
 
-    public void unregisterCancellationHook(Long taskId, Runnable hook) {
-        Execution execution = taskId != null ? activeExecutions.get(taskId) : null;
+    public void unregisterCancellationHook(Long taskId, Runnable hook) { unregisterCancellationHook(taskId, null, hook); }
+    public void unregisterCancellationHook(Long taskId, String token, Runnable hook) {
+        Execution execution = taskId != null ? activeExecutions.get(key(taskId, token)) : null;
         if (execution != null && hook != null) {
             execution.hooks.remove(hook);
         }
     }
 
-    public boolean interrupt(Long taskId) {
-        Execution execution = taskId != null ? activeExecutions.get(taskId) : null;
+    public boolean interrupt(Long taskId) { return interrupt(taskId, null); }
+    public boolean interrupt(Long taskId, String token) {
+        Execution execution = taskId != null ? activeExecutions.get(key(taskId, token)) : null;
         if (execution == null) {
             return false;
         }
-        execution.canceled = true;
+        synchronized (execution) {
+            if (execution.canceled) return true;
+            execution.canceled = true;
+        }
         execution.thread.interrupt();
         for (Runnable hook : execution.hooks) {
             invokeHook(hook);

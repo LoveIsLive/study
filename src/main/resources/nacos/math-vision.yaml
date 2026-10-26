@@ -2,6 +2,24 @@
 # Mirrors the active dev catalog. Runtime credentials remain user-owned in MySQL.
 # The required apikey.secret is stored only in remote Nacos and intentionally
 # omitted from this repository template; all other runtime behavior is below.
+distributed:
+  leaseSeconds: 120
+  heartbeatSeconds: 30
+  cancelPollMillis: 1000
+  recoveryLimit: 2
+  concurrency: 2
+  # Per-worker adaptive polling bounds, including jitter. Empty/contended polls grow
+  # the interval by 1.5x; successful dispatches shorten it to 0.8x.
+  pollMinMillis: 500
+  pollMaxMillis: 5000
+  uploadChunkBytes: 8388608
+  maxArtifactBytes: 1073741824
+  uploadAttempts: 3
+  retentionHours: 24
+  masterUrl: http://127.0.0.1:8080
+  transferRoot: mathvision-transfer
+  # serviceSecret: set a separate random secret (>=32 chars) in remote Nacos only.
+
 workflow:
   visualDesignSceneMaxRetries: 3
   storyboardValidationMaxRetries: 5

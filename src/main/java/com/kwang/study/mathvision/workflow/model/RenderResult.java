@@ -28,6 +28,9 @@ public class RenderResult {
     @JsonProperty("storageArtifactPath")
     private String storageArtifactPath;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String artifactReceipt;
+
     @JsonProperty("localArtifactPath")
     private String localArtifactPath;
 

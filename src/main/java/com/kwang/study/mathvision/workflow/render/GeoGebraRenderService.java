@@ -74,7 +74,6 @@ public class GeoGebraRenderService {
     private static final double DEFAULT_FRAME_Y_MAX = 4.0;
     private static final Pattern SET_COORD_SYSTEM_COMMAND = Pattern.compile(
             "^SetCoordSystem\\s*\\(([^)]*)\\)\\s*$", Pattern.CASE_INSENSITIVE);
-    private ViewBounds activeViewBounds = ViewBounds.defaults();
 
     private static final class ViewBounds {
         private final double xMin;
@@ -138,9 +137,6 @@ public class GeoGebraRenderService {
                 report.completed = true;
                 report.error = "No executable GeoGebra commands were found after stripping comments.";
             } else {
-                ViewBounds previousViewBounds = activeViewBounds;
-                activeViewBounds = viewBounds;
-                try {
                     if (cancellationHookRegistrar == null && cancellationHookClearer == null) {
                         // Preserve the protected extension point used by tests and local adapters.
                         report = validateWithHeadlessBrowser(previewPath, safeFigureName, commands,
@@ -148,12 +144,9 @@ public class GeoGebraRenderService {
                     } else {
                         report = validateWithHeadlessBrowser(previewPath, safeFigureName, commands,
                                 sceneDirectives, geometryPath,
-                                activeViewBounds != null ? activeViewBounds : ViewBounds.defaults(),
+                                viewBounds,
                                 cancellationHookRegistrar, cancellationHookClearer);
                     }
-                } finally {
-                    activeViewBounds = previousViewBounds;
-                }
             }
             if (report != null) {
                 normalizeParsedReport(
@@ -230,7 +223,7 @@ public class GeoGebraRenderService {
                 commands,
                 sceneDirectives,
                 geometryPath,
-                activeViewBounds != null ? activeViewBounds : ViewBounds.defaults(),
+                resolveViewBounds(commands),
                 null,
                 null);
     }

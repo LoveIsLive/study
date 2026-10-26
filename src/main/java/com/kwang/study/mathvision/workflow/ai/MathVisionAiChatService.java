@@ -500,6 +500,10 @@ public class MathVisionAiChatService {
     }
 
     private AiRuntime resolveRuntime(MathVisionTask task) {
+        return com.kwang.study.mathvision.engine.MathVisionExecutionScope.once(this, () -> loadRuntime(task));
+    }
+
+    private AiRuntime loadRuntime(MathVisionTask task) {
         if (task == null) {
             throw new IllegalArgumentException("MathVision task is missing.");
         }

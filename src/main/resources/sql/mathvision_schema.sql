@@ -69,6 +69,9 @@ CREATE TABLE `mathvision_tasks` (
   `last_confirmed_stage`     VARCHAR(40)  NULL                    COMMENT '手动模式最近确认到的阶段',
   `auto_fix_count`           INT          NOT NULL DEFAULT 0      COMMENT '自动修复累计次数 (限流)',
   `cancel_requested`         TINYINT(1)   NOT NULL DEFAULT 0      COMMENT '运行中取消请求标记',
+  `lock_token`               CHAR(36)     NULL                    COMMENT '本次阶段执行令牌',
+  `lease_until`              DATETIME(3)  NULL                    COMMENT '执行租约到期时间 (数据库时间)',
+  `recovery_count`           INT          NOT NULL DEFAULT 0      COMMENT '当前阶段故障接管次数',
   `final_artifact_path`      VARCHAR(512) NULL                    COMMENT '当前版本最终产物路径',
   `final_artifact_type`      VARCHAR(16)  NULL                    COMMENT 'mp4/html',
   `request_id`               VARCHAR(64)  NULL                    COMMENT '创建幂等键',
@@ -79,7 +82,9 @@ CREATE TABLE `mathvision_tasks` (
   UNIQUE KEY `uk_session` (`session_id`),
   UNIQUE KEY `uk_request` (`request_id`),
   KEY `idx_user_list` (`user_id`, `deleted`, `update_time`),
-  KEY `idx_status` (`status`)
+  KEY `idx_status` (`status`),
+  KEY `idx_mathvision_claim` (`deleted`, `status`, `cancel_requested`, `update_time`, `id`),
+  KEY `idx_mathvision_lease` (`deleted`, `status`, `lease_until`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MathVision 生成任务主表';
 
 
