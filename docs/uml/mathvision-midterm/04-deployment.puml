@@ -1,0 +1,54 @@
+@startuml
+!include style.iuml
+top to bottom direction
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 85
+scale 0.7
+
+node "用户终端" as Client <<device>> {
+  node "浏览器" as Browser <<executionEnvironment>>
+}
+
+node "主服务主机" as Master <<device>> {
+  node "JVM / Spring Boot" as MasterJvm <<executionEnvironment>> {
+    artifact "study.jar\nAPI · WebSocket · 文件服务" as StudyJar
+    artifact "平台输入与最终文件" as MasterStorage
+  }
+}
+
+node "Worker 节点池" as WorkerPool {
+  node "Worker A 主机" as HostA <<device>> {
+    node "JVM / Worker 运行环境" as WorkerJvmA <<executionEnvironment>> {
+      artifact "study-mathvision-worker.jar" as WorkerJarA
+      node "Manim / Chromium" as ToolsA <<executionEnvironment>>
+    }
+  }
+
+  node "Worker B 主机" as HostB <<device>> {
+    node "JVM / Worker 运行环境" as WorkerJvmB <<executionEnvironment>> {
+      artifact "study-mathvision-worker.jar" as WorkerJarB
+      node "Manim / Chromium" as ToolsB <<executionEnvironment>>
+    }
+  }
+}
+
+node "共享基础服务主机" as SharedHost <<device>> {
+  node "MySQL" as MySqlEnv <<executionEnvironment>>
+  node "Redis" as RedisEnv <<executionEnvironment>>
+  node "Nacos" as NacosEnv <<executionEnvironment>>
+}
+
+node "外部模型服务" as LlmEnv <<executionEnvironment>>
+
+Client -[hidden]down-> Master
+Master -[hidden]right-> SharedHost
+SharedHost -[hidden]down-> WorkerPool
+WorkerPool -[hidden]down-> LlmEnv
+
+Browser -- Master : HTTPS / STOMP
+Master -- WorkerPool : HTTPS
+Master -- SharedHost
+WorkerPool -- SharedHost
+WorkerPool -- LlmEnv : HTTPS
+@enduml

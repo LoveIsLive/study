@@ -1,0 +1,84 @@
+' Shared presentation style. Change the font here if your machine lacks it.
+' Use Graphviz/Dot for stable direction and partition placement.
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 20
+skinparam defaultFontColor #23354D
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam dpi 150
+skinparam padding 12
+skinparam nodesep 55
+skinparam ranksep 65
+skinparam ArrowColor #5B718A
+skinparam ArrowThickness 1.6
+skinparam ArrowFontSize 16
+skinparam ArrowFontColor #4A617B
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam stereotypeFontSize 15
+skinparam classAttributeIconSize 0
+skinparam component {
+  BackgroundColor #EDF4FC
+  BorderColor #6889B2
+  FontSize 21
+}
+skinparam package {
+  BackgroundColor #F8FAFD
+  BorderColor #C5D2E0
+  FontSize 19
+}
+skinparam node {
+  BackgroundColor #F4F8FD
+  BorderColor #6889B2
+  FontSize 21
+}
+skinparam database {
+  BackgroundColor #EAF6F2
+  BorderColor #559580
+  FontSize 20
+}
+skinparam cloud {
+  BackgroundColor #F5F0FA
+  BorderColor #9C86BA
+}
+skinparam artifact {
+  BackgroundColor #FFFFFF
+  BorderColor #8CA2BB
+}
+skinparam activity {
+  BackgroundColor #EDF4FC
+  BorderColor #6889B2
+  DiamondBackgroundColor #FFF5DF
+  DiamondBorderColor #C69A43
+  StartColor #355B82
+  EndColor #355B82
+  FontSize 20
+}
+skinparam class {
+  BackgroundColor #F3F7FD
+  BorderColor #6889B2
+  HeaderBackgroundColor #DFEAF7
+  FontSize 21
+  AttributeFontSize 18
+}
+skinparam note {
+  BackgroundColor #FFF7E6
+  BorderColor #D3B473
+  FontSize 17
+}
+skinparam sequence {
+  ArrowColor #55718D
+  ArrowFontSize 18
+  ParticipantBackgroundColor #E8F0FA
+  ParticipantBorderColor #6889B2
+  ParticipantFontSize 21
+  LifeLineBorderColor #C5D2E0
+  LifeLineBackgroundColor #FFFFFF
+  GroupBackgroundColor #FFFFFF
+  GroupBorderColor #C5D2E0
+  GroupFontSize 18
+  DividerBackgroundColor #F0F5FA
+  DividerBorderColor #C5D2E0
+}
+hide empty members

@@ -1,0 +1,51 @@
+@startuml
+!include style.iuml
+hide footbox
+autonumber
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+skinparam BoxPadding 12
+skinparam sequence GroupBackgroundColor #FFFFFF
+skinparam sequence GroupBorderColor #C5D2E0
+skinparam sequence LifeLineBackgroundColor #FFFFFF
+
+participant "Worker A" as A
+participant "任务状态服务\n(MySQL)" as DB
+participant "Worker B" as B
+participant "主服务归档服务" as Master
+
+A -> DB : claim stage A
+activate A
+DB --> A : tokenA + lease
+A -> A : execute stage
+deactivate A
+
+== A 失联，租约到期 ==
+
+B -> DB : claim stage B
+activate B
+DB --> B : tokenB + recoveryCount
+B -> Master : init upload
+activate Master
+Master -> DB : verify tokenB
+DB --> Master : valid
+Master --> B : upload session
+deactivate Master
+
+B -> Master : upload chunks
+activate Master
+Master -> DB : verify tokenB
+DB --> Master : valid
+Master --> B : artifact path + signed receipt
+deactivate Master
+
+critical 提交事务
+  B -> DB : lock task; validate version / stage / token / lease
+  DB --> B : commit result; release lease
+end
+deactivate B
+
+A -> DB : stale commit A
+DB -->> A : reject: lease lost
+
+@enduml

@@ -1,0 +1,36 @@
+@startuml
+!include style.iuml
+skinparam activityFontSize 17
+skinparam activityDiamondFontSize 16
+skinparam activityBorderThickness 1.4
+skinparam linetype ortho
+scale 0.6
+
+(*) -right-> "01 题目规范化\n题目理解 Agent" as Normalize
+Normalize -right-> "02 解题推理图\n推理规划 Agent\n数学知识增强 Agent" as Reason
+
+if "需要阶段确认？" then
+  -->[是] "教师查看、编辑或确认" as StageConfirm
+  StageConfirm -right-> "03 可视化分镜\n可视化设计 Agent\n分镜审校 Agent（可选）" as VisualDesign
+else
+  -->[否] VisualDesign
+endif
+
+VisualDesign -right-> "04 代码生成\n代码生成 Agent\n代码审查 Agent（可选）\n程序修复 Agent（按需迭代）" as CodeGeneration
+CodeGeneration -right-> "05 渲染结果\n渲染执行 Agent\n视觉质量评估 Agent（可选）" as Render
+Render -right-> "需要修复且预算未耗尽？" as QualityCheck
+if "需要修复且预算未耗尽？" then
+  -->[是] "程序修复 Agent" as Fix
+  Fix -right-> "重新渲染" as Rerender
+  Rerender -right-> Render
+else
+  -->[否] "需要最终确认？" as FinalConfirm
+  if "需要最终确认？" then
+    -->[是] "教师查看并确认结果" as FinalReview
+    FinalReview -right-> "生成完成" as Done
+  else
+    -->[否] Done
+  endif
+endif
+Done -right-> (*)
+@enduml

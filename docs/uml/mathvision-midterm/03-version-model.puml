@@ -1,0 +1,49 @@
+@startuml
+!include style.iuml
+top to bottom direction
+skinparam linetype ortho
+skinparam nodesep 90
+skinparam ranksep 65
+skinparam classAttributeIconSize 0
+hide circle
+
+class "任务\nMathVisionTask" as Task {
+  id : Long
+  currentVersion : Integer
+  currentStage : String
+  status : String
+}
+
+class "任务版本\nMathVisionVersion" as Version {
+  version : Integer
+  baseVersion : Integer
+  pnVersion : Integer
+  rgVersion : Integer
+  vsVersion : Integer
+  cgVersion : Integer
+  rrVersion : Integer
+  branchStage : String
+  changeSource : String
+}
+
+class "阶段产物\nMathVisionArtifact" as Artifact {
+  stage : String
+  version : Integer
+  baseVersion : Integer
+  artifactJson : JSON
+  changeSource : String
+}
+
+class "阶段结果\nMathVisionStageResult" as Result {
+  artifactId : Long
+  stage : String
+  version : Integer
+  resultJson : JSON
+}
+
+Task "1" -- "1..*" Version : versions
+Task "1" -- "0..*" Artifact : artifacts
+Version "1" --> "0..5" Artifact : stage pointers
+Artifact "1" -- "0..1" Result : execution result
+
+@enduml

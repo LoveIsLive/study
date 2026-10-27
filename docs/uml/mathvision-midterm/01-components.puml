@@ -1,0 +1,53 @@
+@startuml
+!include style.iuml
+top to bottom direction
+skinparam linetype ortho
+skinparam nodesep 85
+skinparam ranksep 90
+skinparam componentStyle rectangle
+
+component "教师工作台" as UI
+
+package "Study 主服务" as MainService {
+  component "任务与阶段接口" as API
+  component "任务与版本管理" as TaskService
+  component "平台文件服务\n输入与最终文件存储" as FileService
+
+  API -[hidden]right-> TaskService
+  TaskService -[hidden]right-> FileService
+}
+
+package "Worker 执行组件" as WorkerService {
+  component "阶段调度器" as Scheduler
+  component "专业 Agent 集合" as Agents
+  component "模型与工具适配" as Adapter
+
+  Scheduler -[hidden]right-> Agents
+  Agents -[hidden]right-> Adapter
+}
+
+MainService -[hidden]right-> WorkerService
+
+component "任务与产物状态\nMySQL" as DB
+component "状态与取消事件\nRedis" as Redis
+component "模型与运行配置\nNacos" as Nacos
+component "外部模型服务" as LLM
+component "Manim / GeoGebra\n运行环境" as Render
+
+DB -[hidden]down-> Redis
+Redis -[hidden]down-> Nacos
+Nacos -[hidden]right-> LLM
+LLM -[hidden]down-> Render
+
+UI ..> API
+API ..> TaskService
+API ..> FileService
+TaskService ..> DB
+Scheduler ..> DB
+Scheduler ..> Redis
+Scheduler ..> Nacos
+Agents ..> FileService
+Agents ..> Adapter
+Adapter ..> LLM
+Agents ..> Render
+@enduml

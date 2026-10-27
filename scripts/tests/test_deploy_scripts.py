@@ -130,6 +130,9 @@ class DeploymentScriptsTest(unittest.TestCase):
     def test_master_preserves_old_working_directory_and_pid(self):
         self.run_shell("deploy-master.sh", 'configure; [[ "$APP_WORK_DIR" == "$ROOT" && "$PID_FILE" == "$ROOT/app.pid" && "$APP_LOG" == "$ROOT/app.log" ]]')
 
+    def test_master_uses_8080_when_app_port_is_not_set(self):
+        self.run_shell("deploy-master.sh", 'unset APP_PORT; configure; [[ "$DEFAULT_APP_PORT" == 8080 && "$APP_PORT" == 8080 ]]')
+
     def test_worker_defaults_are_separate_from_master(self):
         self.run_shell("deploy-mathvision-worker.sh", 'unset BACKEND_PROJECT_PATH; configure; [[ "$APP_WORK_DIR" == "$ROOT/mathvision-worker" && "$PID_FILE" == "$ROOT/mathvision-worker/worker.pid" && "$BACKEND_PROJECT_PATH" == "$ROOT/study-worker" ]]', role="worker")
 
@@ -156,6 +159,47 @@ class DeploymentScriptsTest(unittest.TestCase):
             'if jar_from_args /usr/bin/python -jar "$ROOT/study/target/study.jar"; then exit 13; fi',
             'if jar_from_args; then exit 14; fi',
         ]))
+
+    def test_master_finds_and_stops_an_owned_legacy_listener_on_configured_port(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080; PID_FILE="$ROOT/no-pid"; STATE_DIR="$ROOT/state"; OLD_PID=""; OLD_JAR=""',
+            'listener_pids() { printf "4321\\n"; }',
+            'owned_jar() { [[ "$1" == 4321 ]] && { printf "%s\\n" "$ROOT/old-study.jar"; return 0; }; return 1; }',
+            'find_old_process',
+            '[[ "$OLD_PID" == 4321 && "$OLD_JAR" == "$ROOT/old-study.jar" ]]',
+        ]))
+
+    def test_ss_listener_parser_extracts_java_pid_for_configured_port(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080',
+            'ss() { printf "LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:((\\"java\\",pid=4321,fd=123))\\n"; }',
+            '[[ "$(listener_pids)" == 4321 ]]',
+        ]))
+
+    def test_master_refuses_port_when_ss_hides_listener_pid(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080; PID_FILE="$ROOT/no-pid"; STATE_DIR="$ROOT/state"; OLD_PID=""; OLD_JAR=""',
+            'listener_pids() { return 0; }',
+            'port_listening() { return 0; }',
+            'find_old_process',
+        ]), success=False)
+
+    def test_master_refuses_to_kill_unknown_port_listener(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080; PID_FILE="$ROOT/no-pid"; STATE_DIR="$ROOT/state"; OLD_PID=""; OLD_JAR=""',
+            'listener_pids() { printf "4321\\n"; }',
+            'owned_jar() { return 1; }',
+            'find_old_process',
+        ]), success=False)
+
+    def test_worker_does_not_touch_master_port_listeners(self):
+        self.run_shell("deploy-mathvision-worker.sh", '\n'.join([
+            'ROLE=worker; APP_PORT=""; PID_FILE="$ROOT/no-pid"; STATE_DIR="$ROOT/state"; OLD_PID=""; OLD_JAR=""',
+            'listener_pids() { return 0; }',
+            'owned_jar() { return 1; }',
+            'find_old_process',
+            '[[ -z "$OLD_PID" && -z "$OLD_JAR" ]]',
+        ]), role="worker")
 
     def test_legacy_master_migration_excludes_worker(self):
         self.run_shell("deploy-master.sh", '\n'.join([
