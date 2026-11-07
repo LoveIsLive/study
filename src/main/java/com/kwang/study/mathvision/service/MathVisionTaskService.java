@@ -640,10 +640,7 @@ public class MathVisionTaskService {
                 && "auto".equals(mode)
                 && !"auto".equals(task.getMode());
         if (switchedToAuto && "waiting_confirm".equals(task.getStatus())) {
-            StageEnum waitingStage = StageEnum.fromCode(task.getCurrentStage());
-            if (!MathVisionStageQualityReview.supports(waitingStage)) {
-                return startTask(taskId);
-            }
+            return startTask(taskId);
         }
 
         taskNotifier.notifyTaskChanged(task.getId(), "runtime_settings_updated");

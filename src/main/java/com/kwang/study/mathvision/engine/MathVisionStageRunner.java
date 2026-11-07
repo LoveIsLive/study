@@ -303,13 +303,6 @@ public class MathVisionStageRunner {
                                    StageEnum stage,
                                    MathVisionStageExecutionContext context,
                                    MathVisionStageExecutionResult result) {
-        if (result != null && result.isWaitForUserDecision()) {
-            log.info("MathVision 阶段等待用户选择是否执行智能检查, taskId={}, stage={}",
-                    task.getId(), stage.getCode());
-            taskMapper.markWaitingConfirm(task.getId(), stage.getCode());
-            taskNotifier.notifyTaskChanged(task.getId(), "waiting_confirm");
-            return;
-        }
         if (context.isUserRevision() && context.isStopAfterStage()) {
             log.info("MathVision 自动编辑完成并等待确认, taskId={}, stage={}, baseStageVersion={}",
                     task.getId(), stage.getCode(), context.getBaseStageVersion());
@@ -317,11 +310,20 @@ public class MathVisionStageRunner {
             taskNotifier.notifyTaskChanged(task.getId(), "waiting_confirm");
             return;
         }
-        StageEnum next = nextStage(stage);
+        // Runtime settings can change while a worker is generating an artifact. Read the
+        // current mode inside the fenced commit before deciding whether to pause.
         MathVisionTask latestTask = taskMapper.findById(task.getId());
         String effectiveMode = latestTask != null && StringUtils.hasText(latestTask.getMode())
                 ? latestTask.getMode()
                 : task.getMode();
+        if (result != null && result.isWaitForUserDecision() && !"auto".equals(effectiveMode)) {
+            log.info("MathVision 阶段等待用户选择是否执行智能检查, taskId={}, stage={}, mode={}",
+                    task.getId(), stage.getCode(), effectiveMode);
+            taskMapper.markWaitingConfirm(task.getId(), stage.getCode());
+            taskNotifier.notifyTaskChanged(task.getId(), "waiting_confirm");
+            return;
+        }
+        StageEnum next = nextStage(stage);
         if ("manual".equals(effectiveMode)) {
             if (next == StageEnum.COMPLETED) {
                 log.info("MathVision 任务已完成, taskId={}, completedStage={}, mode={}",

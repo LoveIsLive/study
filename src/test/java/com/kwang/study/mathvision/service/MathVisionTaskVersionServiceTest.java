@@ -32,6 +32,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -438,6 +440,66 @@ class MathVisionTaskVersionServiceTest {
         verify(taskMapper).queueTaskForRun(
                 32L, USER_ID, "visual_storyboard", "reasoning_graph");
         verify(taskNotifier).notifyTaskChanged(32L, "queued");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"visual_storyboard, code_generation", "code_generation, render_result"})
+    void switchingWaitingQualityReviewStageToAutoQueuesNextStage(String stage, String nextStage) {
+        MathVisionTask manualWaiting = task(35L, "waiting_confirm", stage, 1);
+        manualWaiting.setMode("manual");
+        MathVisionTask autoWaiting = task(35L, "waiting_confirm", stage, 1);
+        autoWaiting.setMode("auto");
+        MathVisionTask queued = task(35L, "queued", nextStage, 1);
+        queued.setMode("auto");
+        when(taskMapper.findById(35L)).thenReturn(manualWaiting, autoWaiting, queued);
+        when(taskMapper.updateRuntimeSettings(35L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        when(taskMapper.queueTaskForRun(35L, USER_ID, nextStage, stage)).thenReturn(1);
+        MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
+        request.setMode("auto");
+
+        assertEquals("queued", service.updateRuntimeSettings(35L, request).getStatus());
+
+        verify(taskMapper).queueTaskForRun(35L, USER_ID, nextStage, stage);
+        verify(taskNotifier).notifyTaskChanged(35L, "queued");
+        verify(stageResultMapper, never()).updateResultJson(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void switchingWaitingRenderToAutoCompletesTaskWithoutRenderingAgain() {
+        MathVisionTask manualWaiting = task(36L, "waiting_confirm", "render_result", 1);
+        manualWaiting.setMode("manual");
+        MathVisionTask autoWaiting = task(36L, "waiting_confirm", "render_result", 1);
+        autoWaiting.setMode("auto");
+        MathVisionTask completed = task(36L, "completed", "completed", 1);
+        completed.setMode("auto");
+        when(taskMapper.findById(36L)).thenReturn(manualWaiting, autoWaiting, completed);
+        when(taskMapper.updateRuntimeSettings(36L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
+        request.setMode("auto");
+
+        assertEquals("completed", service.updateRuntimeSettings(36L, request).getStatus());
+
+        verify(taskMapper).markCompleted(36L);
+        verify(taskMapper, never()).queueTaskForRun(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(taskNotifier).notifyTaskChanged(36L, "completed");
+    }
+
+    @Test
+    void switchingRunningTaskToAutoDoesNotQueueAnotherExecution() {
+        MathVisionTask running = task(37L, "running", "code_generation", 1);
+        running.setMode("manual");
+        MathVisionTask updated = task(37L, "running", "code_generation", 1);
+        updated.setMode("auto");
+        when(taskMapper.findById(37L)).thenReturn(running, updated);
+        when(taskMapper.updateRuntimeSettings(37L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
+        request.setMode("auto");
+
+        assertEquals("running", service.updateRuntimeSettings(37L, request).getStatus());
+
+        verify(taskMapper, never()).queueTaskForRun(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
