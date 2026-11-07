@@ -6,6 +6,9 @@ import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionContext;
 import com.kwang.study.mathvision.pojo.MathVisionTask;
 import com.kwang.study.mathvision.workflow.ai.MathVisionAiChatService;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kwang.study.mathvision.workflow.model.AiContentPart;
 import com.kwang.study.mathvision.workflow.model.AiMessage;
 import com.kwang.study.mathvision.workflow.model.KnowledgeGraph;
@@ -54,6 +57,7 @@ import java.util.regex.Pattern;
 
 @Component
 public class StoryboardValidationNode {
+    private static final Logger log = LoggerFactory.getLogger(StoryboardValidationNode.class);
 
     private static final int DEFAULT_MAX_VALIDATION_FIX_ATTEMPTS = 5;
     private static final int DEFAULT_MAX_PLACEMENT_ENRICHMENT_RETRIES = 3;
@@ -102,6 +106,8 @@ public class StoryboardValidationNode {
         int originalSceneCount = sceneCount(current.getStoryboard());
         Instant initialStart = Instant.now();
         List<String> issues = validate(task, bundle, graph, current.getStoryboard(), sceneMode, apiCalls, context);
+        log.info("MathVision 分镜初次检查完成, taskId={}, scenes={}, issues={}",
+                task.getId(), originalSceneCount, issues.size());
         StoryboardValidationReport report = baseReport(current.getStoryboard(), issues, outputTarget);
         appendTrace(report, current.getStoryboard(), "initial_validation", 0, false, false,
                 issues, 0, secondsSince(initialStart), "Initial storyboard validation");
@@ -154,6 +160,8 @@ public class StoryboardValidationNode {
         while (!issues.isEmpty() && attempts < maxValidationFixAttempts) {
             context.checkCanceled();
             attempts++;
+            log.info("MathVision 分镜检查修复, taskId={}, attempt={}/{}, issues={}",
+                    task.getId(), attempts, maxValidationFixAttempts, issues.size());
             Instant cleanupStart = Instant.now();
             int before = apiCalls.value;
             Narrative fixed = attemptLlmFix(task, bundle, graph, current, issues, cleanupTurns,
@@ -265,6 +273,7 @@ public class StoryboardValidationNode {
             int maxPlacementRetries = maxPlacementEnrichmentRetries();
             for (int attempt = 1; attempt <= maxPlacementRetries + 1; attempt++) {
                 context.checkCanceled();
+                log.info("MathVision 分镜位置补全, taskId={}, attempt={}/{}", task.getId(), attempt, maxPlacementRetries + 1);
                 List<AiMessage> messages = new ArrayList<>();
                 messages.add(AiMessage.system(NarrativePrompts.PLACEMENT_ENRICHMENT_SYSTEM_PROMPT));
                 messages.add(AiMessage.system(fixedContext));
@@ -286,11 +295,14 @@ public class StoryboardValidationNode {
                 if (lastIssues.isEmpty() && mergeResult.storyboard != null) {
                     return mergeResult.storyboard;
                 }
+                log.warn("MathVision 分镜位置补全未通过, taskId={}, attempt={}, issues={}", task.getId(), attempt, lastIssues.size());
                 if (attempt <= maxPlacementRetries) {
                     userPrompt = buildPlacementEnrichmentRetryPrompt(lastIssues);
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("MathVision 分镜位置补全失败，使用原布局继续检查, taskId={}, reason={}",
+                    task.getId(), NodeExecutionLogger.summarize(e.getMessage()));
             return null;
         }
         return null;
@@ -327,6 +339,7 @@ public class StoryboardValidationNode {
                                     String outputTarget,
                                     String sceneMode,
                                     Counter apiCalls) {
+        log.info("MathVision 分镜整理请求, taskId={}, issues={}", task.getId(), issues.size());
         try {
             String storyboardJson = objectMapper.writeValueAsString(narrative.getStoryboard());
             String currentRequest = SystemPrompts.buildCurrentRequestSection(
@@ -357,6 +370,8 @@ public class StoryboardValidationNode {
             preserveStepRefs(narrative.getStoryboard(), fixedStoryboard);
             return new Narrative(narrative.getTargetDescription(), fixedStoryboard);
         } catch (Exception e) {
+            log.warn("MathVision 分镜整理失败，保留当前产物, taskId={}, reason={}",
+                    task.getId(), NodeExecutionLogger.summarize(e.getMessage()));
             return null;
         }
     }

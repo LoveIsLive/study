@@ -30,6 +30,9 @@ import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
 import com.kwang.study.mathvision.workflow.util.StoryboardConstraintUtils;
 import com.kwang.study.mathvision.workflow.util.StoryboardNormalizer;
 import com.kwang.study.mathvision.workflow.util.TargetDescriptionBuilder;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -45,6 +48,7 @@ import java.util.regex.Pattern;
 
 @Component
 public class VisualDesignNode {
+    private static final Logger log = LoggerFactory.getLogger(VisualDesignNode.class);
 
     private static final int DEFAULT_MAX_SCENE_RETRIES = 3;
     private static final Pattern NON_IDENTIFIER_CHARS = Pattern.compile("[^A-Za-z0-9_]");
@@ -91,6 +95,7 @@ public class VisualDesignNode {
         String targetDescription = TargetDescriptionBuilder.build(bundle, graph, null);
         String solutionChain = TargetDescriptionBuilder.buildSolutionChain(graph, null);
         if (resolvedRequest.isUserRevision()) {
+            log.info("MathVision 分镜采用完整产物自动编辑, taskId={}, target={}", task.getId(), outputTarget);
             return reviseCompleteStoryboard(
                     task,
                     bundle,
@@ -116,6 +121,10 @@ public class VisualDesignNode {
 
         for (int i = 0; i < teachingNodes.size(); i++) {
             context.checkCanceled();
+            long sceneStarted = System.nanoTime();
+            NodeExecutionLogger.progress("生成分镜场景 " + (i + 1) + "/" + expectedScenes);
+            log.info("MathVision 分镜场景开始, taskId={}, scene={}/{}, target={}",
+                    task.getId(), i + 1, expectedScenes, outputTarget);
             KnowledgeNode node = teachingNodes.get(i);
             String userPrompt = buildScenePrompt(graph, node, i, expectedScenes, state);
             SceneDesignResult sceneResult = requestSceneWithRetry(
@@ -124,6 +133,8 @@ public class VisualDesignNode {
             commitSceneResult(state, sceneResult);
             appendRollingTurn(rollingTurns, sceneResult.userPrompt, toPrettyJson(sceneResult.payload));
             context.checkCanceled();
+            log.info("MathVision 分镜场景完成, taskId={}, scene={}/{}, durationMs={}, logicalRequests={}",
+                    task.getId(), i + 1, expectedScenes, (System.nanoTime() - sceneStarted) / 1_000_000L, sceneResult.apiCalls);
         }
 
         Narrative narrative = assembleNarrative(bundle, graph, state);
@@ -290,6 +301,10 @@ public class VisualDesignNode {
                 return parsed;
             } catch (RuntimeException e) {
                 lastError = e;
+                log.warn("MathVision 分镜场景生成失败, taskId={}, scene={}, attempt={}/{}, willRetry={}, reason={}",
+                        task.getId(), index + 1, attempt + 1, maxSceneRetries + 1,
+                        attempt < maxSceneRetries && !Thread.currentThread().isInterrupted(),
+                        NodeExecutionLogger.summarize(e.getMessage()));
             }
         }
         throw new IllegalStateException("Visual storyboard scene generation failed: " + node.getStep()

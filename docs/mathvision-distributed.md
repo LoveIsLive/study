@@ -41,7 +41,7 @@ WHERE status = 'running' AND lock_token IS NULL;
 - `scripts/deploy-master.sh`：构建前端并整合到主服务 JAR，强制关闭主进程的 MathVision 调度。
 - `scripts/deploy-mathvision-worker.sh`：只构建后端 Worker，准备 Python/Manim/Chromium，启动无 Web 的执行端。
 
-保留原脚本的分支参数和低优先级构建设置。两份脚本均先构建、检查，再停止旧进程；通过启动类精确选择 JAR，启动失败时尝试恢复旧 JAR。源码从远程提交导出到临时目录构建，不执行 `git reset --hard`，也不会清空正在运行的 `target`。
+保留原脚本的分支参数和低优先级构建设置。完成必要的参数与依赖预检、取得部署锁后，脚本会先识别并停止本部署的旧进程，再拉取源码、构建和运行冒烟检查；启动失败或构建阶段失败时，尝试恢复先前的 JAR。主服务会等监听端口释放后再继续。通过启动类精确选择 JAR。源码从远程提交导出到临时目录构建，不执行 `git reset --hard`，也不会清空正在运行的 `target`。
 
 主服务器脚本默认检查 `8080` 监听端口并主动停止能够确认属于本部署的旧 Study 进程，可通过 `APP_PORT` 覆盖。如果端口被其他未知进程占用，脚本会报告 PID 并停止部署，避免误杀；Worker 不监听并处理主服务端口。
 
@@ -169,6 +169,21 @@ location /internal/mathvision/ {
 ```
 
 按硬件设置并发，通过 systemd/cgroup 限制 Worker CPU、内存和进程数，并自动重启异常退出的 Worker。
+
+## Worker 执行日志
+
+默认 INFO 级别即可查看任务领取、阶段执行路径（初始生成／自动编辑／智能检查）、Node 开始与结束、逐场景进度、模型请求与重试、渲染修复路由、最终产物上传与提交。Node 执行超过 30 秒后，每 30 秒报告当前操作、耗时和 API 计数；上传和数据库提交等 Node 外的长步骤由阶段进度日志报告。该日志只说明执行尚未结束，数据库租约仍由独立的续租线程维护。
+
+通过 `taskId` 查询任务日志，结合 `version` 和 `execution`（本次执行令牌的前 8 位）区分不同版本与故障接管。`apiCalls` 统计实际模型 HTTP 请求次数，包含内部重试；`logicalRequests` 统计业务发起的模型请求次数；`resultApiCalls` 是节点返回的原有计数。阶段汇总仅统计本次领取执行，不包含历史阶段的调用。
+
+按默认脚本部署时，日志位于 `${PROJECT_BASE_DIR}/mathvision-worker/worker.log`（控制台输出）及 `${PROJECT_BASE_DIR}/mathvision-worker/logs/mathvision-workflow.log`（MathVision 专用滚动日志）。自定义 `APP_WORK_DIR`、`APP_LOG`、`LOG_DIR` 时以实际路径为准。例如：
+
+```bash
+tail -F /www/server/java_project/mathvision-worker/logs/mathvision-workflow.log
+grep 'taskId=5,' /www/server/java_project/mathvision-worker/logs/mathvision-workflow.log
+```
+
+失败日志包含错误类型、原因和重试信息；取消、执行权失效、网络异常导致本地执行停止也会记录。默认进度日志不输出 Prompt、模型响应正文或认证请求头，错误摘要中的常见认证字段会脱敏。需要完整 AI 诊断时，仍使用原有的 `workflow.aiTraceEnabled` 配置与独立 trace 日志。
 
 ## 并发与恢复语义
 

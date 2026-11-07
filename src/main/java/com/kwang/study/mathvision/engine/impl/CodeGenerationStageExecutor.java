@@ -169,6 +169,8 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
             }
             CodeFixRequest fixRequest = buildEvaluationFixRequest(
                     bundle, narrative, codeResult, latestEvaluation, fixTrace);
+            log.info("MathVision 代码检查路由修复, taskId={}, evaluationAttempt={}, maxFixAttempts={}",
+                    task.getId(), evaluationAttempt, maxCodeEvaluationFixAttempts);
             CodeFixNode.Result fixNodeResult = NodeExecutionLogger.execute(
                     task.getId(),
                     stage().getCode(),

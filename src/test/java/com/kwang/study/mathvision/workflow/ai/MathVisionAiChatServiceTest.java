@@ -13,6 +13,7 @@ import com.kwang.study.mathvision.util.ApiKeyCipher;
 import com.kwang.study.mathvision.workflow.model.AiContentPart;
 import com.kwang.study.mathvision.workflow.model.AiMessage;
 import com.kwang.study.mathvision.workflow.prompt.ToolSchemas;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -22,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -369,6 +371,26 @@ class MathVisionAiChatServiceTest {
                 List.of(AiMessage.user(List.of(AiContentPart.text("Fix the Manim runtime error.")))),
                 ToolSchemas.MANIM_CODE,
                 List.of("manimCode"));
+    }
+
+    @Test
+    void stageMetricsIncludeHttpTimeoutRetryWithoutCountingAnotherLogicalRequest() throws Exception {
+        catalogModel.setRequestTimeoutSeconds(1);
+        catalogModel.setTimeoutRetryAttempts(1);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
+                .thenThrow(new HttpTimeoutException("request timed out"))
+                .thenReturn(plainContentOpenAiResponse("ok"));
+
+        try (NodeExecutionLogger.StageScope stage = NodeExecutionLogger.stage(task.getId(), "reasoning_graph", 1, "12345678-test")) {
+            String result = NodeExecutionLogger.execute(task.getId(), "reasoning_graph", "ExplorationNode",
+                    () -> service.requestText(task, List.of(AiMessage.user(List.of(AiContentPart.text("hello")))), null, List.of()),
+                    ignored -> 1);
+            assertEquals("ok", result);
+            assertTrue(stage.summary().contains("apiCalls=2"));
+            assertTrue(stage.summary().contains("logicalRequests=1"));
+        }
+        verifySends(2);
+        assertEquals("-", NodeExecutionLogger.context());
     }
 
     @SafeVarargs

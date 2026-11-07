@@ -176,6 +176,13 @@ class DeploymentScriptsTest(unittest.TestCase):
             '[[ "$(listener_pids)" == 4321 ]]',
         ]))
 
+    def test_listener_parser_handles_an_idle_port_under_pipefail(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080',
+            'ss() { return 0; }',
+            '[[ -z "$(listener_pids)" ]]',
+        ]))
+
     def test_master_refuses_port_when_ss_hides_listener_pid(self):
         self.run_shell("deploy-master.sh", '\n'.join([
             'ROLE=master; APP_PORT=8080; PID_FILE="$ROOT/no-pid"; STATE_DIR="$ROOT/state"; OLD_PID=""; OLD_JAR=""',
@@ -206,6 +213,36 @@ class DeploymentScriptsTest(unittest.TestCase):
             'jar_from_args /usr/bin/java -jar "$ROOT/study/target/study.jar" >/dev/null',
             'if jar_from_args /usr/bin/java -jar "$ROOT/study/target/study-mathvision-worker.jar"; then exit 15; fi',
         ]))
+
+    def test_legacy_worker_process_is_recognized_without_deployment_tags(self):
+        self.run_shell("deploy-mathvision-worker.sh", '\n'.join([
+            'BACKEND_PROJECT_PATH="$ROOT/study-worker"',
+            'jar_from_args /usr/bin/java -jar "$ROOT/study-worker/target/study-0.0.1-SNAPSHOT-mathvision-worker.jar" >/dev/null',
+            'if jar_from_args /usr/bin/java -jar "$ROOT/study-worker/target/study-0.0.1-SNAPSHOT.jar"; then exit 15; fi',
+        ]), role="worker")
+
+    def test_previous_service_is_stopped_and_released_before_deployment(self):
+        self.run_shell("deploy-master.sh", '\n'.join([
+            'ROLE=master; APP_PORT=8080; STOP_TIMEOUT=2; OLD_PID=""; OLD_JAR=""; OLD_STOPPED=0',
+            'find_old_process() { OLD_PID=4321; OLD_JAR="$ROOT/previous.jar"; }',
+            'stop_process() { printf "stop:%s\\n" "$1" >> "$ROOT/events"; }',
+            'wait_for_port_release() { printf "port-released\\n" >> "$ROOT/events"; }',
+            'stop_previous_service',
+            'printf "snapshot\\n" >> "$ROOT/events"',
+            '[[ "$OLD_STOPPED" == 1 && "$(< "$ROOT/events")" == $\'stop:4321\\nport-released\\nsnapshot\' ]]',
+        ]))
+
+    def test_main_stops_existing_service_before_source_snapshot_and_build(self):
+        for script in ("deploy-master.sh", "deploy-mathvision-worker.sh"):
+            with self.subTest(script=script):
+                body = (SCRIPTS / script).read_text(encoding="utf-8").split("main() {", 1)[1]
+                self.assertLess(body.index("prepare_build"), body.index("stop_previous_service"))
+                stop_index = body.index("stop_previous_service")
+                self.assertLess(stop_index, body.index("snapshot_repository"))
+                self.assertLess(stop_index, body.index("build_backend"))
+                if script.endswith("worker.sh"):
+                    self.assertLess(stop_index, body.index("prepare_python"))
+                    self.assertLess(stop_index, body.index("prepare_playwright"))
 
     def test_cleanup_only_removes_own_build_snapshot(self):
         self.run_shell("deploy-master.sh", '\n'.join([

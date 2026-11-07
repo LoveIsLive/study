@@ -11,6 +11,7 @@ import com.kwang.study.mathvision.workflow.render.ManimRenderService;
 import com.kwang.study.mathvision.workflow.util.ErrorSummarizer;
 import com.kwang.study.mathvision.workflow.util.GeoGebraCodeUtils;
 import com.kwang.study.mathvision.workflow.util.ManimCodeUtils;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -49,14 +50,24 @@ public class RenderNode {
         }
         RenderRetryState effectiveRetryState = retryState != null ? retryState : new RenderRetryState();
         effectiveRetryState.prepareAttempt();
+        NodeExecutionLogger.progress(codeResult.isGeoGebraTarget() ? "GeoGebra 浏览器渲染验证" : "Manim 渲染视频（含语音合成）");
+        log.info("MathVision 渲染开始, taskId={}, target={}, attempt={}, maxAttempts={}, quality={}",
+                task.getId(), codeResult.isGeoGebraTarget() ? "geogebra" : "manim",
+                effectiveRetryState.getAttempts() + 1, Math.max(maxRenderRetries, 0) + 1, renderQuality);
         RenderResult renderResult = codeResult.isGeoGebraTarget()
                 ? renderGeoGebraPreview(codeResult, narrative, effectiveRetryState, maxRenderRetries, outputDir, context)
                 : renderManim(codeResult, effectiveRetryState, renderQuality, maxRenderRetries, outputDir);
         if (context != null) {
             context.checkCanceled();
         }
-        log.debug("MathVision RenderNode 执行完成, taskId={}, success={}, artifactPath={}",
-                task.getId(), renderResult.isSuccess(), renderResult.getArtifactPath());
+        if (renderResult.isSuccess()) {
+            log.info("MathVision 渲染成功, taskId={}, attempts={}, executionSeconds={}, artifactPath={}",
+                    task.getId(), renderResult.getAttempts(), renderResult.getExecutionTimeSeconds(), renderResult.getArtifactPath());
+        } else {
+            log.warn("MathVision 渲染失败, taskId={}, attempts={}, executionSeconds={}, requestCodeFix={}, reason={}",
+                    task.getId(), renderResult.getAttempts(), renderResult.getExecutionTimeSeconds(),
+                    effectiveRetryState.isRequestFix(), NodeExecutionLogger.summarize(renderResult.getLastError()));
+        }
         return new Result(renderResult, 0);
     }
 

@@ -28,6 +28,7 @@ import com.kwang.study.mathvision.workflow.prompt.ToolSchemas;
 import com.kwang.study.mathvision.workflow.util.CoordinateBoundsUtils;
 import com.kwang.study.mathvision.workflow.util.GeoGebraCodeUtils;
 import com.kwang.study.mathvision.workflow.util.ManimCodeUtils;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import com.kwang.study.mathvision.workflow.util.ProblemBundleContextBuilder;
 import com.kwang.study.mathvision.workflow.util.SceneModeUtils;
 import com.kwang.study.mathvision.workflow.util.StoryboardConstraintCatalog;
@@ -109,7 +110,7 @@ public class CodeGenerationNode {
         PerSceneDraft perSceneDraft = null;
 
         if (resolvedRequest.isUserRevision()) {
-            log.debug("MathVision CodeGeneration complete-code revision, taskId={}, target={}",
+            log.info("MathVision CodeGeneration complete-code revision, taskId={}, target={}",
                     task.getId(), outputTarget);
             SingleSceneDraft draft = reviseCompleteCode(
                     task, baseMessages, narrative, outputTarget, resolvedRequest, context, apiCalls);
@@ -123,7 +124,7 @@ public class CodeGenerationNode {
                         ? "Complete GeoGebra construction revised from existing generated code"
                         : "Complete Manim animation revised from existing generated code");
         } else if (multiScene) {
-            log.debug("MathVision CodeGeneration 逐场景生成, taskId={}, scenes={}, target={}",
+            log.info("MathVision CodeGeneration 逐场景生成, taskId={}, scenes={}, target={}",
                     task.getId(), storyboard.getScenes().size(), outputTarget);
             perSceneDraft = generatePerScene(
                     task, baseMessages, storyboard, isGeoGebra, sceneMode, context, apiCalls);
@@ -132,6 +133,7 @@ public class CodeGenerationNode {
                     ? "Per-scene GeoGebra construction generated from approved storyboard"
                     : "Per-scene Manim animation generated from approved storyboard";
         } else {
+            log.info("MathVision CodeGeneration 单次生成, taskId={}, target={}", task.getId(), outputTarget);
             SingleSceneDraft draft = generateSingleScene(
                     task, baseMessages, narrative, outputTarget, context, apiCalls);
             generatedCode = draft.code;
@@ -302,6 +304,10 @@ public class CodeGenerationNode {
             }
             StoryboardScene scene = scenes.get(i);
             String sceneName = sceneNames.get(i);
+            long sceneStarted = System.nanoTime();
+            NodeExecutionLogger.progress("生成代码场景 " + (i + 1) + "/" + scenes.size());
+            log.info("MathVision 代码场景开始, taskId={}, scene={}/{}, sceneId={}",
+                    task.getId(), i + 1, scenes.size(), scene.getSceneId());
             String sceneJson;
             try {
                 sceneJson = StoryboardJsonBuilder.buildSceneForCodegen(
@@ -350,6 +356,9 @@ public class CodeGenerationNode {
                     sceneName,
                     sceneCode,
                     false));
+            log.info("MathVision 代码场景完成, taskId={}, scene={}/{}, sceneId={}, durationMs={}, codeChars={}",
+                    task.getId(), i + 1, scenes.size(), scene.getSceneId(),
+                    (System.nanoTime() - sceneStarted) / 1_000_000L, sceneCode.length());
         }
 
         String generatedCode = isGeoGebra

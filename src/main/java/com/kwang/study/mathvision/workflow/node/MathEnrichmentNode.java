@@ -15,6 +15,9 @@ import com.kwang.study.mathvision.workflow.prompt.EnrichmentPrompts;
 import com.kwang.study.mathvision.workflow.prompt.SystemPrompts;
 import com.kwang.study.mathvision.workflow.prompt.ToolSchemas;
 import com.kwang.study.mathvision.workflow.util.TargetDescriptionBuilder;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -25,6 +28,7 @@ import java.util.Map;
 
 @Component
 public class MathEnrichmentNode {
+    private static final Logger log = LoggerFactory.getLogger(MathEnrichmentNode.class);
 
     private static final int ROLLING_CONTEXT_ROUNDS = 10;
 
@@ -92,13 +96,17 @@ public class MathEnrichmentNode {
             messages.add(AiMessage.user(List.of(AiContentPart.text(userPrompt))));
 
             try {
+                log.info("MathVision 数学推导补全开始, taskId={}, step={}/{}", task.getId(), i + 1, teachingNodes.size());
                 JsonNode payload = aiChatService.requestJson(task, messages, ToolSchemas.MATH_ENRICHMENT);
                 apiCalls++;
                 applyEnrichment(node, payload);
                 appendRollingTurn(rollingTurns, userPrompt, toPrettyJson(payload));
                 enrichedCount++;
+                log.info("MathVision 数学推导补全完成, taskId={}, step={}/{}", task.getId(), i + 1, teachingNodes.size());
             } catch (RuntimeException e) {
                 skippedCount++;
+                log.warn("MathVision 数学推导补全失败，保留原步骤, taskId={}, step={}/{}, reason={}",
+                        task.getId(), i + 1, teachingNodes.size(), NodeExecutionLogger.summarize(e.getMessage()));
             }
             context.checkCanceled();
         }

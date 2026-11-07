@@ -20,6 +20,8 @@ import com.kwang.study.mathvision.workflow.prompt.ProblemNormalizationPrompts;
 import com.kwang.study.mathvision.workflow.prompt.SystemPrompts;
 import com.kwang.study.mathvision.workflow.prompt.ToolSchemas;
 import com.kwang.study.mathvision.workflow.util.SceneModeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -31,6 +33,7 @@ import java.util.List;
 
 @Component
 public class ProblemNormalizationNode {
+    private static final Logger log = LoggerFactory.getLogger(ProblemNormalizationNode.class);
 
     private static final int TEXT_ATTACHMENT_LIMIT_BYTES = 200_000;
 
@@ -72,6 +75,8 @@ public class ProblemNormalizationNode {
         }
 
         context.checkCanceled();
+        log.info("MathVision 题目标准化生成初稿, taskId={}, sourceType={}, imageCount={}",
+                task.getId(), sourcePayload.source.getSourceType(), sourcePayload.imageParts.size());
         JsonNode normalizedPayload = aiChatService.requestJson(
                 task,
                 buildNormalizationMessages(task.getOutputTarget(), sourcePayload, resolvedRequest),
@@ -80,6 +85,7 @@ public class ProblemNormalizationNode {
         ProblemBundle generated = parseProblemBundle(normalizedPayload, sourcePayload.source);
 
         context.checkCanceled();
+        log.info("MathVision 题目标准化复核初稿, taskId={}", task.getId());
         JsonNode reviewedPayload = aiChatService.requestJson(
                 task,
                 buildReviewMessages(task.getOutputTarget(), sourcePayload, generated, resolvedRequest),

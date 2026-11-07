@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -89,8 +90,8 @@ public class ManimRenderService {
             boolean voiceoverCode = containsVoiceoverCode(manimCode);
             List<String> command = buildCommand(
                     codeFile, effectiveSceneName, quality, outputDir, voiceoverCode);
-            log.debug("MathVision Manim 渲染开始, sceneName={}, quality={}, timeout={}min, codeLines={}, scenes={}, outputDir={}",
-                    effectiveSceneName, quality, timeoutBudget.timeoutMinutes(),
+            log.info("MathVision Manim 进程启动, context=[{}], sceneName={}, quality={}, timeoutMinutes={}, codeLines={}, scenes={}, outputDir={}",
+                    NodeExecutionLogger.context(), effectiveSceneName, quality, timeoutBudget.timeoutMinutes(),
                     timeoutBudget.codeLines(), timeoutBudget.sceneCount(),
                     outputDir.toAbsolutePath().normalize());
             Process process = startProcess(command, outputDir,

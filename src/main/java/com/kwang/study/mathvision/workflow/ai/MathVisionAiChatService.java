@@ -866,6 +866,7 @@ public class MathVisionAiChatService {
                                        int timeoutAttempt,
                                        int timeoutSeconds) {
         int requestAttempt = transientAttempt + rateLimitAttempt + timeoutAttempt + 1;
+        long startedNanos = System.nanoTime();
         try {
             throwIfInterrupted();
             if (aiTraceEnabled()) {
@@ -880,8 +881,15 @@ public class MathVisionAiChatService {
             customizer.apply(builder);
             HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(jsonBody)).build();
             NodeExecutionLogger.recordHttpAttempt();
+            NodeExecutionLogger.progress("等待模型响应，attempt=" + requestAttempt + "，timeoutSeconds=" + timeoutSeconds);
+            log.info("MathVision AI 请求开始, taskId={}, context=[{}], provider={}, model={}, attempt={}, timeoutSeconds={}",
+                    runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model, requestAttempt, timeoutSeconds);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             throwIfInterrupted();
+            NodeExecutionLogger.progress("解析模型响应");
+            log.info("MathVision AI 收到响应, taskId={}, context=[{}], provider={}, model={}, attempt={}, http={}, durationMs={}",
+                    runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model,
+                    requestAttempt, response.statusCode(), Duration.ofNanos(System.nanoTime() - startedNanos).toMillis());
             if (aiTraceEnabled()) {
                 MathVisionAiTraceLogger.logResponse(
                         runtime.taskId, runtime.providerCode, runtime.model,
@@ -894,18 +902,24 @@ public class MathVisionAiChatService {
             }
             if (isRateLimitStatusCode(response.statusCode())
                     && rateLimitAttempt < rateLimitRetries(runtime)) {
-                sleep(rateLimitDelayMillis(runtime, rateLimitAttempt, retryAfterHeader(response.headers())));
+                long delay = rateLimitDelayMillis(runtime, rateLimitAttempt, retryAfterHeader(response.headers()));
+                logRetry(runtime, requestAttempt, "HTTP " + response.statusCode(), delay, timeoutSeconds);
+                sleep(delay);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt, rateLimitAttempt + 1, timeoutAttempt, timeoutSeconds);
             }
             if (isRetryableStatusCode(response.statusCode())
                     && transientAttempt < transientFailureRetries(runtime)) {
-                sleep(transientRetryDelayMillis(runtime, transientAttempt));
+                long delay = transientRetryDelayMillis(runtime, transientAttempt);
+                logRetry(runtime, requestAttempt, "HTTP " + response.statusCode(), delay, timeoutSeconds);
+                sleep(delay);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt + 1, rateLimitAttempt, timeoutAttempt, timeoutSeconds);
             }
             throw new AiHttpException(response.statusCode(), response.body());
         } catch (AiHttpException e) {
+            log.warn("MathVision AI 请求失败, taskId={}, context=[{}], provider={}, model={}, attempt={}, http={}",
+                    runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model, requestAttempt, e.statusCode);
             if (aiTraceEnabled()) {
                 MathVisionAiTraceLogger.logFailure(
                         runtime.taskId, runtime.providerCode, runtime.model, requestAttempt, e);
@@ -920,28 +934,46 @@ public class MathVisionAiChatService {
                 // HttpClient.send clears the interrupt flag when it is interrupted.
                 // Restore it so StageRunner can classify this as task cancellation.
                 Thread.currentThread().interrupt();
+                log.info("MathVision AI 请求已中断, taskId={}, context=[{}], attempt={}",
+                        runtime.taskId, NodeExecutionLogger.context(), requestAttempt);
                 throw new IllegalStateException("AI request canceled", e);
             }
             if (isTimeoutFailure(e) && timeoutAttempt < timeoutRetryAttempts(runtime)) {
                 throwIfInterrupted();
                 int nextTimeoutSeconds = nextTimeoutSeconds(runtime, timeoutSeconds);
+                logRetry(runtime, requestAttempt, "请求超时: " + e.getClass().getSimpleName(), 0, nextTimeoutSeconds);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt, rateLimitAttempt, timeoutAttempt + 1, nextTimeoutSeconds);
             }
             if (isRateLimitFailure(e) && rateLimitAttempt < rateLimitRetries(runtime)) {
                 throwIfInterrupted();
-                sleep(rateLimitDelayMillis(runtime, rateLimitAttempt, Optional.empty()));
+                long delay = rateLimitDelayMillis(runtime, rateLimitAttempt, Optional.empty());
+                logRetry(runtime, requestAttempt, "限流: " + e.getClass().getSimpleName(), delay, timeoutSeconds);
+                sleep(delay);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt, rateLimitAttempt + 1, timeoutAttempt, timeoutSeconds);
             }
             if (isRetryableTransportFailure(e) && transientAttempt < transientFailureRetries(runtime)) {
                 throwIfInterrupted();
-                sleep(transientRetryDelayMillis(runtime, transientAttempt));
+                long delay = transientRetryDelayMillis(runtime, transientAttempt);
+                logRetry(runtime, requestAttempt, "网络异常: " + e.getClass().getSimpleName(), delay, timeoutSeconds);
+                sleep(delay);
                 return postJsonWithRetry(runtime, url, jsonBody, customizer,
                         transientAttempt + 1, rateLimitAttempt, timeoutAttempt, timeoutSeconds);
             }
+            log.warn("MathVision AI 请求失败, taskId={}, context=[{}], provider={}, model={}, attempt={}, durationMs={}, errorType={}, reason={}",
+                    runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model, requestAttempt,
+                    Duration.ofNanos(System.nanoTime() - startedNanos).toMillis(), e.getClass().getSimpleName(),
+                    NodeExecutionLogger.summarize(e.getMessage()));
             throw new IllegalStateException("AI API call failed: " + e.getMessage(), e);
         }
+    }
+
+    private void logRetry(AiRuntime runtime, int attempt, String reason, long delayMillis, int nextTimeoutSeconds) {
+        NodeExecutionLogger.progress("等待模型重试，delayMillis=" + delayMillis + "，nextAttempt=" + (attempt + 1));
+        log.warn("MathVision AI 准备重试, taskId={}, context=[{}], provider={}, model={}, attempt={}, nextAttempt={}, delayMillis={}, nextTimeoutSeconds={}, reason={}",
+                runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model, attempt,
+                attempt + 1, delayMillis, nextTimeoutSeconds, reason);
     }
 
     private ArrayNode openAiMessages(List<AiMessage> messages, boolean rawBase64ImageUrl) {

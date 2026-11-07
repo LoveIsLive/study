@@ -18,6 +18,11 @@ import org.junit.jupiter.api.Test;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -103,6 +108,93 @@ class NodeExecutionLoggerTest {
                 .contains("logicalRequests=1")
                 .contains("errorType=IllegalStateException")
                 .contains("error=validation failed with detail");
+    }
+
+    @Test
+    void reportsProgressAndCountsActualRequestsAcrossNodesWithoutLeakingStageContext() {
+        try (NodeExecutionLogger.StageScope stage = NodeExecutionLogger.stage(44L, "render_result", 3, "12345678-private-token")) {
+            NodeExecutionLogger.execute(44L, "render_result", "CodeFixNode", () -> {
+                NodeExecutionLogger.recordLogicalRequest();
+                NodeExecutionLogger.recordHttpAttempt();
+                NodeExecutionLogger.recordHttpAttempt();
+                NodeExecutionLogger.progress("等待模型响应");
+                NodeExecutionLogger.reportProgress();
+                return "ok";
+            }, ignored -> 1);
+            NodeExecutionLogger.execute(44L, "render_result", "RenderNode", () -> "ok", ignored -> 0);
+            assertThat(stage.summary()).contains("nodes=2", "apiCalls=2", "logicalRequests=1");
+            NodeExecutionLogger.progress("等待主服务归档最终产物");
+            NodeExecutionLogger.reportProgress();
+            assertThat(appender.joinedMessages()).contains("阶段执行中", "operation=等待主服务归档最终产物");
+        }
+
+        assertThat(NodeExecutionLogger.context()).isEqualTo("-");
+        String before = appender.joinedMessages();
+        NodeExecutionLogger.reportProgress();
+        assertThat(appender.joinedMessages()).isEqualTo(before)
+                .contains("Node 执行中", "operation=等待模型响应", "version=3", "execution=12345678")
+                .doesNotContain("private-token");
+        try (NodeExecutionLogger.StageScope next = NodeExecutionLogger.stage(45L, "problem_normalization", 1, "abcdefgh")) {
+            assertThat(next.summary()).contains("nodes=0", "apiCalls=0", "logicalRequests=0");
+        }
+    }
+
+    @Test
+    void cleansNodeAndStageContextAfterFailure() {
+        assertThatThrownBy(() -> {
+            try (NodeExecutionLogger.StageScope stage = NodeExecutionLogger.stage(46L, "visual_storyboard", 1, "abcdefgh")) {
+                NodeExecutionLogger.execute(46L, "visual_storyboard", "VisualDesignNode", () -> {
+                    NodeExecutionLogger.recordHttpAttempt();
+                    throw new IllegalStateException("failed");
+                }, ignored -> 0);
+            }
+        }).isInstanceOf(IllegalStateException.class);
+        assertThat(NodeExecutionLogger.context()).isEqualTo("-");
+        String before = appender.joinedMessages();
+        NodeExecutionLogger.reportProgress();
+        assertThat(appender.joinedMessages()).isEqualTo(before);
+    }
+
+    @Test
+    void isolatesConcurrentWorkerExecutions() throws Exception {
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        try {
+            Future<String> first = workers.submit(() -> concurrentExecution(47L, "first-run", 1, ready));
+            Future<String> second = workers.submit(() -> concurrentExecution(48L, "other-run", 2, ready));
+            assertThat(first.get(5, TimeUnit.SECONDS)).contains("taskId=47", "execution=first-ru", "apiCalls=1");
+            assertThat(second.get(5, TimeUnit.SECONDS)).contains("taskId=48", "execution=other-ru", "apiCalls=2");
+        } finally {
+            workers.shutdownNow();
+        }
+    }
+
+    private String concurrentExecution(Long taskId, String token, int attempts, CountDownLatch ready) {
+        try (NodeExecutionLogger.StageScope stage = NodeExecutionLogger.stage(taskId, "code_generation", 1, token)) {
+            NodeExecutionLogger.execute(taskId, "code_generation", "CodeGenerationNode", () -> {
+                ready.countDown();
+                try {
+                    if (!ready.await(3, TimeUnit.SECONDS)) throw new IllegalStateException("Worker did not start");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+                for (int i = 0; i < attempts; i++) NodeExecutionLogger.recordHttpAttempt();
+                NodeExecutionLogger.reportProgress();
+                assertThat(NodeExecutionLogger.context()).contains("taskId=" + taskId);
+                return "ok";
+            }, ignored -> 1);
+            return stage.summary();
+        }
+    }
+
+    @Test
+    void redactsCredentialsWhileKeepingTheFailureReason() {
+        assertThat(NodeExecutionLogger.summarize(
+                "HTTP 401\nAuthorization: Bearer private-key, api_key=another-key, "
+                        + "serviceSecret=secret-value, service-secret=other-secret, access_token=token-value"))
+                .contains("HTTP 401", "<redacted>")
+                .doesNotContain("private-key", "another-key", "secret-value", "other-secret", "token-value", "\n");
     }
 
     private static final class MemoryAppender extends AbstractAppender {

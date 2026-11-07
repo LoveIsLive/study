@@ -181,7 +181,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 maxTotalIterations);
 
         for (int iteration = 0; iteration < maxTotalIterations; iteration++) {
-            log.debug("MathVision render stage iteration started, taskId={}, iteration={}, renderAttempts={}, "
+            log.info("MathVision render stage iteration started, taskId={}, iteration={}, renderAttempts={}, "
                             + "renderFixToolCalls={}, sceneFixAttempts={}, codeLines={}",
                     task.getId(),
                     iteration + 1,
@@ -192,7 +192,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             boolean evaluatingStoredRender = evaluateExistingRender;
             if (evaluatingStoredRender) {
                 evaluateExistingRender = false;
-                log.debug("MathVision scene evaluation reuses stored render, taskId={}, iteration={}, artifactPath={}",
+                log.info("MathVision scene evaluation reuses stored render, taskId={}, iteration={}, artifactPath={}",
                         task.getId(), iteration + 1, renderResult.getArtifactPath());
             } else {
                 RenderNode.Result renderNodeResult = NodeExecutionLogger.execute(
@@ -212,7 +212,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         RenderNode.Result::getApiCalls);
                 renderResult = renderNodeResult.getRenderResult();
                 apiCalls += renderNodeResult.getApiCalls();
-                log.debug("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
+                log.info("MathVision render attempt result, taskId={}, iteration={}, success={}, attempts={}, "
                                 + "executionSeconds={}, artifactPath={}, geometryPath={}, requestFix={}, errorSignature={}",
                         task.getId(),
                         iteration + 1,
@@ -240,7 +240,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                 }
                 CodeFixRequest request = buildRenderFixRequest(
                         bundle, narrative, codeResult, renderResult, renderRetryState, fixTrace);
-                log.debug("MathVision routing render failure to CodeFix, taskId={}, iteration={}, attempts={}, "
+                log.info("MathVision routing render failure to CodeFix, taskId={}, iteration={}, attempts={}, "
                                 + "staticIssues={}, fixHistory={}, promptTokens~{}, errorSignature={}",
                         task.getId(),
                         iteration + 1,
@@ -265,7 +265,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         fixNodeResult.getAssistantTranscript(),
                         renderFixConversationRounds());
                 apiCalls += fixNodeResult.getApiCalls();
-                log.debug("MathVision render CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
+                log.info("MathVision render CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
                                 + "apiCalls={}, executionSeconds={}, postStaticIssues={}, failureReason={}",
                         task.getId(),
                         iteration + 1,
@@ -286,7 +286,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     }
                     break;
                 }
-                log.debug("MathVision render CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
+                log.info("MathVision render CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
                         task.getId(), iteration + 1, countNonBlankLines(codeResult.getGeneratedCode()));
                 continue;
             }
@@ -326,7 +326,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                     SceneEvaluationNode.Result::getApiCalls);
             sceneEvaluationResult = sceneNodeResult.getSceneEvaluationResult();
             apiCalls += sceneNodeResult.getApiCalls();
-            log.debug("MathVision scene evaluation result, taskId={}, iteration={}, approved={}, evaluated={}, "
+            log.info("MathVision scene evaluation result, taskId={}, iteration={}, approved={}, evaluated={}, "
                             + "revisionAttempts={}, totalIssues={}, blockingIssues={}, apiCalls={}, executionSeconds={}, reason={}",
                     task.getId(),
                     iteration + 1,
@@ -358,7 +358,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             }
 
             if (sceneEvaluationResult.isApproved()) {
-                log.debug("MathVision render stage scene evaluation approved, taskId={}, iteration={}",
+                log.info("MathVision render stage scene evaluation approved, taskId={}, iteration={}",
                         task.getId(), iteration + 1);
                 break;
             }
@@ -384,7 +384,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             if (StringUtils.hasText(request.getErrorReason())) {
                 sceneFixHistory.add(request.getErrorReason());
             }
-            log.debug("MathVision routing scene evaluation to CodeFix, taskId={}, iteration={}, sceneFixAttempt={}, "
+            log.info("MathVision routing scene evaluation to CodeFix, taskId={}, iteration={}, sceneFixAttempt={}, "
                             + "promptTokens~{}, issueSummary={}",
                     task.getId(),
                     iteration + 1,
@@ -402,7 +402,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             CodeFixResult fixResult = fixNodeResult.getFixResult();
             fixTrace.add(fixResult);
             apiCalls += fixNodeResult.getApiCalls();
-            log.debug("MathVision scene evaluation CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
+            log.info("MathVision scene evaluation CodeFix result, taskId={}, iteration={}, outcome={}, applied={}, "
                             + "apiCalls={}, executionSeconds={}, postStaticIssues={}, failureReason={}",
                     task.getId(),
                     iteration + 1,
@@ -429,7 +429,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
                         abbreviate(fixResult != null ? fixResult.getFailureReason() : null, 500));
                 break;
             }
-            log.debug("MathVision scene evaluation CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
+            log.info("MathVision scene evaluation CodeFix applied, taskId={}, iteration={}, newCodeLines={}",
                     task.getId(), iteration + 1, countNonBlankLines(codeResult.getGeneratedCode()));
         }
 

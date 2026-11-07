@@ -158,8 +158,7 @@ public class GeoGebraRenderService {
             }
 
             Files.writeString(validationPath, JsonUtils.toPrettyJson(report), StandardCharsets.UTF_8);
-            log.debug("GeoGebra preview generated: {}", previewPath);
-            log.debug("GeoGebra validation report generated: {}", validationPath);
+            log.info("GeoGebra preview generated: {}, validationReport={}", previewPath, validationPath);
 
             String normalizedPreviewPath = previewPath.toAbsolutePath().normalize().toString();
             String normalizedGeometryPath = Files.exists(geometryPath)

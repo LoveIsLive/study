@@ -117,12 +117,17 @@ public class MathVisionTaskScheduler {
                 if (current == null || !run.task.getLockToken().equals(current.getLockToken())
                         || !"running".equals(current.getStatus()) || Boolean.TRUE.equals(current.getCancelRequested())) {
                     run.fenced = true;
+                    log.info("MathVision 停止本地执行, taskId={}, stage={}, execution={}, reason={}",
+                            run.task.getId(), run.task.getCurrentStage(), run.task.getLockToken().substring(0, 8),
+                            current != null && Boolean.TRUE.equals(current.getCancelRequested()) ? "用户取消" : "任务状态或执行权已变化");
                     registry.interrupt(run.task.getId(), run.task.getLockToken()); continue;
                 }
                 int heartbeat = Math.max(1, Math.min(c.getHeartbeatSeconds(), Math.max(30, c.getLeaseSeconds()) / 3));
                 if (now - run.renewed >= TimeUnit.SECONDS.toNanos(heartbeat)) {
                     if (tasks.renewLease(run.task.getId(), run.task.getLockToken(), Math.max(30, c.getLeaseSeconds())) != 1) {
                         run.fenced = true;
+                        log.warn("MathVision 续租失败，停止本地执行, taskId={}, stage={}, execution={}",
+                                run.task.getId(), run.task.getCurrentStage(), run.task.getLockToken().substring(0, 8));
                         registry.interrupt(run.task.getId(), run.task.getLockToken());
                     }
                     run.renewed = now;
@@ -130,7 +135,9 @@ public class MathVisionTaskScheduler {
             } catch (Exception e) {
                 run.fenced = true;
                 registry.interrupt(run.task.getId(), run.task.getLockToken());
-                log.warn("MathVision lease monitor unavailable; stopping local execution, taskId={}", run.task.getId());
+                log.warn("MathVision lease monitor unavailable; stopping local execution, taskId={}, stage={}, errorType={}, reason={}",
+                        run.task.getId(), run.task.getCurrentStage(), e.getClass().getSimpleName(),
+                        com.kwang.study.mathvision.workflow.util.NodeExecutionLogger.summarize(e.getMessage()));
             }
         }
     }

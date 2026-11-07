@@ -12,6 +12,7 @@ import com.kwang.study.mathvision.pojo.MathVisionVersion;
 import com.kwang.study.mathvision.service.MathVisionTaskNotifier;
 import com.kwang.study.mathvision.service.MathVisionWorkflowSummaryService;
 import com.kwang.study.mathvision.workflow.model.StageGenerationMode;
+import com.kwang.study.mathvision.workflow.util.NodeExecutionLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -86,6 +87,10 @@ public class MathVisionStageRunner {
             finishFailure(task, "workflow_error", "当前阶段不可运行");
             return;
         }
+        NodeExecutionLogger.StageScope stageLog = NodeExecutionLogger.stage(
+                taskId, stage.getCode(), task.getCurrentVersion(), task.getLockToken());
+        log.info("MathVision 阶段开始执行, {}, mode={}, outputTarget={}",
+                stageLog.summary(), task.getMode(), task.getOutputTarget());
         try {
             commits.check(task);
             MathVisionStageExecutor executor = executorRegistry.find(stage)
@@ -98,8 +103,9 @@ public class MathVisionStageRunner {
             UserRevisionContext revisionContext = qualityReviewRequested
                     ? null
                     : resolveUserRevisionContext(task, stage);
-            log.info("MathVision 阶段开始执行, taskId={}, stage={}, mode={}, currentVersion={}",
-                    taskId, stage.getCode(), task.getMode(), task.getCurrentVersion());
+            log.info("MathVision 阶段执行路径, {}, operation={}", NodeExecutionLogger.context(),
+                    qualityReviewRequested ? "智能检查" : revisionContext != null ? "自动编辑" : "初始生成");
+            NodeExecutionLogger.progress("执行阶段节点");
             MathVisionStageExecutionContext context = MathVisionStageExecutionContext.builder()
                     .task(task)
                     .stage(stage)
@@ -118,6 +124,10 @@ public class MathVisionStageRunner {
                     .build();
             MathVisionStageExecutionResult result = executor.execute(context);
             commits.check(task);
+            NodeExecutionLogger.progress("提交阶段产物与执行状态");
+            log.info("MathVision 阶段产物准备提交, {}, failed={}, waitForUserDecision={}",
+                    stageLog.summary(), result != null && result.isFailed(),
+                    result != null && result.isWaitForUserDecision());
             Runnable writes = () -> {
                 if (result != null && result.getFinalRenderedCode() != null) {
                     receipts.verify(task, result.getFinalRenderedCode().getArtifactReceipt(),
@@ -144,18 +154,29 @@ public class MathVisionStageRunner {
                 refreshWorkflowSummary(taskId);
             };
             if (commitRetry != null) commitRetry.commit(task, writes); else commits.commit(task, false, writes);
+            if (result != null && result.isFailed()) {
+                log.warn("MathVision 阶段失败并已提交状态, {}, errorType={}, reason={}",
+                        stageLog.summary(), result.getErrorType(), NodeExecutionLogger.summarize(result.getErrorMessage()));
+            } else {
+                log.info("MathVision 阶段完成并已提交, {}", stageLog.summary());
+            }
             if (result != null && result.getCommittedCleanup() != null) {
                 try { result.getCommittedCleanup().run(); }
                 catch (Exception cleanup) { log.warn("MathVision committed workspace cleanup failed, taskId={}", taskId); }
             }
         } catch (MathVisionLeaseLostException e) {
-            log.info("MathVision stale execution discarded, taskId={}, stage={}", taskId, stage.getCode());
+            log.info("MathVision 执行已失去租约，丢弃本次结果, {}", stageLog.summary());
         } catch (Exception e) {
             // An interrupt can mean shutdown, lost lease, or cancellation. Read the database first.
             boolean interrupted = Thread.interrupted();
             try {
                 commits.check(task);
-                if (interrupted) return; // shutdown/monitor failure: leave the lease for safe takeover
+                if (interrupted) {
+                    log.info("MathVision 阶段已中断，保留租约等待接管, {}", stageLog.summary());
+                    return; // shutdown/monitor failure: leave the lease for safe takeover
+                }
+                log.warn("MathVision 阶段执行异常, {}, errorType={}, reason={}",
+                        stageLog.summary(), e.getClass().getSimpleName(), NodeExecutionLogger.summarize(e.getMessage()));
                 finishFailure(task, resolveErrorType(stage), trimMessage(e.getMessage()));
             } catch (MathVisionTaskCanceledException canceled) {
                 try {
@@ -164,14 +185,19 @@ public class MathVisionStageRunner {
                         refreshWorkflowSummary(taskId);
                         taskNotifier.notifyTaskChanged(taskId, "canceled");
                     });
+                    log.info("MathVision 阶段取消完成, {}", stageLog.summary());
                 } catch (MathVisionLeaseLostException ignored) {
                     log.info("MathVision canceled execution already superseded, taskId={}", taskId);
                 }
             } catch (MathVisionLeaseLostException lost) {
                 log.info("MathVision failed execution already superseded, taskId={}", taskId);
             } catch (Exception unavailable) {
-                log.warn("MathVision result cannot be committed; lease will expire, taskId={}: {}", taskId, unavailable.getMessage());
+                log.warn("MathVision result cannot be committed; lease will expire, {}, errorType={}, reason={}",
+                        stageLog.summary(), unavailable.getClass().getSimpleName(),
+                        NodeExecutionLogger.summarize(unavailable.getMessage()));
             }
+        } finally {
+            stageLog.close();
         }
     }
 
@@ -182,7 +208,7 @@ public class MathVisionStageRunner {
             taskNotifier.notifyTaskChanged(task.getId(), "failed");
         });
         log.warn("MathVision stage failed, taskId={}, stage={}, errorType={}, reason={}",
-                task.getId(), task.getCurrentStage(), errorType, message);
+                task.getId(), task.getCurrentStage(), errorType, NodeExecutionLogger.summarize(message));
     }
 
     private void refreshWorkflowSummary(Long taskId) {

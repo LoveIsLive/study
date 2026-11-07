@@ -179,8 +179,11 @@ jar_from_args() {
         if [[ "${args[index]}" == -jar && $((index + 1)) -lt ${#args[@]} ]]; then jar="${args[index+1]}"; fi
     done
     if [[ "$tagged" == 1 && "$rooted" == 1 && -n "$jar" ]]; then printf '%s\n' "$jar"; return; fi
-    # Migration from the old master script: never accept a worker JAR.
+    # Migration from the untagged master and worker deployment scripts.
     if [[ "$has_role" == 0 && "$ROLE" == master && "$jar" == "$BACKEND_PROJECT_PATH"/target/*.jar && "$jar" != *-mathvision-worker.jar ]]; then
+        printf '%s\n' "$jar"; return
+    fi
+    if [[ "$has_role" == 0 && "$ROLE" == worker && "$jar" == "$BACKEND_PROJECT_PATH"/target/*-mathvision-worker.jar ]]; then
         printf '%s\n' "$jar"; return
     fi
     return 1
@@ -197,9 +200,7 @@ owned_jar() {
 listener_pids() {
     [[ -n "${APP_PORT:-}" ]] || return 0
     ss -H -ltnp 2>/dev/null \
-        | awk -v port=":$APP_PORT" '$4 ~ (port "$") { print $NF }' \
-        | grep -oE 'pid=[0-9]+' \
-        | cut -d= -f2 \
+        | awk -v port=":$APP_PORT" '$4 ~ (port "$") { line=$0; while (match(line, /pid=[0-9]+/)) { print substr(line, RSTART + 4, RLENGTH - 4); line=substr(line, RSTART + RLENGTH) } }' \
         | sort -u
 }
 
@@ -247,10 +248,14 @@ find_old_process() {
 
 stop_process() {
     local pid="$1" elapsed=0 group
+    if ! kill -0 "$pid" 2>/dev/null; then
+        rm -f -- "$PID_FILE"
+        return 0
+    fi
     owned_jar "$pid" >/dev/null || return 1
-    group="$(ps -o pgid= -p "$pid")"; group="${group//[[:space:]]/}"
+    group="$(ps -o pgid= -p "$pid" 2>/dev/null || true)"; group="${group//[[:space:]]/}"
     log "停止 $ROLE 进程 PID=$pid"
-    kill -TERM "$pid"
+    kill -TERM "$pid" 2>/dev/null || ! kill -0 "$pid" 2>/dev/null
     while kill -0 "$pid" 2>/dev/null && (( elapsed < STOP_TIMEOUT )); do sleep 1; elapsed=$((elapsed + 1)); done
     if kill -0 "$pid" 2>/dev/null; then
         log "优雅停止超时，终止已校验的 $ROLE 进程。"
@@ -259,6 +264,29 @@ stop_process() {
         kill -TERM -- "-$pid" 2>/dev/null || true
     fi
     rm -f -- "$PID_FILE"
+}
+
+wait_for_port_release() {
+    [[ "$ROLE" == master ]] || return 0
+    local elapsed=0
+    while port_listening; do
+        (( elapsed < STOP_TIMEOUT )) || die "旧服务已停止，但端口 $APP_PORT 仍被占用；拒绝继续部署。"
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+}
+
+stop_previous_service() {
+    find_old_process
+    if [[ -z "$OLD_PID" ]]; then
+        log "未发现正在运行的旧 $ROLE 服务；开始部署。"
+        return
+    fi
+    log "已定位旧 $ROLE 服务，PID=$OLD_PID；在拉取代码和构建前停止。"
+    stop_process "$OLD_PID"
+    wait_for_port_release
+    OLD_STOPPED=1
+    log "旧 $ROLE 服务已停止；开始部署。"
 }
 
 start_process() {
@@ -312,9 +340,9 @@ activate_release() {
     mkdir -p "$RELEASE_DIR"
     cp -- "$SELECTED_JAR" "$RELEASE_DIR/$JAR_NAME"
     printf 'role=%s\nbackend=%s\nprofile=%s\n' "$ROLE" "$BACKEND_COMMIT" "$SPRING_PROFILE" > "$RELEASE_DIR/release.txt"
-    find_old_process
-    if [[ -n "$OLD_PID" ]]; then stop_process "$OLD_PID"; fi
-    OLD_STOPPED=1
+    if [[ "$ROLE" == master ]] && port_listening; then
+        die "部署期间端口 $APP_PORT 被重新占用；拒绝终止未知进程。"
+    fi
     if [[ -f "$APP_LOG" ]]; then mv -- "$APP_LOG" "$APP_LOG.$(date '+%Y%m%d%H%M%S').previous"; fi
     start_process "$RELEASE_DIR/$JAR_NAME"
     if ! wait_started; then tail -n 80 "$APP_LOG" >&2 || true; return 1; fi
@@ -505,6 +533,7 @@ main() {
         return
     fi
     prepare_build
+    stop_previous_service
     BACKEND_BUILD="$BUILD_ROOT/backend"
     snapshot_repository "$BACKEND_PROJECT_PATH" "$BACKEND_REPO_URL" "$backend_branch" "$BACKEND_BUILD"
     BACKEND_COMMIT="$SNAPSHOT_COMMIT"
