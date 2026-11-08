@@ -4,6 +4,8 @@ import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.mapper.MathVisionTaskMapper;
 import com.kwang.study.mathvision.pojo.MathVisionTask;
 import com.kwang.study.mathvision.service.MathVisionTaskNotifier;
+import com.kwang.study.mathvision.workflow.ai.MathVisionAiChatService;
+import com.kwang.study.mathvision.workflow.ai.MathVisionModelReachability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.Map;
+import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -34,6 +38,11 @@ public class MathVisionTaskScheduler {
     private final Executor executor;
     private final MathVisionPollingPolicy polling;
     private final LongSupplier nanoTime;
+    private final MathVisionAiChatService ai;
+    private final MathVisionModelReachability reachability;
+    private java.time.LocalDateTime scanTime;
+    private Long scanId;
+    private final Map<Long, Long> skippedLogTimes = new LinkedHashMap<>();
     private final Map<String, Active> active = new ConcurrentHashMap<>();
     private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "mathvision-lease-monitor"); thread.setDaemon(true); return thread;
@@ -44,17 +53,20 @@ public class MathVisionTaskScheduler {
     @org.springframework.beans.factory.annotation.Autowired
     public MathVisionTaskScheduler(MathVisionTaskMapper tasks, MathVisionStageRunner runner,
             MathVisionTaskNotifier notifier, MathVisionTaskExecutionRegistry registry,
-            MathVisionModelCatalog catalog, @Qualifier("mathVisionTaskExecutor") Executor executor) {
-        this(tasks, runner, notifier, registry, catalog, executor, new Random(), System::nanoTime);
+            MathVisionModelCatalog catalog, @Qualifier("mathVisionTaskExecutor") Executor executor,
+            MathVisionAiChatService ai, MathVisionModelReachability reachability) {
+        this(tasks, runner, notifier, registry, catalog, executor, new Random(), System::nanoTime, ai, reachability);
     }
 
     MathVisionTaskScheduler(MathVisionTaskMapper tasks, MathVisionStageRunner runner,
             MathVisionTaskNotifier notifier, MathVisionTaskExecutionRegistry registry,
-            MathVisionModelCatalog catalog, Executor executor, Random random, LongSupplier nanoTime) {
+            MathVisionModelCatalog catalog, Executor executor, Random random, LongSupplier nanoTime,
+            MathVisionAiChatService ai, MathVisionModelReachability reachability) {
         this.tasks = tasks; this.runner = runner; this.notifier = notifier;
         this.registry = registry; this.catalog = catalog; this.executor = executor;
         this.polling = new MathVisionPollingPolicy(random);
         this.nanoTime = nanoTime;
+        this.ai = ai; this.reachability = reachability;
     }
 
     @PostConstruct public synchronized void start() {
@@ -73,12 +85,38 @@ public class MathVisionTaskScheduler {
         boolean found = false;
         try {
             tasks.settleExpiredLeases(c.getRecoveryLimit());
-            for (Long id : polling.shuffledCandidates(tasks.findClaimCandidates(Math.min(capacity, 16) * 2))) {
+            int batchSize = Math.min(capacity, 16) * 2;
+            List<MathVisionTask> candidates = tasks.findModelClaimCandidates(scanTime, scanId, batchSize, c.getRecoveryLimit());
+            if (candidates.isEmpty() && scanTime != null) {
+                scanTime = null; scanId = null;
+                candidates = tasks.findModelClaimCandidates(null, null, batchSize, c.getRecoveryLimit());
+            }
+            if (!candidates.isEmpty()) {
+                MathVisionTask tail = candidates.get(candidates.size() - 1);
+                scanTime = tail.getUpdateTime(); scanId = tail.getId();
+            }
+            for (MathVisionTask candidate : polling.shuffledCandidates(candidates)) {
                 if (active.size() >= Math.max(1, c.getConcurrency())) break;
+                Long id = candidate.getId();
+                MathVisionAiChatService.PreparedExecution prepared;
+                try {
+                    prepared = ai.prepareExecution(candidate);
+                } catch (IllegalArgumentException invalidConfig) {
+                    logSkipped(candidate, "模型连接配置无效：" + invalidConfig.getClass().getSimpleName());
+                    continue;
+                }
+                if (!reachability.canAccess(prepared.getEndpoint(), id)) {
+                    logSkipped(candidate, "模型服务连通性未通过或正在检测");
+                    continue;
+                }
                 String token = UUID.randomUUID().toString();
-                if (tasks.claimWithLease(id, token, Math.max(30, c.getLeaseSeconds()), c.getRecoveryLimit()) != 1) continue;
+                if (tasks.claimWithModelLease(candidate, token, Math.max(30, c.getLeaseSeconds()), c.getRecoveryLimit()) != 1) continue;
                 MathVisionTask task = tasks.findById(id);
                 if (task == null || !token.equals(task.getLockToken())) continue;
+                // Settings changed after the successful CAS belong to the next stage. Execute
+                // the exact model configuration whose endpoint was checked before this claim.
+                task.setSelectedModelConfigId(candidate.getSelectedModelConfigId());
+                task.setProviderCode(candidate.getProviderCode()); task.setModelName(candidate.getModelName());
                 Active run = new Active(task);
                 active.put(token, run);
                 log.info("MathVision task claimed, instance={}, taskId={}, version={}, stage={}, execution={}, recoveryCount={}",
@@ -86,8 +124,7 @@ public class MathVisionTaskScheduler {
                 try {
                     executor.execute(() -> {
                         registry.register(id, token);
-                        try (MathVisionExecutionScope ignored = new MathVisionExecutionScope()) {
-                            catalog.getWorkflow(); catalog.getModelDefaults(); catalog.getModelProviders();
+                        try (MathVisionExecutionScope ignored = prepared.openScope()) {
                             runner.runOneVisibleStage(task);
                         } finally {
                             registry.unregister(id, token); active.remove(token, run); Thread.interrupted();
@@ -103,6 +140,16 @@ public class MathVisionTaskScheduler {
             nextPoll = nanoTime.getAsLong() + TimeUnit.MILLISECONDS.toNanos(
                     polling.nextDelayMillis(found, c.getPollMinMillis(), c.getPollMaxMillis()));
         }
+    }
+
+    private void logSkipped(MathVisionTask task, String reason) {
+        long now = nanoTime.getAsLong();
+        Long previous = skippedLogTimes.get(task.getId());
+        if (previous != null && now - previous < TimeUnit.MINUTES.toNanos(1)) return;
+        if (skippedLogTimes.size() >= 1024) skippedLogTimes.remove(skippedLogTimes.keySet().iterator().next());
+        skippedLogTimes.put(task.getId(), now);
+        log.info("MathVision Worker 暂不领取任务, instance={}, taskId={}, stage={}, provider={}, reason={}",
+                INSTANCE, task.getId(), task.getCurrentStage(), task.getProviderCode(), reason);
     }
 
     private void monitor() {

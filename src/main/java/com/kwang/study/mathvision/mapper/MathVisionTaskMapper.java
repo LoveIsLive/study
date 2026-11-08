@@ -64,6 +64,29 @@ public interface MathVisionTaskMapper {
             "ORDER BY update_time, id LIMIT #{limit}")
     List<Long> findClaimCandidates(int limit);
 
+    /** Keyset scanning avoids repeatedly visiting only an unreachable queue prefix. */
+    @Select("<script>SELECT id, user_id, selected_model_config_id, provider_code, model_name, " +
+            "current_version, current_stage, update_time FROM mathvision_tasks " +
+            "WHERE deleted = 0 AND cancel_requested = 0 " +
+            "AND (status = 'queued' OR (status = 'running' AND lease_until &lt; NOW(3) AND recovery_count &lt; #{recoveryLimit})) " +
+            "<if test='afterTime != null'>AND (update_time &gt; #{afterTime} OR (update_time = #{afterTime} AND id &gt; #{afterId})) </if>" +
+            "ORDER BY update_time, id LIMIT #{limit}</script>")
+    @ResultMap("MathVisionTaskResultMap")
+    List<MathVisionTask> findModelClaimCandidates(@Param("afterTime") java.time.LocalDateTime afterTime,
+            @Param("afterId") Long afterId, @Param("limit") int limit, @Param("recoveryLimit") int recoveryLimit);
+
+    @Update("UPDATE mathvision_tasks SET " +
+            "recovery_count = CASE WHEN status = 'running' THEN recovery_count + 1 ELSE 0 END, " +
+            "status = 'running', lock_token = #{token}, lease_until = TIMESTAMPADD(SECOND, #{seconds}, NOW(3)), " +
+            "failed_stage = NULL, error_type = NULL, error_message = NULL, update_time = NOW() " +
+            "WHERE id = #{expected.id} AND deleted = 0 AND cancel_requested = 0 " +
+            "AND current_version <=> #{expected.currentVersion} AND current_stage <=> #{expected.currentStage} " +
+            "AND selected_model_config_id <=> #{expected.selectedModelConfigId} " +
+            "AND BINARY provider_code <=> BINARY #{expected.providerCode} AND BINARY model_name <=> BINARY #{expected.modelName} " +
+            "AND (status = 'queued' OR (status = 'running' AND lease_until < NOW(3) AND recovery_count < #{limit}))")
+    int claimWithModelLease(@Param("expected") MathVisionTask expected, @Param("token") String token,
+            @Param("seconds") int seconds, @Param("limit") int limit);
+
     @Update("UPDATE mathvision_tasks SET " +
             "recovery_count = CASE WHEN status = 'running' THEN recovery_count + 1 ELSE 0 END, " +
             "status = 'running', lock_token = #{token}, lease_until = TIMESTAMPADD(SECOND, #{seconds}, NOW(3)), " +

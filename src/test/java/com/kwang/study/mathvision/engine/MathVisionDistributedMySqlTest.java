@@ -57,6 +57,54 @@ class MathVisionDistributedMySqlTest {
     private MathVisionTask claim(long id) {
         assertEquals(1, tasks.claimWithLease(id, UUID.randomUUID().toString(), 120, 2)); return tasks.findById(id);
     }
+    @Test void modelAwareClaimRejectsStaleTaskSelectionAndStillAllowsOnlyOneWorker() throws Exception {
+        long id = task();
+        jdbc.update("UPDATE mathvision_tasks SET provider_code='custom_a', model_name='ModelA', selected_model_config_id=1 WHERE id=?", id);
+        var candidate = tasks.findById(id);
+        jdbc.update("UPDATE mathvision_tasks SET model_name='ModelB' WHERE id=?", id);
+        assertEquals(0, tasks.claimWithModelLease(candidate, UUID.randomUUID().toString(), 120, 2));
+        assertEquals("queued", tasks.findById(id).getStatus()); assertEquals(0, tasks.findById(id).getRecoveryCount());
+        var fresh = tasks.findById(id);
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        try {
+            CountDownLatch start = new CountDownLatch(1); List<Future<Integer>> results = new ArrayList<>();
+            for (int i = 0; i < 6; i++) results.add(pool.submit(() -> {
+                start.await(); return tasks.claimWithModelLease(fresh, UUID.randomUUID().toString(), 120, 2);
+            }));
+            start.countDown(); int count = 0; for (Future<Integer> result : results) count += result.get(20, TimeUnit.SECONDS);
+            assertEquals(1, count);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void modelAwareClaimChecksTaskVersionStageCredentialAndCaseSensitiveModel() {
+        long id = task(); var candidate = tasks.findById(id);
+        jdbc.update("UPDATE mathvision_tasks SET current_version=2 WHERE id=?", id);
+        assertEquals(0, tasks.claimWithModelLease(candidate, "stale-version", 120, 2));
+        candidate = tasks.findById(id);
+        jdbc.update("UPDATE mathvision_tasks SET current_stage='render_result' WHERE id=?", id);
+        assertEquals(0, tasks.claimWithModelLease(candidate, "stale-stage", 120, 2));
+        candidate = tasks.findById(id);
+        jdbc.update("UPDATE mathvision_tasks SET selected_model_config_id=9 WHERE id=?", id);
+        assertEquals(0, tasks.claimWithModelLease(candidate, "stale-credential", 120, 2));
+        jdbc.update("UPDATE mathvision_tasks SET model_name='ModelA' WHERE id=?", id);
+        candidate = tasks.findById(id);
+        jdbc.update("UPDATE mathvision_tasks SET model_name='modela' WHERE id=?", id);
+        assertEquals(0, tasks.claimWithModelLease(candidate, "stale-case", 120, 2));
+        assertEquals(1, tasks.claimWithModelLease(tasks.findById(id), "current-selection", 120, 2));
+    }
+
+    @Test void candidateKeysetCanReadBeyondAnUnreachableQueuePrefix() {
+        long first = task(), second = task(), third = task();
+        for (long id : List.of(first, second, third))
+            jdbc.update("UPDATE mathvision_tasks SET update_time='2000-01-01 00:00:00' WHERE id=?", id);
+        var batch = tasks.findModelClaimCandidates(null, null, 2, 2);
+        assertEquals(List.of(first, second), List.of(batch.get(0).getId(), batch.get(1).getId()));
+        var tail = batch.get(1);
+        assertEquals(third, tasks.findModelClaimCandidates(tail.getUpdateTime(), tail.getId(), 1, 2).get(0).getId());
+        assertNotNull(tail.getUserId()); assertEquals("code_generation", tail.getCurrentStage());
+        // Do not leave old-dated queued rows for other test methods.
+        jdbc.update("UPDATE mathvision_tasks SET update_time=NOW() WHERE id IN (?,?,?)", first, second, third);
+    }
     @Test void concurrentWorkersOnlyClaimOnce() throws Exception {
         long id = task(); ExecutorService pool = Executors.newFixedThreadPool(8);
         try {

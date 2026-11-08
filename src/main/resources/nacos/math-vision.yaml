@@ -12,6 +12,12 @@ distributed:
   # the interval by 1.5x; successful dispatches shorten it to 0.8x.
   pollMinMillis: 500
   pollMaxMillis: 5000
+  # Worker-local endpoint probes; no model inference or shared credential mutation.
+  modelReachability:
+    connectTimeoutMillis: 2000
+    requestTimeoutMillis: 5000
+    successTtlSeconds: 60
+    failureTtlSeconds: 30
   uploadChunkBytes: 8388608
   maxArtifactBytes: 1073741824
   uploadAttempts: 3

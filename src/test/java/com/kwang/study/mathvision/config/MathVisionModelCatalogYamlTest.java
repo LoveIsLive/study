@@ -40,6 +40,10 @@ class MathVisionModelCatalogYamlTest {
         assertEquals(2, catalog.getModelDefaults().getEmptyResponseRetries());
         assertEquals(1_000L, catalog.getModelDefaults().getTransientRetryBaseDelayMillis());
         assertEquals(0.25D, catalog.getModelDefaults().getRateLimitJitterRatio());
+        assertEquals(2000, catalog.getDistributed().getModelReachability().getConnectTimeoutMillis());
+        assertEquals(5000, catalog.getDistributed().getModelReachability().getRequestTimeoutMillis());
+        assertEquals(60, catalog.getDistributed().getModelReachability().getSuccessTtlSeconds());
+        assertEquals(30, catalog.getDistributed().getModelReachability().getFailureTtlSeconds());
 
         MathVisionModelCatalog.ModelCatalog glm = catalog.findModel("zhipu", "glm-5v-turbo");
         assertNotNull(glm);

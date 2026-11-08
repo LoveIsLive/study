@@ -37,6 +37,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 
 class MathVisionAiChatServiceTest {
 
@@ -371,6 +374,66 @@ class MathVisionAiChatServiceTest {
                 List.of(AiMessage.user(List.of(AiContentPart.text("Fix the Manim runtime error.")))),
                 ToolSchemas.MANIM_CODE,
                 List.of("manimCode"));
+    }
+
+    @Test
+    void preparedStageUsesCheckedModelAndCredentialDespiteLaterChanges() throws Exception {
+        var prepared = service.prepareExecution(task);
+        assertEquals("https://example.invalid/v1/chat/completions", prepared.getEndpoint().toString());
+        assertFalse(com.kwang.study.mathvision.engine.MathVisionExecutionScope.active());
+        catalogProvider.setBaseUrl("https://changed.invalid/v1");
+        when(configMapper.findById(9L)).thenThrow(new IllegalArgumentException("credential changed"));
+        enqueueResponses(plainContentOpenAiResponse("ok"));
+        try (var ignored = prepared.openScope()) {
+            assertEquals("ok", service.requestText(task, List.of(AiMessage.user(List.of(AiContentPart.text("hello")))), null, List.of()));
+            assertEquals("https://example.invalid/v1", catalog.findEnabled("zhipu").getBaseUrl());
+        }
+        HttpRequest sent = capturedRequest();
+        assertEquals(prepared.getEndpoint(), sent.uri());
+        assertEquals("Bearer test-api-key", sent.headers().firstValue("Authorization").orElse(""));
+        assertFalse(com.kwang.study.mathvision.engine.MathVisionExecutionScope.active());
+        assertThrows(IllegalArgumentException.class, () -> service.prepareExecution(task));
+    }
+
+    @Test
+    void customProviderProbeUsesTheSameEndpointAsItsActualRequest() throws Exception {
+        var custom = LlmModelConfig.builder().id(9L).ownerUserId(1L).provider("custom_proxy").isCustom(true)
+                .compatibilityType("anthropic").baseUrl("https://proxy.invalid/api")
+                .modelName("claude").contextWindow(128000).maxOutputTokens(16000)
+                .apiKeyEncrypted(cipher.encrypt("private-key")).status("enabled").build();
+        when(configMapper.findById(9L)).thenReturn(custom);
+        task.setProviderCode("custom_proxy"); task.setModelName("claude");
+        var prepared = service.prepareExecution(task);
+        assertEquals("https://proxy.invalid/api/messages", prepared.getEndpoint().toString());
+        enqueueResponses(response("{\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}"));
+        try (var ignored = prepared.openScope()) {
+            assertEquals("ok", service.requestText(task, List.of(AiMessage.user(List.of(AiContentPart.text("hello")))), null, List.of()));
+        }
+        assertEquals(prepared.getEndpoint(), capturedRequest().uri());
+    }
+
+    @Test
+    void realRequestsReportNetworkFailuresButDoNotTreatCancellationAsUnreachable() throws Exception {
+        var health = mock(MathVisionModelReachability.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "reachability", health);
+        catalogModel.setTimeoutRetryAttempts(0);
+        when(httpClient.send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
+                .thenThrow(new java.net.ConnectException("connection refused"));
+        assertThrows(IllegalStateException.class, () -> service.requestRawResponse(task, List.of(), null));
+        verify(health).observeNetworkFailure(java.net.URI.create("https://example.invalid/v1/chat/completions"));
+        org.mockito.Mockito.clearInvocations(health);
+        org.mockito.Mockito.doThrow(new InterruptedException("canceled")).when(httpClient)
+                .send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+        try {
+            assertThrows(IllegalStateException.class, () -> service.requestRawResponse(task, List.of(), null));
+            verify(health, never()).observeNetworkFailure(any());
+        } finally { Thread.interrupted(); }
+    }
+
+    private HttpRequest capturedRequest() throws Exception {
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+        return request.getValue();
     }
 
     @Test

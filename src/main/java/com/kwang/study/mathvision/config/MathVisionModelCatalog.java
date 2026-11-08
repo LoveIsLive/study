@@ -73,10 +73,19 @@ public class MathVisionModelCatalog {
         private long maxArtifactBytes = 1024L * 1024 * 1024;
         private int uploadAttempts = 3;
         private int retentionHours = 24;
+        private ModelReachabilityCatalog modelReachability = new ModelReachabilityCatalog();
         private String masterUrl = "http://127.0.0.1:8080";
         private String transferRoot = "mathvision-transfer";
         @ToString.Exclude
         private String serviceSecret;
+    }
+
+    @Data
+    public static class ModelReachabilityCatalog {
+        private int connectTimeoutMillis = 2000;
+        private int requestTimeoutMillis = 5000;
+        private int successTtlSeconds = 60;
+        private int failureTtlSeconds = 30;
     }
 
     /** 返回启用的供应商 */

@@ -14,8 +14,8 @@ final class MathVisionPollingPolicy {
         this.random = random;
     }
 
-    List<Long> shuffledCandidates(List<Long> candidates) {
-        List<Long> shuffled = new ArrayList<>(candidates);
+    <T> List<T> shuffledCandidates(List<T> candidates) {
+        List<T> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled, random);
         return shuffled;
     }

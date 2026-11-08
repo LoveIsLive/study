@@ -8,6 +8,7 @@ import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.config.MathVisionModelCatalog.ModelCatalog;
 import com.kwang.study.mathvision.config.MathVisionModelCatalog.ProviderCatalog;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
+import com.kwang.study.mathvision.engine.MathVisionExecutionScope;
 import com.kwang.study.mathvision.pojo.LlmModelConfig;
 import com.kwang.study.mathvision.pojo.MathVisionTask;
 import com.kwang.study.mathvision.util.ApiKeyCipher;
@@ -73,16 +74,15 @@ public class MathVisionAiChatService {
     private final ApiKeyCipher cipher;
     private final ObjectMapper mapper;
     private final HttpClient httpClient;
+    @Autowired(required = false)
+    private MathVisionModelReachability reachability;
 
     @Autowired
     public MathVisionAiChatService(LlmModelConfigMapper configMapper,
                                    MathVisionModelCatalog catalog,
                                    ApiKeyCipher cipher,
                                    ObjectMapper mapper) {
-        this(configMapper, catalog, cipher, mapper, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .version(HttpClient.Version.HTTP_1_1)
-                .build());
+        this(configMapper, catalog, cipher, mapper, MathVisionModelEndpoint.httpClient(30_000));
     }
 
     MathVisionAiChatService(LlmModelConfigMapper configMapper,
@@ -500,7 +500,27 @@ public class MathVisionAiChatService {
     }
 
     private AiRuntime resolveRuntime(MathVisionTask task) {
-        return com.kwang.study.mathvision.engine.MathVisionExecutionScope.once(this, () -> loadRuntime(task));
+        return MathVisionExecutionScope.once(this, () -> loadRuntime(task));
+    }
+
+    /** Resolve through the same path as real requests and pin that checked runtime for this stage. */
+    public PreparedExecution prepareExecution(MathVisionTask task) {
+        try (var ignored = new MathVisionExecutionScope()) {
+            catalog.getWorkflow(); catalog.getModelDefaults(); catalog.getModelProviders();
+            AiRuntime runtime = resolveRuntime(task);
+            return new PreparedExecution(runtime.endpoint,
+                    MathVisionExecutionScope.snapshot());
+        }
+    }
+
+    public static class PreparedExecution {
+        private final URI endpoint;
+        private final MathVisionExecutionScope.Snapshot snapshot;
+        private PreparedExecution(URI endpoint, MathVisionExecutionScope.Snapshot snapshot) {
+            this.endpoint = endpoint; this.snapshot = snapshot;
+        }
+        public URI getEndpoint() { return endpoint; }
+        public MathVisionExecutionScope openScope() { return snapshot.open(); }
     }
 
     private AiRuntime loadRuntime(MathVisionTask task) {
@@ -541,7 +561,7 @@ public class MathVisionAiChatService {
                 task.getId(),
                 provider.getCode(),
                 provider.getCode(),
-                resolveBaseUrl(provider.getCode(), provider.getBaseUrl()),
+                MathVisionModelEndpoint.baseUrl(provider.getCode(), provider.getBaseUrl()),
                 task.getModelName(),
                 apiKey,
                 resolveTemperature(provider, model),
@@ -653,7 +673,7 @@ public class MathVisionAiChatService {
     private JsonNode requestOpenAiCompatible(AiRuntime runtime,
                                              List<AiMessage> messages,
                                              String toolsJson) {
-        String url = trimTrailingSlash(runtime.baseUrl) + "/chat/completions";
+        String url = runtime.endpoint.toString();
         try {
             return sendOpenAiCompatibleWithSemanticRetry(
                     runtime,
@@ -790,7 +810,7 @@ public class MathVisionAiChatService {
         generationConfig.put("maxOutputTokens", runtime.maxOutputTokens);
         addGeminiTools(body, toolsJson);
 
-        String url = geminiGenerateUrl(runtime.baseUrl, runtime.model, runtime.apiKey);
+        String url = runtime.endpoint + "?key=" + URLEncoder.encode(runtime.apiKey, StandardCharsets.UTF_8);
         return postJson(runtime, url, body, builder -> applyExtraHeaders(builder, runtime.extraHeadersJson));
     }
 
@@ -835,7 +855,7 @@ public class MathVisionAiChatService {
         }
         addAnthropicTools(body, toolsJson);
 
-        String url = anthropicMessagesUrl(runtime.baseUrl);
+        String url = runtime.endpoint.toString();
         return postJson(runtime, url, body, builder -> {
             builder.header("x-api-key", runtime.apiKey);
             builder.header("anthropic-version", "2023-06-01");
@@ -867,6 +887,7 @@ public class MathVisionAiChatService {
                                        int timeoutSeconds) {
         int requestAttempt = transientAttempt + rateLimitAttempt + timeoutAttempt + 1;
         long startedNanos = System.nanoTime();
+        boolean receivedResponse = false;
         try {
             throwIfInterrupted();
             if (aiTraceEnabled()) {
@@ -885,6 +906,8 @@ public class MathVisionAiChatService {
             log.info("MathVision AI 请求开始, taskId={}, context=[{}], provider={}, model={}, attempt={}, timeoutSeconds={}",
                     runtime.taskId, NodeExecutionLogger.context(), runtime.providerCode, runtime.model, requestAttempt, timeoutSeconds);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            receivedResponse = true;
+            if (reachability != null) reachability.observeResponse(runtime.endpoint, response.statusCode(), response.body());
             throwIfInterrupted();
             NodeExecutionLogger.progress("解析模型响应");
             log.info("MathVision AI 收到响应, taskId={}, context=[{}], provider={}, model={}, attempt={}, http={}, durationMs={}",
@@ -938,6 +961,8 @@ public class MathVisionAiChatService {
                         runtime.taskId, NodeExecutionLogger.context(), requestAttempt);
                 throw new IllegalStateException("AI request canceled", e);
             }
+            if (!receivedResponse && e instanceof IOException && reachability != null)
+                reachability.observeNetworkFailure(runtime.endpoint);
             if (isTimeoutFailure(e) && timeoutAttempt < timeoutRetryAttempts(runtime)) {
                 throwIfInterrupted();
                 int nextTimeoutSeconds = nextTimeoutSeconds(runtime, timeoutSeconds);
@@ -1672,44 +1697,6 @@ public class MathVisionAiChatService {
         return firstNode != null ? firstNode : node.get(second);
     }
 
-    private String resolveBaseUrl(String providerCode, String configured) {
-        if (StringUtils.hasText(configured)) {
-            return configured.trim();
-        }
-        String provider = providerCode != null ? providerCode.toLowerCase(Locale.ROOT) : "";
-        switch (provider) {
-            case "openai":
-                return "https://api.openai.com/v1";
-            case "moonshot":
-                return "https://api.moonshot.cn/v1";
-            case "zhipu":
-                return "https://open.bigmodel.cn/api/paas/v4";
-            case "google":
-                return "https://generativelanguage.googleapis.com/v1beta";
-            case "anthropic":
-                return "https://api.anthropic.com/v1";
-            default:
-                throw new IllegalArgumentException("Missing model provider baseUrl: " + providerCode);
-        }
-    }
-
-    private String geminiGenerateUrl(String baseUrl, String model, String apiKey) {
-        String base = trimTrailingSlash(baseUrl);
-        String encodedKey = URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
-        String path = base.endsWith("/models")
-                ? base + "/" + model + ":generateContent"
-                : base + "/models/" + model + ":generateContent";
-        return path + "?key=" + encodedKey;
-    }
-
-    private String anthropicMessagesUrl(String baseUrl) {
-        String base = trimTrailingSlash(baseUrl);
-        if (base.endsWith("/messages")) {
-            return base;
-        }
-        return base + "/messages";
-    }
-
     private String trimTrailingSlash(String value) {
         return value == null ? "" : value.replaceAll("/+$", "");
     }
@@ -1856,10 +1843,10 @@ public class MathVisionAiChatService {
     }
 
     private static final class AiRuntime {
+        private final URI endpoint;
         private final Long taskId;
         private final String providerCode;
         private final String protocolCode;
-        private final String baseUrl;
         private final String model;
         private final String apiKey;
         private final double temperature;
@@ -1912,9 +1899,9 @@ public class MathVisionAiChatService {
                           String effort,
                           String thinking) {
             this.taskId = taskId;
+            this.endpoint = MathVisionModelEndpoint.generationUri(protocolCode, baseUrl, model);
             this.providerCode = providerCode;
             this.protocolCode = protocolCode;
-            this.baseUrl = baseUrl;
             this.model = model;
             this.apiKey = apiKey;
             this.temperature = temperature;
