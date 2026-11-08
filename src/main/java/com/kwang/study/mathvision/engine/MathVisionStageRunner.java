@@ -142,12 +142,24 @@ public class MathVisionStageRunner {
                     } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid render result metadata", invalid); }
                 }
                 boolean failed = result != null && result.isFailed();
+                boolean autoReview = !failed && shouldAutoReview(task, stage, context, result);
+                if (autoReview) {
+                    result.setResultJson(MathVisionStageQualityReview.updateStatus(
+                            stage, result.getResultJson(), MathVisionStageQualityReview.STATUS_REQUESTED));
+                }
                 if (!failed || !context.isUserRevision()) persistStageResult(task, stage, result, context);
                 if (failed) {
                     taskMapper.markFailed(taskId, stage.getCode(),
                             StringUtils.hasText(result.getErrorType()) ? result.getErrorType() : resolveErrorType(stage),
                             trimMessage(result.getErrorMessage()));
                     taskNotifier.notifyTaskChanged(taskId, "failed");
+                } else if (autoReview) {
+                    // Persist the generated artifact and review request in the same fenced
+                    // transaction, then acquire a fresh lease to run the existing review path.
+                    taskMapper.queueNextStage(taskId, stage.getCode());
+                    taskNotifier.notifyTaskChanged(taskId, "quality_review_queued");
+                    log.info("MathVision 智能检查自动入队, taskId={}, stage={}, node={}",
+                            taskId, stage.getCode(), MathVisionStageQualityReview.nodeName(stage));
                 } else {
                     advanceAfterStage(task, stage, context, result);
                 }
@@ -349,6 +361,18 @@ public class MathVisionStageRunner {
             taskMapper.queueNextStage(task.getId(), next.getCode());
             taskNotifier.notifyTaskChanged(task.getId(), "queued");
         }
+    }
+
+    private boolean shouldAutoReview(MathVisionTask task, StageEnum stage,
+                                     MathVisionStageExecutionContext context, MathVisionStageExecutionResult result) {
+        if (result == null || !result.isWaitForUserDecision() || !StringUtils.hasText(result.getArtifactJson())
+                || context.isUserRevision() || context.isQualityReviewRequested()
+                || !MathVisionStageQualityReview.supports(stage)
+                || !MathVisionStageQualityReview.STATUS_PENDING.equals(
+                        MathVisionStageQualityReview.resolveStatus(stage, result.getResultJson()))) return false;
+        MathVisionTask latest = taskMapper.findById(task.getId());
+        MathVisionTask settings = latest != null ? latest : task;
+        return "auto".equals(settings.getMode()) && !Boolean.FALSE.equals(settings.getAutoQualityReview());
     }
 
     private StageEnum nextStage(StageEnum stage) {

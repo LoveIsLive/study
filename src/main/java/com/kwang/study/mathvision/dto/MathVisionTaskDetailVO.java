@@ -18,6 +18,7 @@ public class MathVisionTaskDetailVO {
     private String inputSourceType;
     private List<InputAssetDTO> inputAssets;
     private String mode;
+    private Boolean autoQualityReview;
     private String outputTarget;
     private String status;
     private String currentStage;

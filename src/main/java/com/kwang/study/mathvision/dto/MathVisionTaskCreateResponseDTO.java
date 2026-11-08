@@ -15,6 +15,7 @@ public class MathVisionTaskCreateResponseDTO {
     private String status;
     private String currentStage;
     private String mode;
+    private Boolean autoQualityReview;
     private String outputTarget;
     private String providerCode;
     private String modelName;

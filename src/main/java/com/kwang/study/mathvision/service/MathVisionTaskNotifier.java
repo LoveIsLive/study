@@ -95,6 +95,7 @@ public class MathVisionTaskNotifier {
                 .errorType(task.getErrorType())
                 .errorMessage(task.getErrorMessage())
                 .mode(task.getMode())
+                .autoQualityReview(!Boolean.FALSE.equals(task.getAutoQualityReview()))
                 .outputTarget(task.getOutputTarget())
                 .providerCode(task.getProviderCode())
                 .modelName(task.getModelName())

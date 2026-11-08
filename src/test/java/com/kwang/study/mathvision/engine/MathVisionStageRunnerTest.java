@@ -23,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -300,6 +302,7 @@ class MathVisionStageRunnerTest {
     })
     void autoModeAdvancesDespiteOptionalQualityReviewDecision(StageEnum stage, String nextStage) {
         MathVisionTask task = runningTask(90L, stage, "auto");
+        task.setAutoQualityReview(false);
         doAnswer(invocation -> {
             invocation.getArgument(0, MathVisionArtifact.class).setId(900L);
             return null;
@@ -370,7 +373,35 @@ class MathVisionStageRunnerTest {
     void automaticTaskContinuesAcrossAllStagesUntilCompleted() {
         AtomicReference<MathVisionTask> current = new AtomicReference<>(
                 runningTask(93L, StageEnum.PROBLEM_NORMALIZATION, "auto"));
+        MathVisionVersion version = MathVisionVersion.builder().taskId(93L).version(1).build();
+        Map<String, MathVisionArtifact> artifacts = new HashMap<>();
+        Map<String, MathVisionStageResult> results = new HashMap<>();
         when(taskMapper.findById(93L)).thenAnswer(ignored -> current.get());
+        when(versionMapper.findByTaskVersion(93L, 1)).thenReturn(version);
+        doAnswer(invocation -> {
+            MathVisionArtifact artifact = invocation.getArgument(0);
+            artifact.setId((long) artifacts.size() + 1); artifacts.put(artifact.getStage(), artifact); return null;
+        }).when(artifactMapper).insert(any());
+        when(artifactMapper.findByTaskStageVersion(org.mockito.ArgumentMatchers.eq(93L), any(), any()))
+                .thenAnswer(invocation -> artifacts.get(invocation.getArgument(1)));
+        doAnswer(invocation -> {
+            String stage = invocation.getArgument(2); Integer pointer = invocation.getArgument(3);
+            switch (stage) {
+                case "problem_normalization": version.setPnVersion(pointer); break;
+                case "reasoning_graph": version.setRgVersion(pointer); break;
+                case "visual_storyboard": version.setVsVersion(pointer); break;
+                case "code_generation": version.setCgVersion(pointer); break;
+                case "render_result": version.setRrVersion(pointer); break;
+            }
+            return null;
+        }).when(versionMapper).updateStagePointer(org.mockito.ArgumentMatchers.eq(93L), org.mockito.ArgumentMatchers.eq(1), any(), any());
+        doAnswer(invocation -> {
+            MathVisionStageResult result = invocation.getArgument(0); results.put(result.getStage(), result); return null;
+        }).when(stageResultMapper).insert(any());
+        when(stageResultMapper.findByTaskStageVersion(org.mockito.ArgumentMatchers.eq(93L), any(), any()))
+                .thenAnswer(invocation -> results.get(invocation.getArgument(1)));
+        when(stageResultMapper.findByArtifactId(any())).thenAnswer(invocation -> results.values().stream()
+                .filter(result -> result.getArtifactId().equals(invocation.getArgument(0))).findFirst().orElse(null));
         for (StageEnum stage : StageEnum.values()) {
             if (stage == StageEnum.COMPLETED) continue;
             when(executorRegistry.find(stage)).thenReturn(Optional.of(executor));
@@ -378,6 +409,10 @@ class MathVisionStageRunnerTest {
         when(executor.execute(any())).thenAnswer(invocation -> {
             MathVisionStageExecutionContext context = invocation.getArgument(0);
             return MathVisionStageExecutionResult.builder()
+                    .artifactJson("{}")
+                    .resultJson(context.isQualityReviewRequested()
+                            ? "{\"qualityReview\":{\"status\":\"completed\"}}"
+                            : "{\"qualityReview\":{\"status\":\"pending\"}}")
                     .waitForUserDecision(MathVisionStageQualityReview.supports(context.getStage())).build();
         });
         doAnswer(invocation -> {
@@ -388,18 +423,61 @@ class MathVisionStageRunnerTest {
         doAnswer(ignored -> { current.get().setStatus("completed"); return null; })
                 .when(taskMapper).markCompleted(93L);
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 8; i++) {
             current.get().setStatus("running");
             runner.runOneVisibleStage(current.get());
-            assertEquals(i == 4 ? "completed" : "queued", current.get().getStatus());
+            assertEquals(i == 7 ? "completed" : "queued", current.get().getStatus());
         }
 
-        verify(executor, times(5)).execute(any());
+        ArgumentCaptor<MathVisionStageExecutionContext> executions = ArgumentCaptor.forClass(MathVisionStageExecutionContext.class);
+        verify(executor, times(8)).execute(executions.capture());
+        assertEquals(java.util.List.of(false, false, false, true, false, true, false, true),
+                executions.getAllValues().stream().map(MathVisionStageExecutionContext::isQualityReviewRequested)
+                        .collect(java.util.stream.Collectors.toList()));
         verify(taskMapper).queueNextStage(93L, "reasoning_graph");
-        verify(taskMapper).queueNextStage(93L, "visual_storyboard");
-        verify(taskMapper).queueNextStage(93L, "code_generation");
-        verify(taskMapper).queueNextStage(93L, "render_result");
+        verify(taskMapper, times(2)).queueNextStage(93L, "visual_storyboard");
+        verify(taskMapper, times(2)).queueNextStage(93L, "code_generation");
+        verify(taskMapper, times(2)).queueNextStage(93L, "render_result");
         verify(taskMapper, never()).markWaitingConfirm(any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = StageEnum.class, names = {"VISUAL_STORYBOARD", "CODE_GENERATION", "RENDER_RESULT"})
+    void automaticModeSchedulesReviewByDefaultAndPersistsItsRequest(StageEnum stage) {
+        MathVisionTask task = runningTask(95L, stage, "auto");
+        when(taskMapper.findById(95L)).thenReturn(task);
+        when(executorRegistry.find(stage)).thenReturn(Optional.of(executor));
+        when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
+                .artifactJson("{}").resultJson("{\"qualityReview\":{\"status\":\"pending\"}}")
+                .waitForUserDecision(true).build());
+        doAnswer(invocation -> { invocation.getArgument(0, MathVisionArtifact.class).setId(950L); return null; })
+                .when(artifactMapper).insert(any());
+
+        runner.runOneVisibleStage(task);
+
+        verify(taskMapper).queueNextStage(95L, stage.getCode());
+        verify(taskMapper, never()).markWaitingConfirm(any(), any());
+        verify(taskMapper, never()).markCompleted(any());
+        ArgumentCaptor<MathVisionStageResult> result = ArgumentCaptor.forClass(MathVisionStageResult.class);
+        verify(stageResultMapper).insert(result.capture());
+        assertTrue(MathVisionStageQualityReview.isRequested(stage, result.getValue().getResultJson()));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true, false", "false, true"})
+    void generationUsesLatestAutoReviewSwitchWhenCommitting(boolean initial, boolean latest) {
+        MathVisionTask task = runningTask(96L, StageEnum.VISUAL_STORYBOARD, "auto");
+        task.setAutoQualityReview(initial);
+        MathVisionTask current = runningTask(96L, StageEnum.VISUAL_STORYBOARD, "auto");
+        current.setAutoQualityReview(latest);
+        when(taskMapper.findById(96L)).thenReturn(current);
+        when(executorRegistry.find(StageEnum.VISUAL_STORYBOARD)).thenReturn(Optional.of(executor));
+        when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
+                .artifactJson("{}").resultJson("{}").waitForUserDecision(true).build());
+
+        runner.runOneVisibleStage(task);
+
+        verify(taskMapper).queueNextStage(96L, latest ? "visual_storyboard" : "code_generation");
     }
 
     @Test

@@ -28,6 +28,9 @@ public class MathVisionTask {
     private String inputAssetsJson;
     /** manual/auto */
     private String mode;
+    /** 自动模式下是否自动执行阶段三、四、五的智能检查。 */
+    @Builder.Default
+    private Boolean autoQualityReview = true;
     /** manim/geogebra */
     private String outputTarget;
     /** created/queued/running/waiting_confirm/failed/completed/canceled */

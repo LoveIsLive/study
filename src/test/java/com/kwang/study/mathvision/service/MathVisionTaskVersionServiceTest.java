@@ -429,7 +429,7 @@ class MathVisionTaskVersionServiceTest {
         queued.setMode("auto");
         when(taskMapper.findById(32L)).thenReturn(manualWaiting, autoWaiting, queued);
         when(taskMapper.updateRuntimeSettings(
-                32L, USER_ID, "auto", null, null, null)).thenReturn(1);
+                32L, USER_ID, "auto", null, null, null, true)).thenReturn(1);
         when(taskMapper.queueTaskForRun(
                 32L, USER_ID, "visual_storyboard", "reasoning_graph")).thenReturn(1);
         MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
@@ -452,7 +452,7 @@ class MathVisionTaskVersionServiceTest {
         MathVisionTask queued = task(35L, "queued", nextStage, 1);
         queued.setMode("auto");
         when(taskMapper.findById(35L)).thenReturn(manualWaiting, autoWaiting, queued);
-        when(taskMapper.updateRuntimeSettings(35L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        when(taskMapper.updateRuntimeSettings(35L, USER_ID, "auto", null, null, null, true)).thenReturn(1);
         when(taskMapper.queueTaskForRun(35L, USER_ID, nextStage, stage)).thenReturn(1);
         MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
         request.setMode("auto");
@@ -473,7 +473,7 @@ class MathVisionTaskVersionServiceTest {
         MathVisionTask completed = task(36L, "completed", "completed", 1);
         completed.setMode("auto");
         when(taskMapper.findById(36L)).thenReturn(manualWaiting, autoWaiting, completed);
-        when(taskMapper.updateRuntimeSettings(36L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        when(taskMapper.updateRuntimeSettings(36L, USER_ID, "auto", null, null, null, true)).thenReturn(1);
         MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
         request.setMode("auto");
 
@@ -485,6 +485,45 @@ class MathVisionTaskVersionServiceTest {
         verify(taskNotifier).notifyTaskChanged(36L, "completed");
     }
 
+    @ParameterizedTest
+    @CsvSource({"visual_storyboard", "code_generation", "render_result"})
+    void switchingWaitingTaskToAutoSchedulesItsPendingReviewFirst(String stage) {
+        MathVisionTask waiting = task(38L, "waiting_confirm", stage, 1); waiting.setMode("manual");
+        MathVisionTask updated = task(38L, "waiting_confirm", stage, 1); updated.setMode("auto");
+        MathVisionTask queued = task(38L, "queued", stage, 1); queued.setMode("auto");
+        when(taskMapper.findById(38L)).thenReturn(waiting, updated, queued);
+        when(taskMapper.updateRuntimeSettings(38L, USER_ID, "auto", null, null, null, true)).thenReturn(1);
+        when(versionMapper.findCurrent(38L)).thenReturn(version(38L, 1, 1, 1, 1, 1, 1));
+        when(artifactMapper.findByTaskStageVersion(38L, stage, 1)).thenReturn(artifact(38L, stage, 1, "{}"));
+        var pending = com.kwang.study.mathvision.pojo.MathVisionStageResult.builder()
+                .id(380L).taskId(38L).stage(stage).version(1).resultJson("{\"qualityReview\":{\"status\":\"pending\"}}").build();
+        when(stageResultMapper.findByTaskStageVersion(38L, stage, 1)).thenReturn(pending);
+        when(taskMapper.queueTaskForRun(38L, USER_ID, stage, null)).thenReturn(1);
+        var request = new MathVisionTaskRuntimeSettingsRequestDTO(); request.setMode("auto");
+
+        assertEquals("queued", service.updateRuntimeSettings(38L, request).getStatus());
+
+        assertTrue(com.kwang.study.mathvision.engine.MathVisionStageQualityReview.isRequested(
+                com.kwang.study.mathvision.enums.StageEnum.fromCode(stage), pending.getResultJson()));
+        verify(taskMapper).queueTaskForRun(38L, USER_ID, stage, null);
+        verify(taskMapper, never()).markCompleted(38L);
+    }
+
+    @Test
+    void autoReviewSwitchCanBeUpdatedAloneWithoutInterruptingRunningTask() {
+        MathVisionTask task = task(39L, "running", "visual_storyboard", 1); task.setMode("auto");
+        MathVisionTask updated = task(39L, "running", "visual_storyboard", 1);
+        updated.setMode("auto"); updated.setAutoQualityReview(false);
+        when(taskMapper.findById(39L)).thenReturn(task, updated);
+        when(taskMapper.updateRuntimeSettings(39L, USER_ID, "auto", null, null, null, false)).thenReturn(1);
+        var request = new MathVisionTaskRuntimeSettingsRequestDTO(); request.setAutoQualityReview(false);
+
+        assertFalse(service.updateRuntimeSettings(39L, request).getAutoQualityReview());
+
+        verify(taskMapper, never()).queueTaskForRun(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
     @Test
     void switchingRunningTaskToAutoDoesNotQueueAnotherExecution() {
         MathVisionTask running = task(37L, "running", "code_generation", 1);
@@ -492,7 +531,7 @@ class MathVisionTaskVersionServiceTest {
         MathVisionTask updated = task(37L, "running", "code_generation", 1);
         updated.setMode("auto");
         when(taskMapper.findById(37L)).thenReturn(running, updated);
-        when(taskMapper.updateRuntimeSettings(37L, USER_ID, "auto", null, null, null)).thenReturn(1);
+        when(taskMapper.updateRuntimeSettings(37L, USER_ID, "auto", null, null, null, true)).thenReturn(1);
         MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
         request.setMode("auto");
 
@@ -506,11 +545,13 @@ class MathVisionTaskVersionServiceTest {
     void switchingModelUpdatesCredentialAndAppliesToFutureStages() {
         MathVisionTask current = task(33L, "completed", "completed", 1);
         current.setMode("manual");
+        current.setAutoQualityReview(false);
         current.setProviderCode("openai");
         current.setModelName("old-model");
         current.setSelectedModelConfigId(3L);
         MathVisionTask updated = task(33L, "completed", "completed", 1);
         updated.setMode("manual");
+        updated.setAutoQualityReview(false);
         updated.setProviderCode("openai");
         updated.setModelName("new-model");
         updated.setSelectedModelConfigId(8L);
@@ -535,7 +576,7 @@ class MathVisionTaskVersionServiceTest {
                         .status("enabled")
                         .build());
         when(taskMapper.updateRuntimeSettings(
-                33L, USER_ID, "manual", 8L, "openai", "new-model")).thenReturn(1);
+                33L, USER_ID, "manual", 8L, "openai", "new-model", false)).thenReturn(1);
         MathVisionTaskRuntimeSettingsRequestDTO request = new MathVisionTaskRuntimeSettingsRequestDTO();
         request.setProviderCode("openai");
         request.setModelName("new-model");
@@ -543,7 +584,7 @@ class MathVisionTaskVersionServiceTest {
         assertEquals("new-model", service.updateRuntimeSettings(33L, request).getModelName());
 
         verify(taskMapper).updateRuntimeSettings(
-                33L, USER_ID, "manual", 8L, "openai", "new-model");
+                33L, USER_ID, "manual", 8L, "openai", "new-model", false);
         verify(taskNotifier).notifyTaskChanged(33L, "runtime_settings_updated");
     }
 

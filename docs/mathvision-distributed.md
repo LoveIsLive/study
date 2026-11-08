@@ -15,7 +15,19 @@ ALTER TABLE mathvision_tasks
     ADD INDEX idx_mathvision_lease (deleted, status, lease_until, id);
 ```
 
-新数据库使用 `src/main/resources/sql/mathvision_schema.sql`，不新增调度表。确认所有旧进程停止后，检查遗留记录：
+新数据库使用 `src/main/resources/sql/mathvision_schema.sql`，不新增调度表。
+
+自动智能检查开关需要为已有数据库增加一个任务字段（已存在时不要重复执行；新库建表已包含）：
+
+```sql
+ALTER TABLE mathvision_tasks
+    ADD COLUMN auto_quality_review TINYINT(1) NOT NULL DEFAULT 1
+    COMMENT '自动模式下自动执行智能检查' AFTER mode;
+```
+
+更新主服务、所有 Worker 和前端前先完成该字段迁移。已有任务默认开启自动智能检查；开关仅在自动模式下生效。
+
+确认所有旧进程停止后，检查遗留记录：
 
 ```sql
 SELECT id, current_stage, cancel_requested
@@ -210,7 +222,7 @@ grep 'taskId=5,' /www/server/java_project/mathvision-worker/logs/mathvision-work
 - 写操作先锁任务行，阶段结果原子提交；LLM、渲染和上传不持有任务行锁。
 - 租约使用 MySQL 时间，过期后旧 Worker 无法提交。等待用户确认时释放租约。
 - 初始生成、自动编辑、智能检查和修复路由保留既有行为。
-- 自动模式在各阶段成功后连续推进，渲染成功后完成任务；阶段三、四、五的可选智能检查不会强制暂停自动流程，也不会自动调用检查节点。手动模式仍等待用户选择智能检查或确认继续。待确认时切换为自动模式会继续下一阶段，阶段五则直接完成；运行中切换模式在本阶段提交时生效。自动编辑仍在本阶段完成后等待确认，失败或取消不会继续后续阶段。
+- 自动模式默认开启“自动执行智能检查”：阶段三、四、五生成产物并提交后，将当前阶段的智能检查自动入队，复用现有检查和 CodeFix 路由，检查结束后继续后续阶段或完成任务；已完成的检查不会重复排队。关闭开关则生成后直接推进。手动模式仍等待用户选择智能检查或确认继续。待确认时切换为自动模式会按开关决定先检查还是继续；运行中修改开关在生成结果提交时生效，已入队或正在执行的检查会完成。自动编辑仍在本阶段完成后等待确认，失败或取消不会继续后续阶段。
 - 取消事件绑定令牌，延迟事件不影响新执行；Redis 失联时数据库检查和前端轮询兜底。
 - 提交令牌记录在现有版本摘要 JSON 中，用于重复提交核对。
 - 归档路径包含执行令牌和内容哈希，不覆盖历史文件；上传和完成请求幂等。

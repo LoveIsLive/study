@@ -171,6 +171,7 @@ public class MathVisionTaskService {
                 .inputSourceType(resolveSourceType(request.getInputSourceType(), assets, request.getMessage()))
                 .inputAssetsJson(writeJson(assets))
                 .mode(request.getMode())
+                .autoQualityReview(!Boolean.FALSE.equals(request.getAutoQualityReview()))
                 .outputTarget(request.getOutputTarget())
                 .status(status)
                 .currentStage(StageEnum.PROBLEM_NORMALIZATION.getCode())
@@ -395,6 +396,7 @@ public class MathVisionTaskService {
                 .status(status)
                 .currentStage(task.getCurrentStage())
                 .mode(task.getMode())
+                .autoQualityReview(!Boolean.FALSE.equals(task.getAutoQualityReview()))
                 .outputTarget(task.getOutputTarget())
                 .providerCode(task.getProviderCode())
                 .modelName(task.getModelName())
@@ -560,6 +562,7 @@ public class MathVisionTaskService {
                 .inputSourceType(task.getInputSourceType())
                 .inputAssets(assets)
                 .mode(task.getMode())
+                .autoQualityReview(!Boolean.FALSE.equals(task.getAutoQualityReview()))
                 .outputTarget(task.getOutputTarget())
                 .status(task.getStatus())
                 .currentStage(task.getCurrentStage())
@@ -602,10 +605,11 @@ public class MathVisionTaskService {
         MathVisionTask task = findOwnedTask(taskId, userId);
 
         boolean updateMode = StringUtils.hasText(request.getMode());
+        boolean updateAutoReview = request.getAutoQualityReview() != null;
         boolean hasProvider = StringUtils.hasText(request.getProviderCode());
         boolean hasModel = StringUtils.hasText(request.getModelName());
-        if (!updateMode && !hasProvider && !hasModel) {
-            throw new IllegalArgumentException("请至少修改运行模式或模型");
+        if (!updateMode && !updateAutoReview && !hasProvider && !hasModel) {
+            throw new IllegalArgumentException("请至少修改运行模式、智能检查设置或模型");
         }
         if (hasProvider != hasModel) {
             throw new IllegalArgumentException("切换模型时必须同时提供模型厂家和模型名称");
@@ -631,15 +635,30 @@ public class MathVisionTaskService {
             selectedModelConfigId = config.getId();
         }
 
+        boolean autoReview = !Boolean.FALSE.equals(updateAutoReview ? request.getAutoQualityReview() : task.getAutoQualityReview());
         if (taskMapper.updateRuntimeSettings(
-                task.getId(), userId, mode, selectedModelConfigId, providerCode, modelName) == 0) {
+                task.getId(), userId, mode, selectedModelConfigId, providerCode, modelName, autoReview) == 0) {
             throw new IllegalArgumentException("任务状态已变化，请刷新后重试");
         }
 
         boolean switchedToAuto = updateMode
                 && "auto".equals(mode)
                 && !"auto".equals(task.getMode());
-        if (switchedToAuto && "waiting_confirm".equals(task.getStatus())) {
+        boolean enabledAutoReview = updateAutoReview && autoReview && Boolean.FALSE.equals(task.getAutoQualityReview());
+        if ("auto".equals(mode) && (switchedToAuto || enabledAutoReview) && "waiting_confirm".equals(task.getStatus())) {
+            StageEnum stage = StageEnum.fromCode(task.getCurrentStage());
+            if (autoReview && MathVisionStageQualityReview.supports(stage)) {
+                MathVisionVersion version = currentVersion(task);
+                Integer stageVersion = version != null ? stageVersionOf(version, stage.getCode()) : null;
+                MathVisionStageResult stageResult = stageVersion != null
+                        ? stageResultMapper.findByTaskStageVersion(taskId, stage.getCode(), stageVersion) : null;
+                if (stageResult != null && !MathVisionStageQualityReview.STATUS_COMPLETED.equals(
+                        MathVisionStageQualityReview.resolveStatus(objectMapper, stage, stageResult.getResultJson()))) {
+                    StageQualityReviewRequestDTO review = new StageQualityReviewRequestDTO();
+                    review.setVersion(stageVersion);
+                    return requestStageQualityReview(taskId, stage.getCode(), review);
+                }
+            }
             return startTask(taskId);
         }
 
@@ -1241,6 +1260,7 @@ public class MathVisionTaskService {
                 .status(t.getStatus())
                 .currentStage(t.getCurrentStage())
                 .mode(t.getMode())
+                .autoQualityReview(!Boolean.FALSE.equals(t.getAutoQualityReview()))
                 .outputTarget(t.getOutputTarget())
                 .providerCode(t.getProviderCode())
                 .modelName(t.getModelName())

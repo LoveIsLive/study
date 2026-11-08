@@ -9,10 +9,10 @@ import java.util.List;
 public interface MathVisionTaskMapper {
 
     @Insert("INSERT INTO mathvision_tasks(session_id, user_id, input_text, input_source_type, " +
-            "input_assets_json, mode, output_target, status, current_stage, cancel_requested, selected_model_config_id, " +
+            "input_assets_json, mode, auto_quality_review, output_target, status, current_stage, cancel_requested, selected_model_config_id, " +
             "provider_code, model_name, current_version, request_id, deleted, create_time, update_time) " +
             "VALUES(#{sessionId}, #{userId}, #{inputText}, #{inputSourceType}, #{inputAssetsJson}, " +
-            "#{mode}, #{outputTarget}, #{status}, #{currentStage}, 0, #{selectedModelConfigId}, " +
+            "#{mode}, COALESCE(#{autoQualityReview}, 1), #{outputTarget}, #{status}, #{currentStage}, 0, #{selectedModelConfigId}, " +
             "#{providerCode}, #{modelName}, #{currentVersion}, #{requestId}, 0, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void insert(MathVisionTask task);
@@ -26,6 +26,7 @@ public interface MathVisionTaskMapper {
             @Result(column = "input_source_type", property = "inputSourceType"),
             @Result(column = "input_assets_json", property = "inputAssetsJson"),
             @Result(column = "mode", property = "mode"),
+            @Result(column = "auto_quality_review", property = "autoQualityReview"),
             @Result(column = "output_target", property = "outputTarget"),
             @Result(column = "status", property = "status"),
             @Result(column = "current_stage", property = "currentStage"),
@@ -295,7 +296,7 @@ public interface MathVisionTaskMapper {
     @Update("UPDATE mathvision_tasks SET current_version = #{currentVersion}, update_time = NOW() WHERE id = #{id}")
     void updateCurrentVersion(@Param("id") Long id, @Param("currentVersion") Integer currentVersion);
 
-    @Update("UPDATE mathvision_tasks SET mode = #{mode}, selected_model_config_id = #{selectedModelConfigId}, " +
+    @Update("UPDATE mathvision_tasks SET mode = #{mode}, auto_quality_review = #{autoQualityReview}, selected_model_config_id = #{selectedModelConfigId}, " +
             "provider_code = #{providerCode}, model_name = #{modelName}, update_time = NOW() " +
             "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
     int updateRuntimeSettings(@Param("id") Long id,
@@ -303,7 +304,8 @@ public interface MathVisionTaskMapper {
                               @Param("mode") String mode,
                               @Param("selectedModelConfigId") Long selectedModelConfigId,
                               @Param("providerCode") String providerCode,
-                              @Param("modelName") String modelName);
+                              @Param("modelName") String modelName,
+                              @Param("autoQualityReview") Boolean autoQualityReview);
 
     /** 激活历史版本后同步任务的用户可见状态。 */
     @Update("UPDATE mathvision_tasks SET current_version = #{currentVersion}, status = #{status}, " +

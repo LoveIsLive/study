@@ -27,6 +27,7 @@ public class MathVisionTaskCreateRequestDTO {
     /** 生成模式: manual/auto。 */
     @NotBlank(message = "Mode cannot be empty")
     private String mode;
+    private Boolean autoQualityReview = true;
 
     /** 输出目标: manim/geogebra。 */
     @NotBlank(message = "Output target cannot be empty")

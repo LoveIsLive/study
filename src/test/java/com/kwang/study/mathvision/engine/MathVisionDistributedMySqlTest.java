@@ -57,6 +57,16 @@ class MathVisionDistributedMySqlTest {
     private MathVisionTask claim(long id) {
         assertEquals(1, tasks.claimWithLease(id, UUID.randomUUID().toString(), 120, 2)); return tasks.findById(id);
     }
+    @Test void autoReviewDefaultsToEnabledAndRuntimeSettingIsPersisted() {
+        long id = task();
+        assertTrue(tasks.findById(id).getAutoQualityReview());
+        assertEquals(1, tasks.updateRuntimeSettings(id, 1L, "auto", null, null, null, false));
+        assertFalse(tasks.findById(id).getAutoQualityReview());
+        var execution = claim(id);
+        assertFalse(execution.getAutoQualityReview());
+        assertEquals(1, tasks.updateRuntimeSettings(id, 1L, "manual", null, null, null, true));
+        assertTrue(tasks.findById(id).getAutoQualityReview());
+    }
     @Test void modelAwareClaimRejectsStaleTaskSelectionAndStillAllowsOnlyOneWorker() throws Exception {
         long id = task();
         jdbc.update("UPDATE mathvision_tasks SET provider_code='custom_a', model_name='ModelA', selected_model_config_id=1 WHERE id=?", id);

@@ -18,6 +18,7 @@ public class MathVisionTaskEventVO {
     private String errorType;
     private String errorMessage;
     private String mode;
+    private Boolean autoQualityReview;
     private String outputTarget;
     private String providerCode;
     private String modelName;

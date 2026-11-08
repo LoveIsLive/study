@@ -16,7 +16,7 @@ public class MathVisionStageExecutionResult {
     private String changeSummary;
     private String finalArtifactPath;
     private String finalArtifactType;
-    /** Manual mode pauses for optional quality review; automatic mode advances without requesting it. */
+    /** Manual mode pauses; automatic mode schedules quality review when enabled, then advances. */
     private boolean waitForUserDecision;
     /** 阶段已产出诊断结果, 但业务上应停在 failed 状态。 */
     private boolean failed;

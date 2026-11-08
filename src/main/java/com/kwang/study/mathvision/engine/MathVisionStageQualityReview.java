@@ -86,6 +86,14 @@ public final class MathVisionStageQualityReview {
         }
     }
 
+    public static String updateStatus(StageEnum stage, String resultJson, String status) {
+        return updateStatus(DEFAULT_MAPPER, stage, resultJson, status);
+    }
+
+    public static String resolveStatus(StageEnum stage, String resultJson) {
+        return resolveStatus(DEFAULT_MAPPER, stage, resultJson);
+    }
+
     private static JsonNode parse(ObjectMapper mapper, String resultJson) {
         if (mapper == null || !StringUtils.hasText(resultJson)) {
             return mapper != null ? mapper.createObjectNode() : new ObjectMapper().createObjectNode();

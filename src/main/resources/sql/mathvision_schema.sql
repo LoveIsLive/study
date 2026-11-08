@@ -55,6 +55,7 @@ CREATE TABLE `mathvision_tasks` (
   `input_source_type`        VARCHAR(16)  NULL                    COMMENT 'text/markdown/image/mixed',
   `input_assets_json`        JSON         NULL                    COMMENT '资产: fileName/filePath/mimeTypeName/fileSize/source',
   `mode`                     VARCHAR(16)  NOT NULL                COMMENT 'manual/auto',
+  `auto_quality_review`      TINYINT(1)   NOT NULL DEFAULT 1      COMMENT '自动模式下自动执行智能检查',
   `output_target`            VARCHAR(16)  NOT NULL                COMMENT 'manim/geogebra',
   `status`                   VARCHAR(20)  NOT NULL DEFAULT 'created'
                              COMMENT 'created/queued/running/waiting_confirm/failed/completed/canceled',
