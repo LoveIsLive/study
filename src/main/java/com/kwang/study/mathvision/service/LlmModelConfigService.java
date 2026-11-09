@@ -11,16 +11,13 @@ import com.kwang.study.mathvision.dto.ProviderModelsVO;
 import com.kwang.study.mathvision.enums.ProviderEnum;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
 import com.kwang.study.mathvision.pojo.LlmModelConfig;
-import com.kwang.study.mathvision.provider.LlmProviderAdapter;
-import com.kwang.study.mathvision.provider.ProviderAdapterRegistry;
-import com.kwang.study.mathvision.provider.ProviderProbeResult;
+import com.kwang.study.mathvision.engine.MathVisionCredentialTestCoordinator;
 import com.kwang.study.mathvision.util.ApiKeyCipher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.net.InetAddress;
 import java.net.URI;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,16 +35,16 @@ public class LlmModelConfigService {
 
     private final LlmModelConfigMapper configMapper;
     private final ApiKeyCipher cipher;
-    private final ProviderAdapterRegistry adapterRegistry;
+    private final MathVisionCredentialTestCoordinator tests;
     private final MathVisionModelCatalog catalog;
 
     public LlmModelConfigService(LlmModelConfigMapper configMapper,
                                  ApiKeyCipher cipher,
-                                 ProviderAdapterRegistry adapterRegistry,
+                                 MathVisionCredentialTestCoordinator tests,
                                  MathVisionModelCatalog catalog) {
         this.configMapper = configMapper;
         this.cipher = cipher;
-        this.adapterRegistry = adapterRegistry;
+        this.tests = tests;
         this.catalog = catalog;
     }
 
@@ -155,7 +152,7 @@ public class LlmModelConfigService {
         configMapper.deleteByOwnerAndProvider(userId, provider.getCode());
     }
 
-    /** 测试厂家 API Key; baseUrl 取自目录, adapter 按 provider 分派。 */
+    /** Only Workers perform the provider request; the master queues a disposable test. */
     public CredentialTestResultVO testCredential(Long userId, String providerCode) {
         LlmModelConfig cfg = configMapper.findByOwnerAndProvider(userId, providerCode);
         ProviderCatalog provider = isCustom(cfg) ? null : requireCatalogProvider(providerCode);
@@ -169,36 +166,11 @@ public class LlmModelConfigService {
                     .build();
         }
 
-        ProviderEnum providerEnum = ProviderEnum.fromCode(
-                isCustom(cfg) ? cfg.getCompatibilityType() : provider.getCode());
-        LlmProviderAdapter adapter = adapterRegistry.get(providerEnum);
-        if (adapter == null) {
-            return CredentialTestResultVO.builder()
-                    .providerCode(resolvedProviderCode)
-                    .success(false)
-                    .status("invalid")
-                    .message("该厂家暂不支持测试")
-                    .build();
-        }
+        return tests.start(cfg);
+    }
 
-        String apiKey = cipher.decrypt(cfg.getApiKeyEncrypted());
-        String baseUrl = isCustom(cfg) ? cfg.getBaseUrl() : provider.getBaseUrl();
-        ProviderProbeResult probe = isCustom(cfg)
-                ? adapter.testModel(apiKey, baseUrl, cfg.getModelName())
-                : adapter.testCredential(apiKey, baseUrl);
-
-        String status = probe.isSuccess() ? "enabled" : "invalid";
-        cfg.setStatus(status);
-        cfg.setLastTestTime(LocalDateTime.now());
-        cfg.setLastTestResult(truncate(probe.getMessage()));
-        configMapper.updateTestResult(cfg);
-
-        return CredentialTestResultVO.builder()
-                .providerCode(resolvedProviderCode)
-                .success(probe.isSuccess())
-                .status(status)
-                .message(probe.isSuccess() ? "API Key 可用" : probe.getMessage())
-                .build();
+    public CredentialTestResultVO credentialTestStatus(Long userId, String providerCode, String testId) {
+        return tests.status(userId, providerCode, testId);
     }
 
     private LlmModelDTO toModelDTO(String providerCode, ModelCatalog m) {
@@ -365,10 +337,4 @@ public class LlmModelConfigService {
         return provider;
     }
 
-    private String truncate(String msg) {
-        if (msg == null) {
-            return null;
-        }
-        return msg.length() > 255 ? msg.substring(0, 255) : msg;
-    }
 }

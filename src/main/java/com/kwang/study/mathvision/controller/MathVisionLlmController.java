@@ -78,6 +78,13 @@ public class MathVisionLlmController {
         return ResponseEntity.ok(R.success(service.testCredential(userId, providerCode)));
     }
 
+    @GetMapping("/providers/{providerCode}/credential/tests/{testId}")
+    public ResponseEntity<R<CredentialTestResultVO>> credentialTestStatus(@PathVariable String providerCode,
+                                                                         @PathVariable String testId) {
+        return ResponseEntity.ok(R.success(service.credentialTestStatus(
+                AuthenticationUserUtil.getCurrentUserId(), providerCode, testId)));
+    }
+
     /** 获取某厂家在目录中的可用模型列表 (含能力声明) */
     @GetMapping("/providers/{providerCode}/models")
     public ResponseEntity<R<ProviderModelsVO>> listModels(@PathVariable String providerCode) {

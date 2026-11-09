@@ -54,6 +54,17 @@ public interface LlmModelConfigMapper {
             "last_test_result = #{lastTestResult}, update_time = NOW() WHERE id = #{id}")
     void updateTestResult(LlmModelConfig config);
 
+    /** Do not let a slow test overwrite an edited key, URL, protocol or model. */
+    @Update("UPDATE llm_model_configs SET status = #{result.status}, last_test_time = #{result.lastTestTime}, " +
+            "last_test_result = #{result.lastTestResult}, update_time = NOW() " +
+            "WHERE id = #{expected.id} AND owner_user_id = #{expected.ownerUserId} AND status <> 'disabled' " +
+            "AND BINARY api_key_encrypted <=> BINARY #{expected.apiKeyEncrypted} " +
+            "AND BINARY provider <=> BINARY #{expected.provider} AND is_custom <=> #{expected.isCustom} " +
+            "AND BINARY compatibility_type <=> BINARY #{expected.compatibilityType} " +
+            "AND BINARY base_url <=> BINARY #{expected.baseUrl} AND BINARY model_name <=> BINARY #{expected.modelName} " +
+            "AND BINARY extra_headers_json <=> BINARY #{expected.extraHeadersJson}")
+    int updateTestResultIfUnchanged(@Param("result") LlmModelConfig result, @Param("expected") LlmModelConfig expected);
+
     @Delete("DELETE FROM llm_model_configs WHERE owner_user_id = #{ownerUserId} AND provider = #{provider}")
     int deleteByOwnerAndProvider(@Param("ownerUserId") Long ownerUserId,
                                  @Param("provider") String provider);

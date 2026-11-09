@@ -3,12 +3,9 @@ package com.kwang.study.mathvision.service;
 import com.kwang.study.mathvision.config.MathVisionModelCatalog;
 import com.kwang.study.mathvision.dto.CredentialTestResultVO;
 import com.kwang.study.mathvision.dto.CustomProviderConfigDTO;
-import com.kwang.study.mathvision.enums.ProviderEnum;
+import com.kwang.study.mathvision.engine.MathVisionCredentialTestCoordinator;
 import com.kwang.study.mathvision.mapper.LlmModelConfigMapper;
 import com.kwang.study.mathvision.pojo.LlmModelConfig;
-import com.kwang.study.mathvision.provider.LlmProviderAdapter;
-import com.kwang.study.mathvision.provider.ProviderAdapterRegistry;
-import com.kwang.study.mathvision.provider.ProviderProbeResult;
 import com.kwang.study.mathvision.util.ApiKeyCipher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,18 +26,18 @@ class LlmModelConfigServiceTest {
 
     private LlmModelConfigMapper mapper;
     private ApiKeyCipher cipher;
-    private ProviderAdapterRegistry registry;
+    private MathVisionCredentialTestCoordinator tests;
     private LlmModelConfigService service;
 
     @BeforeEach
     void setUp() {
         mapper = mock(LlmModelConfigMapper.class);
         cipher = new ApiKeyCipher("custom-provider-test-secret");
-        registry = mock(ProviderAdapterRegistry.class);
+        tests = mock(MathVisionCredentialTestCoordinator.class);
         service = new LlmModelConfigService(
                 mapper,
                 cipher,
-                registry,
+                tests,
                 new MathVisionModelCatalog());
     }
 
@@ -100,7 +97,7 @@ class LlmModelConfigServiceTest {
     }
 
     @Test
-    void testsCustomProviderThroughConfiguredModelInsteadOfModelList() {
+    void delegatesCustomProviderTestToWorkersWithoutChangingCredentialStatus() {
         LlmModelConfig config = LlmModelConfig.builder()
                 .ownerUserId(7L)
                 .provider("custom_1")
@@ -113,19 +110,14 @@ class LlmModelConfigServiceTest {
                 .apiKeyMasked("****-key")
                 .status("enabled")
                 .build();
-        LlmProviderAdapter adapter = mock(LlmProviderAdapter.class);
         when(mapper.findByOwnerAndProvider(7L, "custom_1")).thenReturn(config);
-        when(registry.get(ProviderEnum.OPENAI)).thenReturn(adapter);
-        when(adapter.testModel("secret-key", "https://api.vendor.example/v1", "vendor-model"))
-                .thenReturn(ProviderProbeResult.ok("API Key 和模型可用"));
+        when(tests.start(config)).thenReturn(CredentialTestResultVO.builder().success(false).testState("pending").build());
 
         CredentialTestResultVO result = service.testCredential(7L, "custom_1");
 
-        assertTrue(result.getSuccess());
-        verify(adapter).testModel(
-                "secret-key", "https://api.vendor.example/v1", "vendor-model");
-        verify(adapter, never()).testCredential(any(), any());
-        verify(mapper).updateTestResult(config);
+        assertEquals("pending", result.getTestState());
+        verify(tests).start(config);
+        verify(mapper, never()).updateTestResult(any());
     }
 
     private CustomProviderConfigDTO request() {

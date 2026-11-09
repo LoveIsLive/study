@@ -22,6 +22,7 @@ class MathVisionDistributedMySqlTest {
     private static String schema, processUrl;
     private static DataSource admin, source;
     private MathVisionTaskMapper tasks;
+    private LlmModelConfigMapper modelConfigs;
     private MathVisionArtifactMapper artifacts;
     private MathVisionVersionMapper versions;
     private MathVisionStageCommitService commits;
@@ -44,15 +45,38 @@ class MathVisionDistributedMySqlTest {
         jdbc = new JdbcTemplate(source);
         var configuration = new org.apache.ibatis.session.Configuration(); configuration.setMapUnderscoreToCamelCase(true);
         configuration.addMapper(MathVisionTaskMapper.class); configuration.addMapper(MathVisionArtifactMapper.class); configuration.addMapper(MathVisionVersionMapper.class);
+        configuration.addMapper(LlmModelConfigMapper.class);
         SqlSessionFactoryBean factory = new SqlSessionFactoryBean(); factory.setDataSource(source); factory.setConfiguration(configuration);
         var session = new SqlSessionTemplate(factory.getObject());
         tasks = session.getMapper(MathVisionTaskMapper.class); artifacts = session.getMapper(MathVisionArtifactMapper.class); versions = session.getMapper(MathVisionVersionMapper.class);
+        modelConfigs = session.getMapper(LlmModelConfigMapper.class);
         manager = new DataSourceTransactionManager(source); commits = new MathVisionStageCommitService(tasks, manager, versions, new ObjectMapper());
     }
     private long task() {
         var task = MathVisionTask.builder().sessionId(UUID.randomUUID().toString()).userId(1L).mode("auto").outputTarget("manim")
                 .status("queued").currentStage("code_generation").currentVersion(1).build(); tasks.insert(task);
         versions.insert(MathVisionVersion.builder().taskId(task.getId()).version(1).changeSource("initial_generation").isCurrent(true).build()); return task.getId();
+    }
+
+    @Test void workerTestSuccessCannotOverwriteChangedOrDisabledCredential() {
+        var config = LlmModelConfig.builder().ownerUserId(101L).provider("custom_" + UUID.randomUUID())
+                .isCustom(true).compatibilityType("openai").baseUrl("https://gateway.invalid/v1")
+                .modelName("model").apiKeyEncrypted("ciphertext-original").status("invalid").build();
+        modelConfigs.insert(config);
+        var expected = modelConfigs.findById(config.getId());
+        var passed = new LlmModelConfig(); passed.setStatus("enabled");
+        passed.setLastTestTime(java.time.LocalDateTime.now()); passed.setLastTestResult("Worker 测试通过");
+        assertEquals(1, modelConfigs.updateTestResultIfUnchanged(passed, expected));
+        assertEquals("enabled", modelConfigs.findById(config.getId()).getStatus());
+        jdbc.update("UPDATE llm_model_configs SET api_key_encrypted='ciphertext-new' WHERE id=?", config.getId());
+        assertEquals(0, modelConfigs.updateTestResultIfUnchanged(passed, expected));
+        expected = modelConfigs.findById(config.getId());
+        jdbc.update("UPDATE llm_model_configs SET base_url='https://other.invalid/v1' WHERE id=?", config.getId());
+        assertEquals(0, modelConfigs.updateTestResultIfUnchanged(passed, expected));
+        expected = modelConfigs.findById(config.getId());
+        jdbc.update("UPDATE llm_model_configs SET status='disabled' WHERE id=?", config.getId());
+        assertEquals(0, modelConfigs.updateTestResultIfUnchanged(passed, expected));
+        assertEquals("disabled", modelConfigs.findById(config.getId()).getStatus());
     }
     private MathVisionTask claim(long id) {
         assertEquals(1, tasks.claimWithLease(id, UUID.randomUUID().toString(), 120, 2)); return tasks.findById(id);
