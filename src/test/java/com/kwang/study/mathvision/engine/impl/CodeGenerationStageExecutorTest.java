@@ -109,9 +109,9 @@ class CodeGenerationStageExecutorTest {
         assertFalse(generationResult.isFailed());
         assertTrue(generationResult.isWaitForUserDecision());
         JsonNode generationJson = objectMapper.readTree(generationResult.getResultJson());
-        assertTrue(generationJson.path("codeGenerationAttempts").asInt() == 2);
-        assertTrue(generationJson.path("codeGenerationRetryFailures").size() == 1);
-        assertTrue("pending".equals(generationJson.path("qualityReview").path("status").asText()));
+        assertTrue(generationJson.path("code_generation_attempts").asInt() == 2);
+        assertTrue(generationJson.path("code_generation_retry_failures").size() == 1);
+        assertTrue("pending".equals(generationJson.path("quality_review").path("status").asText()));
         verify(codeEvaluationNode, times(0)).run(eq(task), any(ProblemBundle.class), any(Narrative.class),
                 any(CodeResult.class), anyInt(), anyBoolean(), any(MathVisionStageExecutionContext.class));
         verify(codeFixNode, times(0)).run(
@@ -131,12 +131,12 @@ class CodeGenerationStageExecutorTest {
         assertFalse(reviewResult.isFailed());
         assertTrue(reviewResult.isWaitForUserDecision());
         JsonNode resultJson = objectMapper.readTree(reviewResult.getResultJson());
-        assertFalse(resultJson.path("codeEvaluationApproved").asBoolean());
-        assertTrue(resultJson.path("codeEvaluationWarning").asBoolean());
-        assertTrue(resultJson.path("codeGenerationAttempts").asInt() == 2);
-        assertTrue(resultJson.path("codeGenerationRetryFailures").size() == 1);
-        assertTrue(resultJson.path("codeEvaluationMaxRetries").asInt() == 1);
-        assertTrue("completed".equals(resultJson.path("qualityReview").path("status").asText()));
+        assertFalse(resultJson.path("code_evaluation_approved").asBoolean());
+        assertTrue(resultJson.path("code_evaluation_warning").asBoolean());
+        assertTrue(resultJson.path("code_generation_attempts").asInt() == 2);
+        assertTrue(resultJson.path("code_generation_retry_failures").size() == 1);
+        assertTrue(resultJson.path("code_evaluation_max_retries").asInt() == 1);
+        assertTrue("completed".equals(resultJson.path("quality_review").path("status").asText()));
         verify(codeGenerationNode, times(2)).run(
                 eq(task), any(ProblemBundle.class), any(Narrative.class),
                 any(StageGenerationRequest.class), any(MathVisionStageExecutionContext.class));

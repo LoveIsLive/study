@@ -99,7 +99,7 @@ class MathVisionStageRunnerTest {
         when(executorRegistry.find(StageEnum.VISUAL_STORYBOARD)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
                 .artifactJson("{\"target_description\":\"revised storyboard\"}")
-                .resultJson("{\"validationCompleted\":true}")
+                .resultJson("{\"validation_completed\":true}")
                 .waitForUserDecision(true)
                 .build());
         when(artifactMapper.findMaxVersion(81L, "visual_storyboard")).thenReturn(4);
@@ -202,7 +202,7 @@ class MathVisionStageRunnerTest {
                 .artifactId(44L)
                 .stage("visual_storyboard")
                 .version(4)
-                .resultJson("{\"validationCompleted\":false}")
+                .resultJson("{\"validation_completed\":false}")
                 .build();
         when(taskMapper.findById(82L)).thenReturn(task);
         when(versionMapper.findByTaskVersion(82L, 2)).thenReturn(version);
@@ -211,7 +211,7 @@ class MathVisionStageRunnerTest {
         when(executorRegistry.find(StageEnum.VISUAL_STORYBOARD)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
                 .artifactJson("{\"target_description\":\"updated\"}")
-                .resultJson("{\"validationCompleted\":true}")
+                .resultJson("{\"validation_completed\":true}")
                 .changeSource("auto_fix")
                 .changeSummary("system retry completed")
                 .build());
@@ -224,7 +224,7 @@ class MathVisionStageRunnerTest {
         assertEquals("{\"target_description\":\"updated\"}", artifactCaptor.getValue().getArtifactJson());
         assertEquals("auto_fix", artifactCaptor.getValue().getChangeSource());
         verify(stageResultMapper).updateResultJson(stageResult);
-        assertEquals("{\"validationCompleted\":true}", stageResult.getResultJson());
+        assertEquals("{\"validation_completed\":true}", stageResult.getResultJson());
         verify(artifactMapper, never()).findMaxVersion(82L, "visual_storyboard");
         verify(artifactMapper, never()).insert(any());
         verify(versionMapper, never()).updateStagePointer(82L, 2, "visual_storyboard", 4);
@@ -264,7 +264,7 @@ class MathVisionStageRunnerTest {
                 .taskId(85L)
                 .stage("visual_storyboard")
                 .version(8)
-                .resultJson("{\"qualityReview\":{\"status\":\"requested\"}}")
+                .resultJson("{\"quality_review\":{\"status\":\"requested\"}}")
                 .build();
         when(taskMapper.findById(85L)).thenReturn(task);
         when(versionMapper.findByTaskVersion(85L, 6)).thenReturn(version);
@@ -276,7 +276,7 @@ class MathVisionStageRunnerTest {
         when(executorRegistry.find(StageEnum.VISUAL_STORYBOARD)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
                 .artifactJson("{\"storyboard\":{\"validated\":true}}")
-                .resultJson("{\"qualityReview\":{\"status\":\"completed\"}}")
+                .resultJson("{\"quality_review\":{\"status\":\"completed\"}}")
                 .waitForUserDecision(true)
                 .build());
 
@@ -311,7 +311,7 @@ class MathVisionStageRunnerTest {
         when(executorRegistry.find(stage)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
                 .artifactJson("{}")
-                .resultJson("{\"qualityReview\":{\"status\":\"pending\"}}")
+                .resultJson("{\"quality_review\":{\"status\":\"pending\"}}")
                 .waitForUserDecision(true)
                 .build());
 
@@ -411,8 +411,8 @@ class MathVisionStageRunnerTest {
             return MathVisionStageExecutionResult.builder()
                     .artifactJson("{}")
                     .resultJson(context.isQualityReviewRequested()
-                            ? "{\"qualityReview\":{\"status\":\"completed\"}}"
-                            : "{\"qualityReview\":{\"status\":\"pending\"}}")
+                            ? "{\"quality_review\":{\"status\":\"completed\"}}"
+                            : "{\"quality_review\":{\"status\":\"pending\"}}")
                     .waitForUserDecision(MathVisionStageQualityReview.supports(context.getStage())).build();
         });
         doAnswer(invocation -> {
@@ -448,7 +448,7 @@ class MathVisionStageRunnerTest {
         when(taskMapper.findById(95L)).thenReturn(task);
         when(executorRegistry.find(stage)).thenReturn(Optional.of(executor));
         when(executor.execute(any())).thenReturn(MathVisionStageExecutionResult.builder()
-                .artifactJson("{}").resultJson("{\"qualityReview\":{\"status\":\"pending\"}}")
+                .artifactJson("{}").resultJson("{\"quality_review\":{\"status\":\"pending\"}}")
                 .waitForUserDecision(true).build());
         doAnswer(invocation -> { invocation.getArgument(0, MathVisionArtifact.class).setId(950L); return null; })
                 .when(artifactMapper).insert(any());

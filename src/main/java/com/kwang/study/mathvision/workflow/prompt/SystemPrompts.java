@@ -314,7 +314,7 @@ public final class SystemPrompts {
             "Reasoning-graph learner-facing Chinese text rules:\n"
                     + "- Write every learner-facing natural-language field in Chinese: each node's `step` and `reason`, every `definitions` value, `interpretation`, and every `examples` item.\n"
                     + "- Keep formulas, variable names, point names, geometric notation, and LaTeX symbolic; do not translate symbols such as `A`, `P`, `AB`, `x`, `\\angle APB`, or formula content into Chinese prose.\n"
-                    + "- Keep backend-only identifiers and enum values in ASCII English, including node `id`, `start_id`, `node_type`, `next_edges` keys and values, and `teaching_order` entries. Definition keys should remain the exact symbol or notation being defined.\n"
+                    + "- Keep backend-only identifiers and enum values in ASCII English, including node `id`, `start_node_id`, `node_type`, `next_edges` keys and values, and `teaching_order` entries. Definition keys should remain the exact symbol or notation being defined.\n"
                     + "- During enrichment and user revision, preserve Chinese learner-facing text; do not translate it to English or pinyin.\n";
 
     /** Manim-only action narration and voiceover planning rules. */

@@ -25,6 +25,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -205,8 +206,8 @@ public class ExplorationNode {
     private KnowledgeGraph parseGraphPayload(JsonNode payload, DirectGraphMode graphMode) {
         Map<String, KnowledgeNode> nodes = parseGraphNodes(payload, graphMode);
         Map<String, List<String>> nextEdges = parseNextEdges(payload, nodes);
-        String requestedStartId = payload != null && payload.hasNonNull("start_id")
-                ? ConceptUtils.normalizeConcept(payload.get("start_id").asText())
+        String requestedStartId = payload != null && payload.hasNonNull("start_node_id")
+                ? ConceptUtils.normalizeConcept(payload.get("start_node_id").asText())
                 : "";
         String startId = selectStart(requestedStartId, nodes, nextEdges, graphMode);
         recomputeDepths(startId, nodes, nextEdges);
@@ -216,13 +217,19 @@ public class ExplorationNode {
 
     private Map<String, KnowledgeNode> parseGraphNodes(JsonNode payload, DirectGraphMode graphMode) {
         Map<String, KnowledgeNode> nodes = new LinkedHashMap<>();
-        JsonNode nodesArray = payload != null ? payload.get("nodes") : null;
-        if (nodesArray == null || !nodesArray.isArray()) {
+        JsonNode nodesObject = payload != null ? payload.get("nodes") : null;
+        if (nodesObject == null || !nodesObject.isObject()) {
             return nodes;
         }
 
-        for (JsonNode nodeJson : nodesArray) {
-            String rawId = nodeJson.hasNonNull("id") ? nodeJson.get("id").asText() : nodeJson.path("step").asText("");
+        Iterator<Map.Entry<String, JsonNode>> entries = nodesObject.fields();
+        while (entries.hasNext()) {
+            Map.Entry<String, JsonNode> entry = entries.next();
+            JsonNode nodeJson = entry.getValue();
+            if (nodeJson == null || !nodeJson.isObject()) {
+                continue;
+            }
+            String rawId = nodeJson.hasNonNull("id") ? nodeJson.get("id").asText() : entry.getKey();
             String nodeId = ConceptUtils.normalizeConcept(rawId);
             if (!StringUtils.hasText(nodeId) || nodes.containsKey(nodeId)) {
                 continue;

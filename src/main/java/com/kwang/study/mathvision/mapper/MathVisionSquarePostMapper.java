@@ -25,8 +25,8 @@ public interface MathVisionSquarePostMapper {
             "t.user_id AS owner_user_id, " +
             "COALESCE(NULLIF(s.title, ''), 'MathVision 教学成果') AS title, " +
             "LEFT(t.input_text, 500) AS summary, t.output_target, u.username AS author_name, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactPath')) AS artifact_path, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactType')) AS artifact_type " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_path')) AS artifact_path, " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_type')) AS artifact_type " +
             "FROM mathvision_square_posts p " +
             "INNER JOIN mathvision_tasks t ON t.id = p.task_id AND t.deleted = 0 " +
             "INNER JOIN mathvision_versions v ON v.task_id = p.task_id AND v.version = p.version " +
@@ -55,8 +55,8 @@ public interface MathVisionSquarePostMapper {
             "t.user_id AS owner_user_id, " +
             "COALESCE(NULLIF(s.title, ''), 'MathVision 教学成果') AS title, " +
             "LEFT(t.input_text, 500) AS summary, t.output_target, u.username AS author_name, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactPath')) AS artifact_path, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactType')) AS artifact_type " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_path')) AS artifact_path, " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_type')) AS artifact_type " +
             "FROM mathvision_square_posts p " +
             "INNER JOIN mathvision_tasks t ON t.id = p.task_id AND t.deleted = 0 " +
             "INNER JOIN mathvision_versions v ON v.task_id = p.task_id AND v.version = p.version " +
@@ -74,8 +74,8 @@ public interface MathVisionSquarePostMapper {
             "t.user_id AS owner_user_id, " +
             "COALESCE(NULLIF(s.title, ''), 'MathVision 教学成果') AS title, " +
             "LEFT(t.input_text, 500) AS summary, t.output_target, u.username AS author_name, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactPath')) AS artifact_path, " +
-            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifactType')) AS artifact_type " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_path')) AS artifact_path, " +
+            "JSON_UNQUOTE(JSON_EXTRACT(a.artifact_json, '$.artifact_type')) AS artifact_type " +
             "FROM mathvision_square_posts p " +
             "INNER JOIN mathvision_tasks t ON t.id = p.task_id AND t.deleted = 0 " +
             "INNER JOIN mathvision_versions v ON v.task_id = p.task_id AND v.version = p.version " +

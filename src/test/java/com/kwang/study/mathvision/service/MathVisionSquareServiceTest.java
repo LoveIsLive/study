@@ -158,7 +158,7 @@ class MathVisionSquareServiceTest {
                         .taskId(5L)
                         .version(2)
                         .rrVersion(3)
-                        .workflowSummaryJson("{\"artifactPath\":\"" + sourcePath + "\"}")
+                        .workflowSummaryJson("{\"artifact_path\":\"" + sourcePath + "\"}")
                         .build());
         when(artifactMapper.findByTaskStageVersion(5L, "render_result", 3)).thenReturn(
                 MathVisionArtifact.builder()
@@ -166,7 +166,7 @@ class MathVisionSquareServiceTest {
                         .taskId(5L)
                         .stage("render_result")
                         .version(3)
-                        .artifactJson("{\"artifactPath\":\"" + sourcePath + "\",\"artifactType\":\"mp4\"}")
+                        .artifactJson("{\"artifact_path\":\"" + sourcePath + "\",\"artifact_type\":\"mp4\"}")
                         .build());
         FileObjectResult file = new FileObjectResult();
         file.setMimeTypeName("video/mp4");

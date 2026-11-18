@@ -100,18 +100,18 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         CodeResult codeResult = nodeResult.getCodeResult();
         codeResult.setToolCalls(nodeResult.getApiCalls());
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", nodeResult.getApiCalls());
-        resultJson.put("codeGenerationApiCalls", nodeResult.getApiCalls());
-        resultJson.put("codeGenerationAttempts", generationRun.attempts);
-        ArrayNode generationFailures = resultJson.putArray("codeGenerationRetryFailures");
+        resultJson.put("api_calls", nodeResult.getApiCalls());
+        resultJson.put("code_generation_api_calls", nodeResult.getApiCalls());
+        resultJson.put("code_generation_attempts", generationRun.attempts);
+        ArrayNode generationFailures = resultJson.putArray("code_generation_retry_failures");
         for (String failure : generationRun.failures) {
             generationFailures.add(failure);
         }
-        resultJson.put("lineCount", codeResult != null ? codeResult.codeLineCount() : 0);
-        resultJson.put("sceneName", codeResult != null ? codeResult.getSceneName() : null);
-        resultJson.put("artifactName", codeResult != null ? codeResult.getArtifactName() : null);
-        resultJson.put("artifactFormat", codeResult != null ? codeResult.getArtifactFormat() : null);
-        resultJson.put("outputTarget", codeResult != null ? codeResult.getOutputTarget() : null);
+        resultJson.put("line_count", codeResult != null ? codeResult.codeLineCount() : 0);
+        resultJson.put("scene_name", codeResult != null ? codeResult.getSceneName() : null);
+        resultJson.put("artifact_name", codeResult != null ? codeResult.getArtifactName() : null);
+        resultJson.put("artifact_format", codeResult != null ? codeResult.getArtifactFormat() : null);
+        resultJson.put("output_target", codeResult != null ? codeResult.getOutputTarget() : null);
         MathVisionStageQualityReview.writeState(
                 resultJson, stage(), MathVisionStageQualityReview.STATUS_PENDING);
 
@@ -199,28 +199,28 @@ public class CodeGenerationStageExecutor implements MathVisionStageExecutor {
         }
 
         ObjectNode resultJson = previousResult(context);
-        int previousApiCalls = resultJson.path("apiCalls").asInt(0);
+        int previousApiCalls = resultJson.path("api_calls").asInt(0);
         int totalApiCalls = previousApiCalls + reviewApiCalls;
         codeResult.setToolCalls(totalApiCalls);
         boolean approved = latestEvaluation != null && latestEvaluation.isApprovedForRender();
-        resultJson.put("apiCalls", totalApiCalls);
-        resultJson.put("codeEvaluationApiCalls", reviewApiCalls);
-        resultJson.put("codeEvaluationMaxRetries", maxCodeEvaluationFixAttempts);
-        resultJson.put("codeFixConversationRounds", codeFixConversationRounds());
-        resultJson.put("lineCount", codeResult.codeLineCount());
-        resultJson.put("sceneName", codeResult.getSceneName());
-        resultJson.put("artifactName", codeResult.getArtifactName());
-        resultJson.put("artifactFormat", codeResult.getArtifactFormat());
-        resultJson.put("outputTarget", codeResult.getOutputTarget());
-        resultJson.put("codeEvaluationApproved", approved);
-        resultJson.put("codeEvaluationWarning", !approved);
-        resultJson.put("codeEvaluationGateReason", latestEvaluation != null ? latestEvaluation.getGateReason() : "");
-        resultJson.set("codeEvaluation", objectMapper.valueToTree(latestEvaluation));
-        ArrayNode attemptsNode = resultJson.putArray("codeEvaluationAttempts");
+        resultJson.put("api_calls", totalApiCalls);
+        resultJson.put("code_evaluation_api_calls", reviewApiCalls);
+        resultJson.put("code_evaluation_max_retries", maxCodeEvaluationFixAttempts);
+        resultJson.put("code_fix_conversation_rounds", codeFixConversationRounds());
+        resultJson.put("line_count", codeResult.codeLineCount());
+        resultJson.put("scene_name", codeResult.getSceneName());
+        resultJson.put("artifact_name", codeResult.getArtifactName());
+        resultJson.put("artifact_format", codeResult.getArtifactFormat());
+        resultJson.put("output_target", codeResult.getOutputTarget());
+        resultJson.put("code_evaluation_approved", approved);
+        resultJson.put("code_evaluation_warning", !approved);
+        resultJson.put("code_evaluation_gate_reason", latestEvaluation != null ? latestEvaluation.getGateReason() : "");
+        resultJson.set("code_evaluation", objectMapper.valueToTree(latestEvaluation));
+        ArrayNode attemptsNode = resultJson.putArray("code_evaluation_attempts");
         for (CodeEvaluationResult attempt : evaluationAttempts) {
             attemptsNode.add(objectMapper.valueToTree(attempt));
         }
-        ArrayNode fixTraceNode = resultJson.putArray("codeFixTrace");
+        ArrayNode fixTraceNode = resultJson.putArray("code_fix_trace");
         for (CodeFixResult fixResult : fixTrace) {
             fixTraceNode.add(objectMapper.valueToTree(fixResult));
         }

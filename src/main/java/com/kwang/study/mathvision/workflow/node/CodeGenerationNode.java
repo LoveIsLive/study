@@ -335,7 +335,7 @@ public class CodeGenerationNode {
                     task,
                     sceneMessages,
                     ToolSchemas.SCENE_CODE,
-                    List.of("sceneCode"));
+                    List.of("scene_code"));
             apiCalls[0] += response.getApiCalls();
 
             updateRuntimeObjectState(createdRuntimeObjects, visibleRuntimeObjects, scene, enrichedRegistry);
@@ -1275,9 +1275,9 @@ public class CodeGenerationNode {
 
     private List<String> preferredCodeFields(String outputTarget) {
         if ("geogebra".equalsIgnoreCase(outputTarget)) {
-            return List.of("geogebraCode");
+            return List.of("geogebra_code");
         }
-        return List.of("manimCode");
+        return List.of("manim_code");
     }
 
     private String textField(JsonNode payload, String field) {

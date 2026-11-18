@@ -1,7 +1,6 @@
 package com.kwang.study.mathvision.workflow.node;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kwang.study.mathvision.engine.MathVisionStageExecutionContext;
 import com.kwang.study.mathvision.enums.StageEnum;
@@ -169,10 +168,10 @@ class ReasoningGraphRevisionNodeTest {
 
     private ObjectNode graphPayload(String firstStep, String secondStep) {
         ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("start_id", "step_1");
-        ArrayNode nodes = payload.putArray("nodes");
-        nodes.add(graphNode("step_1", firstStep, "problem", 0));
-        nodes.add(graphNode("step_2", secondStep, "conclusion", 1));
+        payload.put("start_node_id", "step_1");
+        ObjectNode nodes = payload.putObject("nodes");
+        nodes.set("step_1", graphNode("step_1", firstStep, "problem", 0));
+        nodes.set("step_2", graphNode("step_2", secondStep, "conclusion", 1));
         payload.putObject("next_edges").putArray("step_1").add("step_2");
         payload.putArray("teaching_order").add("step_1").add("step_2");
         return payload;

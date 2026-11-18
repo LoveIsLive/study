@@ -75,8 +75,8 @@ class VisualStoryboardStageExecutorTest {
         assertFalse(designResult.isFailed());
         assertTrue(designResult.isWaitForUserDecision());
         JsonNode designJson = objectMapper.readTree(designResult.getResultJson());
-        assertEquals("pending", designJson.path("qualityReview").path("status").asText());
-        assertFalse(designJson.path("validationCompleted").asBoolean());
+        assertEquals("pending", designJson.path("quality_review").path("status").asText());
+        assertFalse(designJson.path("validation_completed").asBoolean());
         verify(validationNode, times(0)).run(
                 eq(task), any(ProblemBundle.class), any(KnowledgeGraph.class),
                 any(Narrative.class), any(MathVisionStageExecutionContext.class));
@@ -100,8 +100,8 @@ class VisualStoryboardStageExecutorTest {
 
         assertTrue(reviewResult.isWaitForUserDecision());
         JsonNode reviewJson = objectMapper.readTree(reviewResult.getResultJson());
-        assertTrue(reviewJson.path("validationCompleted").asBoolean());
-        assertEquals("completed", reviewJson.path("qualityReview").path("status").asText());
+        assertTrue(reviewJson.path("validation_completed").asBoolean());
+        assertEquals("completed", reviewJson.path("quality_review").path("status").asText());
         verify(visualDesignNode, times(1)).run(
                 eq(task), any(ProblemBundle.class), any(KnowledgeGraph.class),
                 any(MathVisionStageExecutionContext.class));

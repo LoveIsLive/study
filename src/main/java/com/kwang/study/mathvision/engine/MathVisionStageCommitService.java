@@ -63,7 +63,7 @@ public class MathVisionStageCommitService {
                 try { summary = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(version.getWorkflowSummaryJson()); }
                 catch (Exception ignored) { summary = json.createObjectNode(); }
                 if (summary == null) summary = json.createObjectNode();
-                var tokens = summary.with("executionCommits");
+                var tokens = summary.with("execution_commits");
                 tokens.put(execution.getLockToken(), execution.getCurrentStage());
                 versions.updateWorkflowSummary(execution.getId(), execution.getCurrentVersion(), summary.toString());
             }
@@ -77,7 +77,7 @@ public class MathVisionStageCommitService {
     public boolean wasCommitted(MathVisionTask execution) {
         if (execution.getLockToken() == null) return false;
         var version = versions.findByTaskVersion(execution.getId(), execution.getCurrentVersion());
-        try { return version != null && json.readTree(version.getWorkflowSummaryJson()).path("executionCommits").has(execution.getLockToken()); }
+        try { return version != null && json.readTree(version.getWorkflowSummaryJson()).path("execution_commits").has(execution.getLockToken()); }
         catch (Exception ignored) { return false; }
     }
 }

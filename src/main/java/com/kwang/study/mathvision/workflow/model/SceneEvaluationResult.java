@@ -19,46 +19,46 @@ public class SceneEvaluationResult {
     @JsonProperty("approved")
     private boolean approved;
 
-    @JsonProperty("revisionTriggered")
+    @JsonProperty("revision_triggered")
     private boolean revisionTriggered;
 
-    @JsonProperty("revisionAttempts")
+    @JsonProperty("revision_attempts")
     private int revisionAttempts;
 
-    @JsonProperty("renderSuccess")
+    @JsonProperty("render_success")
     private boolean renderSuccess;
 
-    @JsonProperty("sceneName")
+    @JsonProperty("scene_name")
     private String sceneName;
 
-    @JsonProperty("geometryPath")
+    @JsonProperty("geometry_path")
     private String geometryPath;
 
-    @JsonProperty("gateReason")
+    @JsonProperty("gate_reason")
     private String gateReason;
 
-    @JsonProperty("sampleCount")
+    @JsonProperty("sample_count")
     private int sampleCount;
 
-    @JsonProperty("issueSampleCount")
+    @JsonProperty("issue_sample_count")
     private int issueSampleCount;
 
-    @JsonProperty("totalIssueCount")
+    @JsonProperty("total_issue_count")
     private int totalIssueCount;
 
-    @JsonProperty("overlapIssueCount")
+    @JsonProperty("overlap_issue_count")
     private int overlapIssueCount;
 
-    @JsonProperty("offscreenIssueCount")
+    @JsonProperty("offscreen_issue_count")
     private int offscreenIssueCount;
 
-    @JsonProperty("blockingIssueCount")
+    @JsonProperty("blocking_issue_count")
     private int blockingIssueCount;
 
-    @JsonProperty("toolCalls")
+    @JsonProperty("tool_calls")
     private int toolCalls;
 
-    @JsonProperty("executionTimeSeconds")
+    @JsonProperty("execution_time_seconds")
     private double executionTimeSeconds;
 
     @JsonProperty("samples")
@@ -68,29 +68,29 @@ public class SceneEvaluationResult {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class SampleEvaluation {
-        @JsonProperty("sampleId")
+        @JsonProperty("sample_id")
         private String sampleId;
-        @JsonProperty("playIndex")
+        @JsonProperty("play_index")
         private Integer playIndex;
-        @JsonProperty("sampleRole")
+        @JsonProperty("sample_role")
         private String sampleRole;
         @JsonProperty("trigger")
         private String trigger;
-        @JsonProperty("sceneMethod")
+        @JsonProperty("scene_method")
         private String sceneMethod;
-        @JsonProperty("sourceCode")
+        @JsonProperty("source_code")
         private String sourceCode;
-        @JsonProperty("elementCount")
+        @JsonProperty("element_count")
         private int elementCount;
-        @JsonProperty("hasIssues")
+        @JsonProperty("has_issues")
         private boolean hasIssues;
-        @JsonProperty("issueCount")
+        @JsonProperty("issue_count")
         private int issueCount;
-        @JsonProperty("overlapIssueCount")
+        @JsonProperty("overlap_issue_count")
         private int overlapIssueCount;
-        @JsonProperty("offscreenIssueCount")
+        @JsonProperty("offscreen_issue_count")
         private int offscreenIssueCount;
-        @JsonProperty("blockingIssueCount")
+        @JsonProperty("blocking_issue_count")
         private int blockingIssueCount;
         @JsonProperty("issues")
         private List<LayoutIssue> issues = new ArrayList<>();
@@ -106,21 +106,21 @@ public class SceneEvaluationResult {
         private String message;
         @JsonProperty("severity")
         private String severity;
-        @JsonProperty("reasonCode")
+        @JsonProperty("reason_code")
         private String reasonCode;
-        @JsonProperty("likelyFalsePositive")
+        @JsonProperty("likely_false_positive")
         private Boolean likelyFalsePositive;
-        @JsonProperty("recommendedAction")
+        @JsonProperty("recommended_action")
         private String recommendedAction;
-        @JsonProperty("primaryElement")
+        @JsonProperty("primary_element")
         private ElementRef primaryElement;
-        @JsonProperty("secondaryElement")
+        @JsonProperty("secondary_element")
         private ElementRef secondaryElement;
         @JsonProperty("overflow")
         private Overflow overflow;
-        @JsonProperty("intersectionArea")
+        @JsonProperty("intersection_area")
         private Double intersectionArea;
-        @JsonProperty("intersectionBounds")
+        @JsonProperty("intersection_bounds")
         private Bounds intersectionBounds;
     }
 
@@ -128,13 +128,13 @@ public class SceneEvaluationResult {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class ElementRef {
-        @JsonProperty("stableId")
+        @JsonProperty("stable_id")
         private String stableId;
-        @JsonProperty("semanticName")
+        @JsonProperty("semantic_name")
         private String semanticName;
-        @JsonProperty("className")
+        @JsonProperty("class_name")
         private String className;
-        @JsonProperty("sampleRole")
+        @JsonProperty("sample_role")
         private String sampleRole;
         @JsonProperty("bounds")
         private Bounds bounds;

@@ -208,9 +208,9 @@ public class CodeFixNode {
 
     private List<String> preferredFields(String outputTarget) {
         if ("geogebra".equalsIgnoreCase(outputTarget)) {
-            return List.of("geogebraCode");
+            return List.of("geogebra_code");
         }
-        return List.of("manimCode");
+        return List.of("manim_code");
     }
 
     private String normalizeFixedCode(String fixedCode, String outputTarget) {

@@ -10,7 +10,7 @@ import org.springframework.util.StringUtils;
 public final class MathVisionStageQualityReview {
 
     private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
-    public static final String FIELD = "qualityReview";
+    public static final String FIELD = "quality_review";
     public static final String STATUS_PENDING = "pending";
     public static final String STATUS_REQUESTED = "requested";
     public static final String STATUS_COMPLETED = "completed";
@@ -111,36 +111,36 @@ public final class MathVisionStageQualityReview {
             return false;
         }
         if (StageEnum.VISUAL_STORYBOARD.equals(stage)) {
-            return root.path("validationCompleted").asBoolean(false) || root.has("validationReport");
+            return root.path("validation_completed").asBoolean(false) || root.has("validation_report");
         }
         if (StageEnum.CODE_GENERATION.equals(stage)) {
-            return root.has("codeEvaluationAttempts")
-                    || root.has("codeEvaluationApproved")
-                    || root.has("codeEvaluationGateReason");
+            return root.has("code_evaluation_attempts")
+                    || root.has("code_evaluation_approved")
+                    || root.has("code_evaluation_gate_reason");
         }
         if (StageEnum.RENDER_RESULT.equals(stage)) {
-            return root.has("sceneEvaluation") || root.has("sceneEvaluationApproved");
+            return root.has("scene_evaluation") || root.has("scene_evaluation_approved");
         }
         return false;
     }
 
     private static void clearCompletedReviewFields(ObjectNode root, StageEnum stage) {
         if (StageEnum.VISUAL_STORYBOARD.equals(stage)) {
-            root.remove("validationReport");
-            root.put("validationCompleted", false);
+            root.remove("validation_report");
+            root.put("validation_completed", false);
             return;
         }
         if (StageEnum.CODE_GENERATION.equals(stage)) {
-            root.remove("codeEvaluationAttempts");
-            root.remove("codeFixTrace");
-            root.remove("codeEvaluationApproved");
-            root.remove("codeEvaluationGateReason");
+            root.remove("code_evaluation_attempts");
+            root.remove("code_fix_trace");
+            root.remove("code_evaluation_approved");
+            root.remove("code_evaluation_gate_reason");
             return;
         }
         if (StageEnum.RENDER_RESULT.equals(stage)) {
-            root.remove("sceneEvaluation");
-            root.remove("sceneEvaluationApproved");
-            root.remove("sceneEvaluationWarning");
+            root.remove("scene_evaluation");
+            root.remove("scene_evaluation_approved");
+            root.remove("scene_evaluation_warning");
         }
     }
 

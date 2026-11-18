@@ -157,13 +157,13 @@ public class MathVisionFinalCodeArtifactService {
             ObjectNode result = parsed != null && parsed.isObject()
                     ? (ObjectNode) parsed.deepCopy()
                     : objectMapper.createObjectNode();
-            result.put("lineCount", finalCodeResult.codeLineCount());
-            result.put("sceneName", finalCodeResult.getSceneName());
-            result.put("artifactName", finalCodeResult.getArtifactName());
-            result.put("artifactFormat", finalCodeResult.getArtifactFormat());
-            result.put("outputTarget", finalCodeResult.getOutputTarget());
-            result.put("finalCodeUpdatedFromRender", true);
-            result.put("finalCodeStageVersion", finalCodeVersion);
+            result.put("line_count", finalCodeResult.codeLineCount());
+            result.put("scene_name", finalCodeResult.getSceneName());
+            result.put("artifact_name", finalCodeResult.getArtifactName());
+            result.put("artifact_format", finalCodeResult.getArtifactFormat());
+            result.put("output_target", finalCodeResult.getOutputTarget());
+            result.put("final_code_updated_from_render", true);
+            result.put("final_code_stage_version", finalCodeVersion);
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to copy code-generation result metadata: " + e.getMessage(), e);

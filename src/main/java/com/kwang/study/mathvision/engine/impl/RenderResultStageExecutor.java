@@ -486,38 +486,38 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
         }
 
         ObjectNode resultJson = previousResult(context);
-        resultJson.put("apiCalls", apiCalls);
-        resultJson.put("renderQuality", renderQuality);
-        resultJson.put("renderMaxRetries", renderMaxRetries);
-        resultJson.put("sceneEvaluationMaxRetries", sceneEvaluationMaxRetries);
-        resultJson.put("renderFixConversationMessages", renderFixConversation.size());
-        resultJson.put("sceneFixConversationMessages", 0);
-        resultJson.put("sceneFixHistoryEntries", sceneFixHistory.size());
-        resultJson.set("renderResult", objectMapper.valueToTree(renderResult));
-        resultJson.set("lastRenderResult", objectMapper.valueToTree(lastRenderResult));
-        resultJson.set("sceneEvaluation", objectMapper.valueToTree(sceneEvaluationResult));
+        resultJson.put("api_calls", apiCalls);
+        resultJson.put("render_quality", renderQuality);
+        resultJson.put("render_max_retries", renderMaxRetries);
+        resultJson.put("scene_evaluation_max_retries", sceneEvaluationMaxRetries);
+        resultJson.put("render_fix_conversation_messages", renderFixConversation.size());
+        resultJson.put("scene_fix_conversation_messages", 0);
+        resultJson.put("scene_fix_history_entries", sceneFixHistory.size());
+        resultJson.set("render_result", objectMapper.valueToTree(renderResult));
+        resultJson.set("last_render_result", objectMapper.valueToTree(lastRenderResult));
+        resultJson.set("scene_evaluation", objectMapper.valueToTree(sceneEvaluationResult));
         resultJson.put("success", stageSuccess);
-        resultJson.put("renderSuccess", renderSuccess);
-        resultJson.put("renderEverSucceeded", renderSuccess);
-        resultJson.put("renderFinalSuccess", renderFinalSuccess);
-        resultJson.put("sceneEvaluationApproved", sceneApproved);
-        resultJson.put("sceneEvaluationWarning", sceneEvaluationWarning);
-        resultJson.put("finalCodeWritebackUpdated", false); // Set by the fenced stage transaction.
+        resultJson.put("render_success", renderSuccess);
+        resultJson.put("render_ever_succeeded", renderSuccess);
+        resultJson.put("render_final_success", renderFinalSuccess);
+        resultJson.put("scene_evaluation_approved", sceneApproved);
+        resultJson.put("scene_evaluation_warning", sceneEvaluationWarning);
+        resultJson.put("final_code_writeback_updated", false); // Set by the fenced stage transaction.
         if (StringUtils.hasText(storageError)) {
-            resultJson.put("artifactStorageWarning", storageError);
+            resultJson.put("artifact_storage_warning", storageError);
         }
-        resultJson.put("artifactPath", renderResult != null ? renderResult.getArtifactPath() : null);
-        resultJson.put("artifactType", renderResult != null ? renderResult.getArtifactType() : null);
-        ArrayNode fixTraceNode = resultJson.putArray("codeFixTrace");
+        resultJson.put("artifact_path", renderResult != null ? renderResult.getArtifactPath() : null);
+        resultJson.put("artifact_type", renderResult != null ? renderResult.getArtifactType() : null);
+        ArrayNode fixTraceNode = resultJson.putArray("code_fix_trace");
         for (CodeFixResult fixResult : fixTrace) {
             fixTraceNode.add(objectMapper.valueToTree(fixResult));
         }
-        ObjectNode internalCheckpoints = resultJson.has("internalCheckpoints")
-                && resultJson.get("internalCheckpoints").isObject()
-                ? (ObjectNode) resultJson.get("internalCheckpoints")
-                : resultJson.putObject("internalCheckpoints");
+        ObjectNode internalCheckpoints = resultJson.has("internal_checkpoints")
+                && resultJson.get("internal_checkpoints").isObject()
+                ? (ObjectNode) resultJson.get("internal_checkpoints")
+                : resultJson.putObject("internal_checkpoints");
         if (latestGeometryReport != null && !latestGeometryReport.isNull()) {
-            internalCheckpoints.set("geometryReport", latestGeometryReport);
+            internalCheckpoints.set("geometry_report", latestGeometryReport);
         }
         MathVisionStageQualityReview.writeState(
                 resultJson,
@@ -530,9 +530,9 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
             stageSuccess = false;
             if (renderResult != null) {
                 renderResult.setArtifactPath(null); renderResult.setVideoPath(null); renderResult.setLocalArtifactPath(null);
-                resultJson.set("renderResult", objectMapper.valueToTree(renderResult));
-                if (lastRenderResult == renderResult) resultJson.set("lastRenderResult", objectMapper.valueToTree(renderResult));
-                resultJson.putNull("artifactPath"); resultJson.put("success", false);
+                resultJson.set("render_result", objectMapper.valueToTree(renderResult));
+                if (lastRenderResult == renderResult) resultJson.set("last_render_result", objectMapper.valueToTree(renderResult));
+                resultJson.putNull("artifact_path"); resultJson.put("success", false);
             }
         }
         String errorType = StringUtils.hasText(storageError) ? "storage_error" : !stageSuccess ? "render_error" : null;
@@ -598,7 +598,7 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
 
     private int previousApiCalls(MathVisionStageExecutionContext context) {
         JsonNode root = parsePreviousResult(context);
-        return root.path("apiCalls").asInt(0);
+        return root.path("api_calls").asInt(0);
     }
 
     private ObjectNode previousResult(MathVisionStageExecutionContext context) {
@@ -608,8 +608,8 @@ public class RenderResultStageExecutor implements MathVisionStageExecutor {
 
     private JsonNode geometryReportFromResult(MathVisionStageExecutionContext context) {
         JsonNode report = parsePreviousResult(context)
-                .path("internalCheckpoints")
-                .path("geometryReport");
+                .path("internal_checkpoints")
+                .path("geometry_report");
         return report.isMissingNode() || report.isNull() ? null : report.deepCopy();
     }
 

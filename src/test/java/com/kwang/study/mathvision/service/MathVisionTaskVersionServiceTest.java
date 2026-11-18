@@ -66,7 +66,7 @@ class MathVisionTaskVersionServiceTest {
         when(taskMapper.findById(202L)).thenReturn(task);
         when(versionMapper.findByTaskVersion(202L, 1)).thenReturn(MathVisionVersion.builder().taskId(202L).version(1).cgVersion(2).build());
         when(artifactMapper.findByTaskStageVersion(202L, "code_generation", 2)).thenReturn(
-                MathVisionArtifact.builder().artifactJson("{\"generatedCode\":\"newer\"}").build());
+                MathVisionArtifact.builder().artifactJson("{\"generated_code\":\"newer\"}").build());
         var request = new com.kwang.study.mathvision.dto.StageContentSaveRequestDTO();
         request.setVersion(2); request.setBaseEtag(com.kwang.study.mathvision.util.MathVisionContentTag.of("old content"));
         request.setContent(new ObjectMapper().createObjectNode().put("generatedCode", "old edit"));
@@ -133,7 +133,7 @@ class MathVisionTaskVersionServiceTest {
         when(versionMapper.findByTask(21L)).thenReturn(List.of(v2, v1));
         when(artifactMapper.findByTaskStageVersion(21L, "render_result", 1))
                 .thenReturn(artifact(21L, "render_result", 1,
-                        "{\"success\":true,\"artifactPath\":\"/mathvision/task-21/v2.mp4\",\"artifactType\":\"mp4\"}"));
+                        "{\"success\":true,\"artifact_path\":\"/mathvision/task-21/v2.mp4\",\"artifact_type\":\"mp4\"}"));
 
         List<MathVisionVersionItemVO> versions = service.listTaskVersions(21L);
 
@@ -160,7 +160,7 @@ class MathVisionTaskVersionServiceTest {
                 .thenReturn(artifact(22L, "visual_storyboard", 4, "{\"scenes\":[]}"));
         when(artifactMapper.findByTaskStageVersion(22L, "code_generation", 5))
                 .thenReturn(artifact(22L, "code_generation", 5,
-                        "{\"generatedCode\":\"print('V3')\",\"artifactFormat\":\"python\"}"));
+                        "{\"generated_code\":\"print('V3')\",\"artifact_format\":\"python\"}"));
 
         MathVisionVersionDetailVO detail = service.getTaskVersionDetail(22L, 3);
 
@@ -236,7 +236,7 @@ class MathVisionTaskVersionServiceTest {
         when(versionMapper.setCurrent(25L, 2)).thenReturn(1);
         when(artifactMapper.findByTaskStageVersion(25L, "render_result", 4))
                 .thenReturn(artifact(25L, "render_result", 4,
-                        "{\"success\":true,\"artifactPath\":\"/mathvision/task-25/v2.html\",\"artifactType\":\"html\"}"));
+                        "{\"success\":true,\"artifact_path\":\"/mathvision/task-25/v2.html\",\"artifact_type\":\"html\"}"));
         when(taskMapper.activateVersionState(
                 25L, USER_ID, 2, "completed", "completed", "render_result",
                 null, null, null, "/mathvision/task-25/v2.html", "html")).thenReturn(1);
@@ -496,7 +496,7 @@ class MathVisionTaskVersionServiceTest {
         when(versionMapper.findCurrent(38L)).thenReturn(version(38L, 1, 1, 1, 1, 1, 1));
         when(artifactMapper.findByTaskStageVersion(38L, stage, 1)).thenReturn(artifact(38L, stage, 1, "{}"));
         var pending = com.kwang.study.mathvision.pojo.MathVisionStageResult.builder()
-                .id(380L).taskId(38L).stage(stage).version(1).resultJson("{\"qualityReview\":{\"status\":\"pending\"}}").build();
+                .id(380L).taskId(38L).stage(stage).version(1).resultJson("{\"quality_review\":{\"status\":\"pending\"}}").build();
         when(stageResultMapper.findByTaskStageVersion(38L, stage, 1)).thenReturn(pending);
         when(taskMapper.queueTaskForRun(38L, USER_ID, stage, null)).thenReturn(1);
         var request = new MathVisionTaskRuntimeSettingsRequestDTO(); request.setMode("auto");

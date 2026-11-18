@@ -82,16 +82,16 @@ public class ReasoningGraphStageExecutor implements MathVisionStageExecutor {
                 MathEnrichmentNode.Result::getApiCalls);
 
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", explorationResult.getApiCalls() + enrichmentResult.getApiCalls());
-        resultJson.put("resolvedInputMode", explorationResult.getResolvedInputMode());
-        resultJson.put("nodeCount", graph.countNodes());
-        resultJson.put("edgeCount", graph.countEdges());
-        resultJson.put("maxDepth", graph.getMaxDepth());
-        resultJson.put("enrichedCount", enrichmentResult.getEnrichedCount());
-        resultJson.put("skippedCount", enrichmentResult.getSkippedCount());
-        ObjectNode checkpoints = resultJson.putObject("internalCheckpoints");
-        checkpoints.set("explorationGraph", explorationCheckpoint);
-        checkpoints.set("enrichedGraph", objectMapper.valueToTree(graph));
+        resultJson.put("api_calls", explorationResult.getApiCalls() + enrichmentResult.getApiCalls());
+        resultJson.put("resolved_input_mode", explorationResult.getResolvedInputMode());
+        resultJson.put("node_count", graph.countNodes());
+        resultJson.put("edge_count", graph.countEdges());
+        resultJson.put("max_depth", graph.getMaxDepth());
+        resultJson.put("enriched_count", enrichmentResult.getEnrichedCount());
+        resultJson.put("skipped_count", enrichmentResult.getSkippedCount());
+        ObjectNode checkpoints = resultJson.putObject("internal_checkpoints");
+        checkpoints.set("exploration_graph", explorationCheckpoint);
+        checkpoints.set("enriched_graph", objectMapper.valueToTree(graph));
 
         return MathVisionStageExecutionResult.builder()
                 .artifactJson(toPrettyJson(graph))

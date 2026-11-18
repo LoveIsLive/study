@@ -1,5 +1,6 @@
 package com.kwang.study.mathvision.workflow.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -13,36 +14,40 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class CodeResult {
 
-    @JsonProperty("generatedCode")
+    @JsonProperty("generated_code")
     private String generatedCode;
 
+    @JsonProperty("header_code")
     private String headerCode;
 
+    @JsonProperty("scene_entries")
     private List<SceneCodeEntry> sceneEntries = new ArrayList<>();
 
-    @JsonProperty("sceneName")
+    @JsonProperty("scene_name")
     private String sceneName;
 
     @JsonProperty("description")
     private String description;
 
-    @JsonProperty("outputTarget")
+    @JsonProperty("output_target")
     private String outputTarget = "manim";
 
-    @JsonProperty("artifactFormat")
+    @JsonProperty("artifact_format")
     private String artifactFormat = "python";
 
-    @JsonProperty("artifactName")
+    @JsonProperty("artifact_name")
     private String artifactName;
 
+    @JsonProperty("target_concept")
     private String targetConcept = "";
 
+    @JsonProperty("target_description")
     private String targetDescription = "";
 
-    @JsonProperty("toolCalls")
+    @JsonProperty("tool_calls")
     private int toolCalls;
 
-    @JsonProperty("executionTimeSeconds")
+    @JsonProperty("execution_time_seconds")
     private double executionTimeSeconds;
 
     public boolean hasCode() {
@@ -53,10 +58,12 @@ public class CodeResult {
         return hasCode() ? generatedCode.split("\\R").length : 0;
     }
 
+    @JsonIgnore
     public boolean isGeoGebraTarget() {
         return "geogebra".equalsIgnoreCase(outputTarget);
     }
 
+    @JsonIgnore
     public boolean isManimTarget() {
         return !isGeoGebraTarget();
     }

@@ -53,10 +53,10 @@ public class ProblemNormalizationStageExecutor implements MathVisionStageExecuto
         ProblemBundle problemBundle = nodeResult.getProblemBundle();
 
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", nodeResult.getApiCalls());
-        resultJson.put("sourceType", nodeResult.getSourceType());
-        resultJson.put("imageCount", nodeResult.getImageCount());
-        resultJson.put("statementLength", nodeResult.getStatementLength());
+        resultJson.put("api_calls", nodeResult.getApiCalls());
+        resultJson.put("source_type", nodeResult.getSourceType());
+        resultJson.put("image_count", nodeResult.getImageCount());
+        resultJson.put("statement_length", nodeResult.getStatementLength());
 
         return MathVisionStageExecutionResult.builder()
                 .artifactJson(toPrettyJson(problemBundle))

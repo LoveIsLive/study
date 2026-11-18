@@ -135,9 +135,9 @@ public class MathVisionStageRunner {
                     var writeback = finalCodeService.persistFinalCode(task, result.getFinalRenderedCode());
                     try {
                         var metadata = (com.fasterxml.jackson.databind.node.ObjectNode) resultMapper.readTree(result.getResultJson());
-                        metadata.put("finalCodeWritebackUpdated", writeback.isUpdated());
-                        metadata.put("finalCodePreviousStageVersion", writeback.getPreviousVersion());
-                        metadata.put("finalCodeStageVersion", writeback.getFinalVersion());
+                        metadata.put("final_code_writeback_updated", writeback.isUpdated());
+                        metadata.put("final_code_previous_stage_version", writeback.getPreviousVersion());
+                        metadata.put("final_code_stage_version", writeback.getFinalVersion());
                         result.setResultJson(metadata.toString());
                     } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid render result metadata", invalid); }
                 }

@@ -13,43 +13,43 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class CodeEvaluationResult {
 
-    @JsonProperty("totalEvaluations")
+    @JsonProperty("total_evaluations")
     private int totalEvaluations;
 
-    @JsonProperty("approvedForRender")
+    @JsonProperty("approved_for_render")
     private boolean approvedForRender;
 
-    @JsonProperty("revisionTriggered")
+    @JsonProperty("revision_triggered")
     private boolean revisionTriggered;
 
-    @JsonProperty("revisedCodeApplied")
+    @JsonProperty("revised_code_applied")
     private boolean revisedCodeApplied;
 
-    @JsonProperty("revisionAttempts")
+    @JsonProperty("revision_attempts")
     private int revisionAttempts;
 
-    @JsonProperty("toolCalls")
+    @JsonProperty("tool_calls")
     private int toolCalls;
 
-    @JsonProperty("gateReason")
+    @JsonProperty("gate_reason")
     private String gateReason;
 
-    @JsonProperty("sceneName")
+    @JsonProperty("scene_name")
     private String sceneName;
 
-    @JsonProperty("initialStaticAnalysis")
+    @JsonProperty("initial_static_analysis")
     private StaticAnalysis initialStaticAnalysis;
 
-    @JsonProperty("finalStaticAnalysis")
+    @JsonProperty("final_static_analysis")
     private StaticAnalysis finalStaticAnalysis;
 
-    @JsonProperty("initialReview")
+    @JsonProperty("initial_review")
     private ReviewSnapshot initialReview;
 
-    @JsonProperty("finalReview")
+    @JsonProperty("final_review")
     private ReviewSnapshot finalReview;
 
-    @JsonProperty("executionTimeSeconds")
+    @JsonProperty("execution_time_seconds")
     private double executionTimeSeconds;
 
     @JsonProperty("attempts")
@@ -61,13 +61,13 @@ public class CodeEvaluationResult {
     public static class EvaluationAttempt {
         @JsonProperty("sequence")
         private int sequence;
-        @JsonProperty("approvedForRender")
+        @JsonProperty("approved_for_render")
         private boolean approvedForRender;
-        @JsonProperty("gateReason")
+        @JsonProperty("gate_reason")
         private String gateReason;
-        @JsonProperty("sceneName")
+        @JsonProperty("scene_name")
         private String sceneName;
-        @JsonProperty("staticAnalysis")
+        @JsonProperty("static_analysis")
         private StaticAnalysis staticAnalysis;
         @JsonProperty("review")
         private ReviewSnapshot review;
@@ -77,37 +77,55 @@ public class CodeEvaluationResult {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class StaticAnalysis {
-        @JsonProperty("codeLines")
+        @JsonProperty("code_lines")
         private int codeLines;
-        @JsonProperty("sceneCount")
+        @JsonProperty("scene_count")
         private int sceneCount;
+        @JsonProperty("to_edge_count")
         private int toEdgeCount;
+        @JsonProperty("shift_count")
         private int shiftCount;
+        @JsonProperty("large_shift_count")
         private int largeShiftCount;
+        @JsonProperty("fade_in_count")
         private int fadeInCount;
+        @JsonProperty("fade_out_count")
         private int fadeOutCount;
+        @JsonProperty("transform_count")
         private int transformCount;
+        @JsonProperty("replacement_transform_count")
         private int replacementTransformCount;
+        @JsonProperty("fade_transform_count")
         private int fadeTransformCount;
+        @JsonProperty("arrange_count")
         private int arrangeCount;
+        @JsonProperty("next_to_count")
         private int nextToCount;
-        @JsonProperty("className")
+        @JsonProperty("class_name")
         private String className;
-        @JsonProperty("usesManimImport")
+        @JsonProperty("uses_manim_import")
         private boolean usesManimImport;
-        @JsonProperty("hasConstruct")
+        @JsonProperty("has_construct")
         private boolean hasConstruct;
-        @JsonProperty("mathTexCount")
+        @JsonProperty("math_tex_count")
         private int mathTexCount;
-        @JsonProperty("textCount")
+        @JsonProperty("text_count")
         private int textCount;
+        @JsonProperty("three_dscene")
         private boolean threeDScene;
+        @JsonProperty("three_dstoryboard_scene_count")
         private int threeDStoryboardSceneCount;
+        @JsonProperty("three_dobject_count")
         private int threeDObjectCount;
+        @JsonProperty("max_entering_objects")
         private int maxEnteringObjects;
+        @JsonProperty("max_visible_objects")
         private int maxVisibleObjects;
+        @JsonProperty("max_visible_textual_objects")
         private int maxVisibleTextualObjects;
+        @JsonProperty("max_narration_words_per_second")
         private double maxNarrationWordsPerSecond;
+        @JsonProperty("min_narration_words_per_second")
         private double minNarrationWordsPerSecond;
         @JsonProperty("findings")
         private List<StaticFinding> findings = new ArrayList<>();
@@ -122,7 +140,7 @@ public class CodeEvaluationResult {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class StaticFinding {
-        @JsonProperty("ruleId")
+        @JsonProperty("rule_id")
         private String ruleId;
         @JsonProperty("severity")
         private String severity;
@@ -146,17 +164,17 @@ public class CodeEvaluationResult {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class ReviewSnapshot {
-        @JsonProperty("approvedForRender")
+        @JsonProperty("approved_for_render")
         private boolean approvedForRender;
-        @JsonProperty("ruleChecks")
+        @JsonProperty("rule_checks")
         private List<RuleCheck> ruleChecks = new ArrayList<>();
         @JsonProperty("summary")
         private String summary;
         @JsonProperty("strengths")
         private List<String> strengths = new ArrayList<>();
-        @JsonProperty("blockingIssues")
+        @JsonProperty("blocking_issues")
         private List<String> blockingIssues = new ArrayList<>();
-        @JsonProperty("revisionDirectives")
+        @JsonProperty("revision_directives")
         private List<String> revisionDirectives = new ArrayList<>();
     }
 
@@ -166,7 +184,7 @@ public class CodeEvaluationResult {
     public static class RuleCheck {
         @JsonProperty("severity")
         private String severity;
-        @JsonProperty("ruleId")
+        @JsonProperty("rule_id")
         private String ruleId;
         @JsonProperty("requirement")
         private String requirement;

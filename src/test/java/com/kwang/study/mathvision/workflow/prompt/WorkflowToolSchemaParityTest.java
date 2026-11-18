@@ -63,24 +63,24 @@ class WorkflowToolSchemaParityTest {
     void codeGenerationAndCodeFixUseTheSameUpstreamContracts() throws Exception {
         JsonNode manim = function(ToolSchemas.MANIM_CODE);
         assertEquals("write_manim_code", manim.path("name").asText());
-        assertEquals(Set.of("description", "manimCode", "scene_name"), propertyNames(manim));
-        assertEquals(Set.of("manimCode"), stringValues(manim.path("parameters").path("required")));
+        assertEquals(Set.of("description", "manim_code", "scene_name"), propertyNames(manim));
+        assertEquals(Set.of("manim_code"), stringValues(manim.path("parameters").path("required")));
         assertFalse(manim.path("parameters").has("additionalProperties"));
 
         JsonNode geogebra = function(ToolSchemas.GEOGEBRA_CODE);
         assertEquals("write_geogebra_code", geogebra.path("name").asText());
         assertEquals(
-                Set.of("artifact_format", "description", "figure_name", "geogebraCode"),
+                Set.of("artifact_format", "description", "figure_name", "geogebra_code"),
                 propertyNames(geogebra));
-        assertEquals(Set.of("geogebraCode"), stringValues(geogebra.path("parameters").path("required")));
+        assertEquals(Set.of("geogebra_code"), stringValues(geogebra.path("parameters").path("required")));
     }
 
     @Test
     void sceneCodeAndCodeReviewUseUpstreamFieldNames() throws Exception {
         JsonNode scene = function(ToolSchemas.SCENE_CODE);
         assertEquals("write_scene_code", scene.path("name").asText());
-        assertEquals(Set.of("sceneCode"), propertyNames(scene));
-        assertEquals(Set.of("sceneCode"), stringValues(scene.path("parameters").path("required")));
+        assertEquals(Set.of("scene_code"), propertyNames(scene));
+        assertEquals(Set.of("scene_code"), stringValues(scene.path("parameters").path("required")));
 
         JsonNode review = function(ToolSchemas.CODE_REVIEW);
         assertEquals("write_code_review", review.path("name").asText());
@@ -124,10 +124,14 @@ class WorkflowToolSchemaParityTest {
     private void assertGraphContract(String schema, String functionName) throws Exception {
         JsonNode graph = function(schema);
         assertEquals(functionName, graph.path("name").asText());
-        assertEquals(Set.of("next_edges", "nodes", "start_id", "teaching_order"), propertyNames(graph));
+        assertEquals(Set.of("next_edges", "nodes", "start_node_id", "teaching_order"), propertyNames(graph));
         assertEquals(
-                Set.of("next_edges", "nodes", "start_id", "teaching_order"),
+                Set.of("next_edges", "nodes", "start_node_id", "teaching_order"),
                 stringValues(graph.path("parameters").path("required")));
+        // nodes is an object keyed by node id, matching the persisted KnowledgeGraph.
+        JsonNode nodes = graph.path("parameters").path("properties").path("nodes");
+        assertEquals("object", nodes.path("type").asText());
+        assertTrue(nodes.path("additionalProperties").path("properties").has("id"));
     }
 
     private Set<String> propertyNames(JsonNode function) {

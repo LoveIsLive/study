@@ -1846,13 +1846,13 @@ public class MathVisionTaskService {
         String error = render != null ? render.getLastError() : null;
         if (result != null) {
             if (!StringUtils.hasText(path)) {
-                path = result.path("artifactPath").asText(null);
+                path = result.path("artifact_path").asText(null);
             }
             if (!StringUtils.hasText(type)) {
-                type = result.path("artifactType").asText(null);
+                type = result.path("artifact_type").asText(null);
             }
             if (!StringUtils.hasText(error)) {
-                error = result.path("sceneEvaluation").path("gateReason").asText(null);
+                error = result.path("scene_evaluation").path("gate_reason").asText(null);
             }
         }
         return new RenderMetadata(success, path, type, error);

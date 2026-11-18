@@ -37,7 +37,7 @@ public class MathVisionArtifactReceipt {
             var version = versions.findByTaskVersion(task.getId(), task.getCurrentVersion());
             if (version != null && version.getRrVersion() != null) {
                 var artifact = artifacts.findByTaskStageVersion(task.getId(), "render_result", version.getRrVersion());
-                if (artifact != null && path != null && path.equals(json.readTree(artifact.getArtifactJson()).path("artifactPath").asText())) return;
+                if (artifact != null && path != null && path.equals(json.readTree(artifact.getArtifactJson()).path("artifact_path").asText())) return;
             }
             if (receipt == null) throw new IllegalArgumentException("Missing artifact receipt");
             String[] parts = receipt.split("\\.");

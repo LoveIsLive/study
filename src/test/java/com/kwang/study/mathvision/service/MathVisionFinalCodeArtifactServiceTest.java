@@ -72,7 +72,7 @@ class MathVisionFinalCodeArtifactServiceTest {
                 .taskId(91L)
                 .stage(StageEnum.CODE_GENERATION.getCode())
                 .version(2)
-                .resultJson("{\"codeEvaluationApproved\":false,\"codeEvaluationWarning\":true}")
+                .resultJson("{\"code_evaluation_approved\":false,\"code_evaluation_warning\":true}")
                 .build();
         when(stageResultMapper.findByArtifactId(101L)).thenReturn(currentResult);
         doAnswer(invocation -> { invocation.getArgument(0, MathVisionArtifact.class).setId(202L); return null; })
@@ -103,9 +103,9 @@ class MathVisionFinalCodeArtifactServiceTest {
         ArgumentCaptor<MathVisionStageResult> resultCaptor = ArgumentCaptor.forClass(MathVisionStageResult.class);
         verify(stageResultMapper).insert(resultCaptor.capture());
         JsonNode copiedResult = objectMapper.readTree(resultCaptor.getValue().getResultJson());
-        assertTrue(copiedResult.path("codeEvaluationWarning").asBoolean());
-        assertTrue(copiedResult.path("finalCodeUpdatedFromRender").asBoolean());
-        assertEquals(3, copiedResult.path("finalCodeStageVersion").asInt());
+        assertTrue(copiedResult.path("code_evaluation_warning").asBoolean());
+        assertTrue(copiedResult.path("final_code_updated_from_render").asBoolean());
+        assertEquals(3, copiedResult.path("final_code_stage_version").asInt());
         verify(artifactMapper, never()).updateArtifactJson(any());
         verify(versionMapper).updateStagePointer(91L, 4, "code_generation", 3);
     }

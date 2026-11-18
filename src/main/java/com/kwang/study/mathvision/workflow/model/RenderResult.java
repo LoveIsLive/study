@@ -13,51 +13,52 @@ public class RenderResult {
     @JsonProperty("success")
     private boolean success;
 
-    @JsonProperty("finalGeneratedCode")
+    @JsonProperty("final_generated_code")
     private String finalGeneratedCode;
 
-    @JsonProperty("sceneName")
+    @JsonProperty("scene_name")
     private String sceneName;
 
-    @JsonProperty("videoPath")
+    @JsonProperty("video_path")
     private String videoPath;
 
-    @JsonProperty("artifactPath")
+    @JsonProperty("artifact_path")
     private String artifactPath;
 
-    @JsonProperty("storageArtifactPath")
+    @JsonProperty("storage_artifact_path")
     private String storageArtifactPath;
 
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonProperty("artifact_receipt")
     private String artifactReceipt;
 
-    @JsonProperty("localArtifactPath")
+    @JsonProperty("local_artifact_path")
     private String localArtifactPath;
 
-    @JsonProperty("artifactFileName")
+    @JsonProperty("artifact_file_name")
     private String artifactFileName;
 
-    @JsonProperty("artifactMimeType")
+    @JsonProperty("artifact_mime_type")
     private String artifactMimeType;
 
-    @JsonProperty("geometryPath")
+    @JsonProperty("geometry_path")
     private String geometryPath;
 
-    @JsonProperty("outputTarget")
+    @JsonProperty("output_target")
     private String outputTarget = "manim";
 
-    @JsonProperty("artifactType")
+    @JsonProperty("artifact_type")
     private String artifactType;
 
     @JsonProperty("attempts")
     private int attempts;
 
-    @JsonProperty("lastError")
+    @JsonProperty("last_error")
     private String lastError;
 
-    @JsonProperty("toolCalls")
+    @JsonProperty("tool_calls")
     private int toolCalls;
 
-    @JsonProperty("executionTimeSeconds")
+    @JsonProperty("execution_time_seconds")
     private double executionTimeSeconds;
 }

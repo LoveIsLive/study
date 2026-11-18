@@ -174,15 +174,15 @@ class RenderResultStageExecutorTest {
 
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertTrue(resultJson.path("success").asBoolean());
-        assertTrue(resultJson.path("renderSuccess").asBoolean());
-        assertFalse(resultJson.path("sceneEvaluationApproved").asBoolean());
-        assertFalse(resultJson.path("sceneEvaluationWarning").asBoolean());
-        assertEquals("pending", resultJson.path("qualityReview").path("status").asText());
-        assertEquals("medium", resultJson.path("renderQuality").asText());
-        assertEquals(7, resultJson.path("renderMaxRetries").asInt());
-        assertEquals(2, resultJson.path("sceneEvaluationMaxRetries").asInt());
+        assertTrue(resultJson.path("render_success").asBoolean());
+        assertFalse(resultJson.path("scene_evaluation_approved").asBoolean());
+        assertFalse(resultJson.path("scene_evaluation_warning").asBoolean());
+        assertEquals("pending", resultJson.path("quality_review").path("status").asText());
+        assertEquals("medium", resultJson.path("render_quality").asText());
+        assertEquals(7, resultJson.path("render_max_retries").asInt());
+        assertEquals(2, resultJson.path("scene_evaluation_max_retries").asInt());
         assertEquals("/mathvision/task-42/v3/final/final.mp4",
-                resultJson.path("artifactPath").asText());
+                resultJson.path("artifact_path").asText());
 
         verify(renderNode, times(1)).run(eq(task), any(CodeResult.class), eq(narrative),
                 any(RenderNode.RenderRetryState.class), anyString(), anyInt(), any(Path.class),
@@ -191,8 +191,8 @@ class RenderResultStageExecutorTest {
                 any(RenderResult.class), anyInt(), any(MathVisionStageExecutionContext.class));
         verify(codeFixNode, times(0)).run(
                 eq(task), any(), any(MathVisionStageExecutionContext.class), anyList());
-        assertEquals(0, resultJson.path("sceneFixConversationMessages").asInt());
-        assertEquals(0, resultJson.path("sceneFixHistoryEntries").asInt());
+        assertEquals(0, resultJson.path("scene_fix_conversation_messages").asInt());
+        assertEquals(0, resultJson.path("scene_fix_history_entries").asInt());
         verify(fileStorageService).createFile(
                 eq("/mathvision/task-42/v3/final/final.mp4"),
                 any(InputStream.class), eq("video/mp4"));
@@ -309,8 +309,8 @@ class RenderResultStageExecutorTest {
                         .task(task)
                         .stage(StageEnum.RENDER_RESULT)
                         .qualityReviewRequested(true)
-                        .existingStageResultJson("{\"apiCalls\":0,\"internalCheckpoints\":"
-                                + "{\"geometryReport\":{\"samples\":[]}},\"qualityReview\":"
+                        .existingStageResultJson("{\"api_calls\":0,\"internal_checkpoints\":"
+                                + "{\"geometry_report\":{\"samples\":[]}},\"quality_review\":"
                                 + "{\"status\":\"requested\"}}")
                         .build());
 
@@ -318,11 +318,11 @@ class RenderResultStageExecutorTest {
         assertTrue(result.isWaitForUserDecision());
         assertEquals(storedVideoPath, result.getFinalArtifactPath());
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
-        assertTrue(resultJson.path("renderEverSucceeded").asBoolean());
-        assertFalse(resultJson.path("renderFinalSuccess").asBoolean());
-        assertTrue(resultJson.path("renderResult").path("success").asBoolean());
-        assertFalse(resultJson.path("lastRenderResult").path("success").asBoolean());
-        assertEquals("completed", resultJson.path("qualityReview").path("status").asText());
+        assertTrue(resultJson.path("render_ever_succeeded").asBoolean());
+        assertFalse(resultJson.path("render_final_success").asBoolean());
+        assertTrue(resultJson.path("render_result").path("success").asBoolean());
+        assertFalse(resultJson.path("last_render_result").path("success").asBoolean());
+        assertEquals("completed", resultJson.path("quality_review").path("status").asText());
         assertEquals(null, uploadedVideo.get());
         verify(finalCodeArtifactService, times(0)).persistFinalCode(eq(task), any(RenderResult.class));
         verify(renderNode, times(1)).run(eq(task), any(CodeResult.class), eq(narrative),
@@ -406,7 +406,7 @@ class RenderResultStageExecutorTest {
         }
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
         assertFalse(resultJson.path("success").asBoolean());
-        assertEquals("archive unavailable", resultJson.path("artifactStorageWarning").asText());
+        assertEquals("archive unavailable", resultJson.path("artifact_storage_warning").asText());
     }
 
     @Test
@@ -498,7 +498,7 @@ class RenderResultStageExecutorTest {
         assertEquals("user", conversationSnapshots.get(1).get(0).getRole());
         assertEquals("assistant", conversationSnapshots.get(1).get(1).getRole());
         JsonNode resultJson = objectMapper.readTree(result.getResultJson());
-        assertEquals(4, resultJson.path("renderFixConversationMessages").asInt());
+        assertEquals(4, resultJson.path("render_fix_conversation_messages").asInt());
         assertFalse(Files.exists(tempDir.resolve("runs/task-44/v1/render")));
     }
 

@@ -81,11 +81,11 @@ class CodeGenerationNodeTest {
                 .baseStageVersion(7)
                 .build();
         ObjectNode payload = objectMapper.createObjectNode()
-                .put("manimCode", "class MainScene(Scene):\n    # revised complete program\n    pass")
+                .put("manim_code", "class MainScene(Scene):\n    # revised complete program\n    pass")
                 .put("scene_name", "MainScene")
                 .put("description", "revised complete animation");
         when(aiChatService.requestCode(eq(task), anyList(), anyString(), anyList()))
-                .thenReturn(codeResponse(payload, payload.path("manimCode").asText()));
+                .thenReturn(codeResponse(payload, payload.path("manim_code").asText()));
 
         CodeGenerationNode.Result result = node.run(task, bundle, narrative, request, context);
 
@@ -114,7 +114,7 @@ class CodeGenerationNodeTest {
         assertTrue(userPrompt.contains("scene_2"));
         assertTrue(userPrompt.contains("Return the complete executable Python/Manim file"));
         assertEquals(ToolSchemas.MANIM_CODE, schemaCaptor.getValue());
-        assertEquals(List.of("manimCode"), fieldsCaptor.getValue());
+        assertEquals(List.of("manim_code"), fieldsCaptor.getValue());
         assertTrue(messageText(messages.get(2)).contains("放慢第二个场景"));
     }
 
@@ -146,10 +146,10 @@ class CodeGenerationNodeTest {
                 .instruction("Move point A back to the origin.")
                 .build();
         ObjectNode payload = objectMapper.createObjectNode()
-                .put("geogebraCode", "A = (0, 0)")
+                .put("geogebra_code", "A = (0, 0)")
                 .put("figure_name", "MathVisionFigure");
         when(aiChatService.requestCode(eq(task), anyList(), anyString(), anyList()))
-                .thenReturn(codeResponse(payload, payload.path("geogebraCode").asText()));
+                .thenReturn(codeResponse(payload, payload.path("geogebra_code").asText()));
 
         CodeGenerationNode.Result result = node.run(task, bundle, narrative, request, context);
 
@@ -161,18 +161,18 @@ class CodeGenerationNodeTest {
         verify(aiChatService).requestCode(
                 eq(task), anyList(), schemaCaptor.capture(), fieldsCaptor.capture());
         assertEquals(ToolSchemas.GEOGEBRA_CODE, schemaCaptor.getValue());
-        assertEquals(List.of("geogebraCode"), fieldsCaptor.getValue());
+        assertEquals(List.of("geogebra_code"), fieldsCaptor.getValue());
     }
 
     @Test
     void singleSceneUsesUpstreamPromptAndToolContract() throws Exception {
         Narrative narrative = new Narrative("single scene target", oneSceneStoryboard());
         ObjectNode payload = objectMapper.createObjectNode()
-                .put("manimCode", "class MainScene(Scene):\n    def construct(self):\n        pass")
+                .put("manim_code", "class MainScene(Scene):\n    def construct(self):\n        pass")
                 .put("scene_name", "MainScene")
                 .put("description", "single scene");
         when(aiChatService.requestCode(eq(task), anyList(), anyString(), anyList()))
-                .thenReturn(codeResponse(payload, payload.path("manimCode").asText()));
+                .thenReturn(codeResponse(payload, payload.path("manim_code").asText()));
 
         CodeGenerationNode.Result result = node.run(task, bundle, narrative, context);
 
@@ -190,7 +190,7 @@ class CodeGenerationNodeTest {
         assertTrue(messageText(messages.get(1)).contains("Stage 5 / Code Generation"));
         assertTrue(messageText(messages.get(2)).contains("Compact storyboard JSON"));
         assertEquals(ToolSchemas.MANIM_CODE, schemaCaptor.getValue());
-        assertEquals(List.of("manimCode"), fieldsCaptor.getValue());
+        assertEquals(List.of("manim_code"), fieldsCaptor.getValue());
     }
 
     @Test
@@ -325,7 +325,7 @@ class CodeGenerationNodeTest {
                 MathVisionAiChatService.CodeResponse.class.getDeclaredConstructor(
                         JsonNode.class, String.class, String.class, String.class, int.class);
         constructor.setAccessible(true);
-        ObjectNode payload = objectMapper.createObjectNode().put("sceneCode", code);
+        ObjectNode payload = objectMapper.createObjectNode().put("scene_code", code);
         return constructor.newInstance(payload, code, code, "", 1);
     }
 

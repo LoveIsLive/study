@@ -95,8 +95,11 @@ CREATE TABLE `mathvision_tasks` (
 --      problem_normalization -> ProblemBundle
 --      reasoning_graph       -> KnowledgeGraph (dag_graph)
 --      visual_storyboard     -> Narrative
---      code_generation       -> { "format":"python|geogebra_commands", "text":"..." }
---      render_result         -> { "artifactPath":"...", "artifactType":"mp4|html" }
+--      code_generation       -> CodeResult { "generated_code", "header_code", "scene_entries", "scene_name",
+--                                              "output_target", "artifact_format", "artifact_name", ... }
+--      render_result         -> RenderResult { "success", "artifact_path", "artifact_type", "video_path",
+--                                              "final_generated_code", "attempts", "last_error", ... }
+--    所有产物与 stage_results.result_json 的键统一为 snake_case; 旧库用 scripts/migrate_mathvision_json_keys.py 一次性迁移。
 -- -------------------------------------------------------------
 CREATE TABLE `mathvision_artifacts` (
   `id`             BIGINT       NOT NULL AUTO_INCREMENT,

@@ -81,14 +81,14 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         com.fasterxml.jackson.databind.JsonNode visualDesignCheckpoint =
                 objectMapper.valueToTree(narrative).deepCopy();
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", designResult.getApiCalls());
-        resultJson.put("visualDesignApiCalls", designResult.getApiCalls());
-        resultJson.put("sceneCount", narrative.getStoryboard().getScenes().size());
-        resultJson.put("objectCount", narrative.getStoryboard().getObjectRegistry().size());
-        resultJson.put("validationCompleted", false);
-        resultJson.put("sceneMode", designResult.getSceneMode());
-        ObjectNode checkpoints = resultJson.putObject("internalCheckpoints");
-        checkpoints.set("visualDesign", visualDesignCheckpoint);
+        resultJson.put("api_calls", designResult.getApiCalls());
+        resultJson.put("visual_design_api_calls", designResult.getApiCalls());
+        resultJson.put("scene_count", narrative.getStoryboard().getScenes().size());
+        resultJson.put("object_count", narrative.getStoryboard().getObjectRegistry().size());
+        resultJson.put("validation_completed", false);
+        resultJson.put("scene_mode", designResult.getSceneMode());
+        ObjectNode checkpoints = resultJson.putObject("internal_checkpoints");
+        checkpoints.set("visual_design", visualDesignCheckpoint);
         MathVisionStageQualityReview.writeState(
                 resultJson, stage(), MathVisionStageQualityReview.STATUS_PENDING);
 
@@ -120,17 +120,17 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         int previousApiCalls = previousApiCalls(context);
 
         ObjectNode resultJson = objectMapper.createObjectNode();
-        resultJson.put("apiCalls", previousApiCalls + validationResult.getApiCalls());
-        resultJson.put("visualDesignApiCalls", previousApiCalls);
-        resultJson.put("storyboardValidationApiCalls", validationResult.getApiCalls());
-        resultJson.put("sceneCount", validatedNarrative.getStoryboard().getScenes().size());
-        resultJson.put("objectCount", validatedNarrative.getStoryboard().getObjectRegistry().size());
-        resultJson.put("validationCompleted", true);
-        resultJson.put("sceneMode", bundle.getSceneMode());
-        resultJson.set("validationReport", objectMapper.valueToTree(validationResult.getReport()));
-        ObjectNode checkpoints = resultJson.putObject("internalCheckpoints");
-        checkpoints.set("visualDesign", objectMapper.valueToTree(narrative));
-        checkpoints.set("validatedStoryboard", objectMapper.valueToTree(validatedNarrative));
+        resultJson.put("api_calls", previousApiCalls + validationResult.getApiCalls());
+        resultJson.put("visual_design_api_calls", previousApiCalls);
+        resultJson.put("storyboard_validation_api_calls", validationResult.getApiCalls());
+        resultJson.put("scene_count", validatedNarrative.getStoryboard().getScenes().size());
+        resultJson.put("object_count", validatedNarrative.getStoryboard().getObjectRegistry().size());
+        resultJson.put("validation_completed", true);
+        resultJson.put("scene_mode", bundle.getSceneMode());
+        resultJson.set("validation_report", objectMapper.valueToTree(validationResult.getReport()));
+        ObjectNode checkpoints = resultJson.putObject("internal_checkpoints");
+        checkpoints.set("visual_design", objectMapper.valueToTree(narrative));
+        checkpoints.set("validated_storyboard", objectMapper.valueToTree(validatedNarrative));
         MathVisionStageQualityReview.writeState(
                 resultJson, stage(), MathVisionStageQualityReview.STATUS_COMPLETED);
 
@@ -175,7 +175,7 @@ public class VisualStoryboardStageExecutor implements MathVisionStageExecutor {
         }
         try {
             return Math.max(objectMapper.readTree(context.getExistingStageResultJson())
-                    .path("apiCalls").asInt(0), 0);
+                    .path("api_calls").asInt(0), 0);
         } catch (Exception ignored) {
             return 0;
         }

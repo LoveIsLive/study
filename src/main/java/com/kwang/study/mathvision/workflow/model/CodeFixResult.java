@@ -29,45 +29,45 @@ public class CodeFixResult {
     @JsonProperty("source")
     private CodeFixSource source;
 
-    @JsonProperty("originalGeneratedCode")
+    @JsonProperty("original_generated_code")
     private String originalGeneratedCode;
 
-    @JsonProperty("fixedGeneratedCode")
+    @JsonProperty("fixed_generated_code")
     private String fixedGeneratedCode;
 
-    @JsonProperty("errorReason")
+    @JsonProperty("error_reason")
     private String errorReason;
 
-    @JsonProperty("rulesPrompt")
+    @JsonProperty("rules_prompt")
     private String rulesPrompt;
 
-    @JsonProperty("fixedContextPrompt")
+    @JsonProperty("fixed_context_prompt")
     private String fixedContextPrompt;
 
-    @JsonProperty("currentRequestPrompt")
+    @JsonProperty("current_request_prompt")
     private String currentRequestPrompt;
 
-    @JsonProperty("failureReason")
+    @JsonProperty("failure_reason")
     private String failureReason;
 
-    @JsonProperty("postFixStaticAuditIssueCount")
+    @JsonProperty("post_fix_static_audit_issue_count")
     private int postFixStaticAuditIssueCount;
 
-    @JsonProperty("postFixStaticAuditSummary")
+    @JsonProperty("post_fix_static_audit_summary")
     private String postFixStaticAuditSummary;
 
-    @JsonProperty("acceptanceIssues")
+    @JsonProperty("acceptance_issues")
     private List<String> acceptanceIssues = new ArrayList<>();
 
-    @JsonProperty("acceptanceWarnings")
+    @JsonProperty("acceptance_warnings")
     private List<String> acceptanceWarnings = new ArrayList<>();
 
     @JsonProperty("applied")
     private boolean applied;
 
-    @JsonProperty("toolCalls")
+    @JsonProperty("tool_calls")
     private int toolCalls;
 
-    @JsonProperty("executionTimeSeconds")
+    @JsonProperty("execution_time_seconds")
     private double executionTimeSeconds;
 }

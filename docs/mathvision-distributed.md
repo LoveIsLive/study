@@ -115,6 +115,32 @@ DEPLOY_ENV_FILE=/etc/study/worker.env bash deploy-mathvision-worker.sh
 
 脚本沿用 nohup 运行方式；现有 systemd 或其他守护进程管理的服务应先通过原管理器停止，避免守护进程自动拉起旧进程。脚本不会自动执行前面的 SQL、修改 Nacos、创建 MySQL/Redis 服务或生成密钥。保留历史启动包和旧 venv 供回退，需按磁盘容量定期清理不再使用的历史版本。
 
+## Windows Worker 部署
+
+Windows Worker 使用 PowerShell 5.1 脚本：
+
+~~~powershell
+# 仅检查 Java、Python、Git；不停止进程或安装依赖
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-mathvision-worker.ps1 -Check
+
+# 交互输入分支，或显式指定；不会默认部署 main
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-mathvision-worker.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-mathvision-worker.ps1 -Branch release-branch
+
+# 指定部署根和可信 UTF-8 KEY=VALUE 环境文件
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-mathvision-worker.ps1 -Branch release-branch -ProjectBaseDir D:\study-platform -EnvironmentFile D:\study-platform\worker.env
+~~~
+
+不提供分支参数时脚本交互询问，非交互部署必须指定 -Branch；不会默认部署 main。环境文件按字面读取，不执行 PowerShell 代码，也不要提交包含密钥的文件。
+
+脚本先定位并停止本部署或旧版未标记的 Worker，再拉取远程分支快照、构建、准备版本化 Python venv 和 Playwright Chromium，执行 Manim/Chromium 冒烟测试后才启动新 JAR。构建或启动失败时尝试恢复旧 JAR 和旧 venv。它不部署主服务、不安装 MySQL/Redis/Nacos，也不会配置防火墙。默认运行目录为 <PROJECT_BASE_DIR>\mathvision-worker，控制台日志为 worker.log 和 worker-stderr.log，MathVision 滚动日志在 logs\mathvision-workflow.log。
+
+Windows 主机需预先安装 JDK 11+、Git、Python 3.11+、FFmpeg、SoX、带 latex.exe 和 dvisvgm.exe 的 TeX 发行版、Manim 所需 Cairo/Pango 原生运行库及中文字体（例如 Noto Sans CJK SC 或 Microsoft YaHei），并把对应目录加入 PATH。脚本不会用 Chocolatey/WinGet 自动安装系统依赖；缺少原生依赖或冒烟失败时会保留旧 Worker。Python pip 包及 Chromium 会在部署过程中自动准备。-Check 只检查 Java、Python 和 Git，不会停止服务、拉代码、构建或运行完整渲染冒烟；完整依赖在正式替换 Worker 前验证。
+
+如 Worker 由 NSSM、WinSW、Windows 服务或任务计划程序托管，先关闭其自动重启或从对应管理器停止服务，再运行部署脚本；否则外部管理器可能在脚本检查期间重新启动旧 Worker。建议用部署 Worker 的同一 Windows 用户预先安装、测试 Manim/TeX/字体和 Python 环境。
+
+支持设置 JAVA_BIN、PYTHON_BIN、BACKEND_REPO_URL、BACKEND_PROJECT_PATH、APP_WORK_DIR、APP_LOG、APP_ERROR_LOG、LOG_DIR、PYTHON_VENV_DIR、PLAYWRIGHT_BROWSERS_PATH、MATHVISION_RENDER_OUTPUT_ROOT、MATHVISION_GEOGEBRA_CACHE_DIR、MATHVISION_MASTER_URL、MATHVISION_SERVICE_SECRET、WORKER_DB_POOL_SIZE、JAVA_OPTS_VALUE、RUN_TESTS、INSTALL_PLAYWRIGHT、RUN_RENDER_SMOKE。Worker 仍需访问共享 MySQL、Redis、Nacos 和主服务器内部传输接口。
+
 ### 手动构建
 
 ```bash

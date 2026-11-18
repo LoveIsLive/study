@@ -54,15 +54,15 @@ class MathVisionWorkflowSummaryServiceTest {
 
         when(resultMapper.findByTaskStageVersion(91L, StageEnum.CODE_GENERATION.getCode(), 2))
                 .thenReturn(MathVisionStageResult.builder()
-                        .resultJson("{\"apiCalls\":4,\"lineCount\":180,\"codeGenerationAttempts\":2," +
-                                "\"codeEvaluationGateReason\":\"approved\"}")
+                        .resultJson("{\"api_calls\":4,\"line_count\":180,\"code_generation_attempts\":2," +
+                                "\"code_evaluation_gate_reason\":\"approved\"}")
                         .build());
         when(resultMapper.findByTaskStageVersion(91L, StageEnum.RENDER_RESULT.getCode(), 1))
                 .thenReturn(MathVisionStageResult.builder()
-                        .resultJson("{\"apiCalls\":3,\"renderSuccess\":true,\"renderFinalSuccess\":true," +
-                                "\"sceneEvaluationApproved\":true," +
-                                "\"sceneEvaluation\":{\"gateReason\":\"passed\"}," +
-                                "\"renderResult\":{\"attempts\":2,\"artifactPath\":\"/final.mp4\"}}")
+                        .resultJson("{\"api_calls\":3,\"render_success\":true,\"render_final_success\":true," +
+                                "\"scene_evaluation_approved\":true," +
+                                "\"scene_evaluation\":{\"gate_reason\":\"passed\"}," +
+                                "\"render_result\":{\"attempts\":2,\"artifact_path\":\"/final.mp4\"}}")
                         .build());
 
         MathVisionWorkflowSummaryService service = new MathVisionWorkflowSummaryService(
@@ -70,15 +70,15 @@ class MathVisionWorkflowSummaryServiceTest {
         String summary = service.refresh(task);
 
         JsonNode root = mapper.readTree(summary);
-        assertEquals(7, root.path("totalApiCalls").asInt());
-        assertEquals(180, root.path("codeLines").asInt());
-        assertEquals(2, root.path("codeGenerationAttempts").asInt());
-        assertTrue(root.path("renderSuccess").asBoolean());
-        assertEquals("passed", root.path("sceneEvaluationGateReason").asText());
+        assertEquals(7, root.path("total_api_calls").asInt());
+        assertEquals(180, root.path("code_lines").asInt());
+        assertEquals(2, root.path("code_generation_attempts").asInt());
+        assertTrue(root.path("render_success").asBoolean());
+        assertEquals("passed", root.path("scene_evaluation_gate_reason").asText());
 
         ArgumentCaptor<String> summaryCaptor = ArgumentCaptor.forClass(String.class);
         verify(versionMapper).updateWorkflowSummary(org.mockito.ArgumentMatchers.eq(91L),
                 org.mockito.ArgumentMatchers.eq(3), summaryCaptor.capture());
-        assertTrue(summaryCaptor.getValue().contains("\"codeLines\" : 180"));
+        assertTrue(summaryCaptor.getValue().contains("\"code_lines\" : 180"));
     }
 }
